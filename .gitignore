@@ -8,3 +8,8 @@ data/*.txt
 .env
 .venv/.instalado
 .claude/
+
+# Resultados del prototipo (datos ficticios) que sí se publican
+!data/redteam.db
+!data/batallas.jsonl
+!data/campana_a.txt
