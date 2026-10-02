@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# CyberShield AI Defense — arranque en un solo comando.
+# Primera vez: crea .venv, instala dependencias y prepara la BD. Después: solo arranca el servidor.
+set -e
+cd "$(dirname "$0")"
+
+AZUL='\033[1;34m'; VERDE='\033[1;32m'; AMARILLO='\033[1;33m'; ROJO='\033[1;31m'; NC='\033[0m'
+info()  { printf "${AZUL}[i]${NC} %s\n" "$*"; }
+ok()    { printf "${VERDE}[✓]${NC} %s\n" "$*"; }
+aviso() { printf "${AMARILLO}[!]${NC} %s\n" "$*"; }
+falla() { printf "${ROJO}[✗]${NC} %s\n" "$*" >&2; }
+
+MODELOS_RECOMENDADOS=("qwen2.5:7b" "llama3.2:3b")
+DB="data/lab.db"
+
+# ---------- 1. Python 3.11+ ----------
+PY=""
+for c in python3 python; do
+  if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+    PY="$c"; break
+  fi
+done
+if [ -z "$PY" ]; then
+  falla "No se encontró Python 3.11 o superior."
+  echo "    Instálalo desde https://www.python.org/downloads/ y vuelve a ejecutar ./ejecutar" >&2
+  exit 1
+fi
+ok "Python: $($PY --version 2>&1)"
+
+# ---------- 2. Entorno virtual y dependencias ----------
+if [ ! -d .venv ]; then
+  info "Creando entorno virtual (.venv)…"
+  "$PY" -m venv .venv
+fi
+if [ -f .venv/bin/activate ]; then
+  # shellcheck disable=SC1091
+  source .venv/bin/activate
+elif [ -f .venv/Scripts/activate ]; then
+  # shellcheck disable=SC1091
+  source .venv/Scripts/activate
+else
+  falla "No se pudo activar .venv (bórralo con 'rm -rf .venv' y reintenta)."
+  exit 1
+fi
+
+if [ ! -f .venv/.instalado ] || [ requirements.txt -nt .venv/.instalado ] \
+   || ! python -c "import fastapi, uvicorn" >/dev/null 2>&1; then
+  info "Instalando dependencias (solo la primera vez)…"
+  python -m pip install -q --disable-pip-version-check -r requirements.txt
+  touch .venv/.instalado
+  ok "Dependencias instaladas."
+else
+  ok "Dependencias ya instaladas."
+fi
+
+# ---------- 3. Base de datos de ejemplo ----------
+if [ ! -f "$DB" ]; then
+  info "Creando la base de datos ficticia ($DB)…"
+  python -m src.lab.seed
+fi
+
+# ---------- 4. Ollama (opcional) ----------
+if command -v ollama >/dev/null 2>&1; then
+  ok "Ollama encontrado."
+  if LISTA=$(ollama list 2>/dev/null); then
+    FALTAN=()
+    for m in "${MODELOS_RECOMENDADOS[@]}"; do
+      if ! printf '%s\n' "$LISTA" | awk 'NR>1 {print $1}' | grep -Fxq "$m"; then FALTAN+=("$m"); fi
+    done
+    if [ "${#FALTAN[@]}" -gt 0 ]; then
+      aviso "Faltan modelos recomendados: ${FALTAN[*]} (pueden pesar varios GB)."
+      resp="n"
+      read -r -p "¿Descargarlos ahora con 'ollama pull'? (y/n) " resp || resp="n"
+      if [ "$resp" = "y" ] || [ "$resp" = "Y" ]; then
+        for m in "${FALTAN[@]}"; do
+          info "Descargando $m…"
+          ollama pull "$m" || aviso "No se pudo descargar $m; continúo sin él."
+        done
+      else
+        info "Continúo sin descargar modelos."
+      fi
+    else
+      ok "Modelos recomendados disponibles."
+    fi
+  else
+    aviso "Ollama está instalado pero no responde. Inícialo (app de Ollama o 'ollama serve') para usar el modo real."
+  fi
+else
+  aviso "Ollama no está en el PATH: la Batalla IA vs IA y la Prueba manual REAL no funcionarán."
+  echo "    Descárgalo en https://ollama.com/download (la Simulación MOCK sí funciona)."
+fi
+
+# ---------- 5. Servidor ----------
+ok "Arrancando el laboratorio…"
+printf "${VERDE}    Abre: http://localhost:8000${NC}   (Ctrl+C para detener)\n"
+exec python server/app.py

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+data/*.db
+data/*.txt
+*.jsonl
+.DS_Store
+.env
+.venv/.instalado
+.claude/
