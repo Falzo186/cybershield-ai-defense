@@ -13,7 +13,8 @@
     historialTerm: [],
     idxTerm: 0,
     metricas: null,
-    ollama: { disponible: false, modelos: [] },
+    rol: null,            // "rojo" | "azul" | "general" | null (pantalla de selección de equipo)
+    ollama: { atq: { disponible: false, modelos: [] }, def: { disponible: false, modelos: [] } }, // una Ollama por equipo
     origen: null,         // origen de los eventos de la ejecución en curso: "ollama" | "mock" | null
     manualReal: false,    // modo manual: false = MOCK, true = Ollama real
     contadores: { intentos: 0, exitosos: 0, bloqueados: 0, ia: 0 }, // se acumulan ronda a ronda (ERROR no cuenta)
@@ -80,15 +81,26 @@
     else if (estado.corriendo) {
       r = estado.origen === "ollama" ? ["🟢 OLLAMA", "origen-real"]
         : estado.origen === "mock" ? ["🟡 MOCK", "origen-mock"] : ["⏳ INICIANDO…", "origen-wait"];
-    } else r = estado.ollama.disponible ? ["🟢 OLLAMA", "origen-real"] : ["🔴 SIN OLLAMA", "origen-off"];
+    } else r = ollamaListo() ? ["🟢 OLLAMA", "origen-real"] : ["🔴 SIN OLLAMA", "origen-off"];
     R.setOrigen(r[0], r[1]);
   }
 
   // El origen REAL aplica a la batalla y al manual con el interruptor en REAL.
   function usaOllama() { return estado.modo === "batalla" || (estado.modo === "manual" && estado.manualReal); }
 
+  // La batalla necesita la Ollama del atacante Y la del defensor; el manual real solo la del defensor.
+  function ollamaListo() {
+    const o = estado.ollama;
+    return estado.modo === "batalla" ? o.atq.disponible && o.def.disponible : o.def.disponible;
+  }
+
+  // IP/host de la Ollama de cada equipo ("atq" | "def"), guardada solo en ESTE navegador.
+  function hostDe(rol) {
+    return $("host-" + (rol === "def" ? "def" : "atq")).value.trim() || HOST_DEFECTO;
+  }
+
   function aplicarControles() {
-    const sinOllama = usaOllama() && !estado.ollama.disponible;
+    const sinOllama = usaOllama() && !ollamaListo();
     R.setCorriendo(estado.corriendo, sinOllama, "Inicie Ollama");
   }
 
@@ -98,20 +110,33 @@
     actualizarOrigen();
   }
 
-  function aplicarOllama(d) {
-    estado.ollama = { disponible: !!d.disponible, modelos: Array.isArray(d.modelos) ? d.modelos : [] };
-    R.setOllama(estado.ollama);
+  function aplicarOllama(rol, d) {
+    estado.ollama[rol] = { disponible: !!d.disponible, modelos: Array.isArray(d.modelos) ? d.modelos : [] };
+    R.setOllama(rol, estado.ollama[rol]);
     aplicarControles();
     actualizarOrigen();
   }
 
-  async function refrescarModelos() {
+  // Consulta la Ollama del equipo (atq|def) en SU host; avisar=true muestra el resultado (botón "Probar conexión").
+  async function consultarHost(rol, avisar) {
+    const host = hostDe(rol);
+    LS.set(rol === "def" ? "cs_host_def" : "cs_host_atq", host);
     try {
-      const [e, m] = await Promise.all([API.ollamaEstado(), API.ollamaModelos()]);
-      aplicarOllama({ disponible: e.disponible, modelos: m.modelos });
-    } catch (_) {
-      aplicarOllama({ disponible: false, modelos: [] }); // p. ej. servidor mock sin endpoints de Ollama
+      const e = await API.ollamaEstado(host);
+      const m = e.disponible ? await API.ollamaModelos(host) : { modelos: [] };
+      aplicarOllama(rol, { disponible: e.disponible, modelos: m.modelos });
+      if (avisar) {
+        R.toast(e.disponible ? "Conexión OK con " + host + " · " + m.modelos.length + " modelo(s)"
+          : "Sin conexión con " + host + ". ¿Ollama abierto y expuesto en la red (OLLAMA_HOST=0.0.0.0)?");
+      }
+    } catch (err) {
+      aplicarOllama(rol, { disponible: false, modelos: [] }); // p. ej. servidor mock sin endpoints de Ollama
+      if (avisar) R.toast(err.message);
     }
+  }
+
+  function refrescarModelos() {
+    return Promise.all([consultarHost("atq"), consultarHost("def")]);
   }
 
   async function cargarUsuarios() {
@@ -159,7 +184,11 @@
 
   // ---------- eventos SSE ----------
   const handlers = {
-    ollama_estado(d) { aplicarOllama(d); },
+    // El estado difundido es el de la Ollama por defecto del servidor: solo se aplica si coincide con el host de este equipo.
+    ollama_estado(d) {
+      if (d.host && d.host === hostDe("atq")) aplicarOllama("atq", d);
+      if (d.host && d.host === hostDe("def")) aplicarOllama("def", d);
+    },
     ronda_inicio(d) {
       estado.origen = d.origen || "mock";
       actualizarOrigen();
@@ -223,7 +252,10 @@
       reiniciarVista();
       setCorriendo(true);
       try {
-        await API.iniciarBatallaReal({ modelo_atq: atq, modelo_def: def, rondas: n, usuario, intensidad });
+        await API.iniciarBatallaReal({
+          modelo_atq: atq, modelo_def: def, rondas: n, usuario, intensidad,
+          host_atacante: hostDe("atq"), host_defensor: hostDe("def"),
+        });
       } catch (e) {
         setCorriendo(false);
         R.toast(e.message);
@@ -256,9 +288,9 @@
     let cuerpoReal = null;
     if (real) {
       const modelo = R.valorSelect("sel-def"), usuario = R.valorSelect("sel-usuario");
-      if (!estado.ollama.disponible) { R.toast("Inicie Ollama"); return; }
+      if (!ollamaListo()) { R.toast("Inicie Ollama"); return; }
       if (!modelo || !usuario) { R.toast("Seleccione el modelo del defensor y el usuario."); return; }
-      cuerpoReal = { prompt: texto, modelo_def: modelo, usuario };
+      cuerpoReal = { prompt: texto, modelo_def: modelo, usuario, host_atacante: hostDe("atq"), host_defensor: hostDe("def") };
     }
     estado.historialTerm.push(texto);
     estado.idxTerm = estado.historialTerm.length;
@@ -282,16 +314,56 @@
     }
   }
 
+  // ---------- equipo (rol) y persistencia local ----------
+  const ROLES = ["rojo", "azul", "general"];
+  const HOST_DEFECTO = "http://localhost:11434";
+  // Auditoría inicial por equipo (los toggles siguen siendo editables).
+  const FILTROS_POR_ROL = { rojo: ["ATTACKER", "SYSTEM"], azul: ["DEFENDER", "POLICY", "SYSTEM"] };
+  const LS = {
+    get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (_) { /* almacenamiento bloqueado */ } },
+  };
+
+  // ?rol=rojo|azul|general (o el último elegido en este navegador). ?cambiar=1 fuerza la pantalla de selección.
+  function resolverRol() {
+    const p = new URLSearchParams(location.search);
+    if (p.has("cambiar")) return null;
+    let rol = p.get("rol");
+    if (!ROLES.includes(rol)) {
+      rol = LS.get("cs_rol");
+      if (!ROLES.includes(rol)) return null;
+      try { history.replaceState(null, "", "?rol=" + rol); } catch (_) { /* sin history */ }
+    }
+    return rol;
+  }
+
+  function elegirEquipo(rol) {
+    if (!ROLES.includes(rol)) return;
+    LS.set("cs_rol", rol);
+    location.href = location.pathname + "?rol=" + rol; // recarga con la vista elegida
+  }
+
   // ---------- arranque ----------
   function init() {
+    estado.rol = resolverRol();
+    R.setEquipo(estado.rol);
+    R.mostrarSelector(!estado.rol);
+    document.querySelectorAll("[data-equipo]").forEach((b) => b.addEventListener("click", () => elegirEquipo(b.dataset.equipo)));
+    $("host-atq").value = LS.get("cs_host_atq") || HOST_DEFECTO;
+    $("host-def").value = LS.get("cs_host_def") || HOST_DEFECTO;
+    ["atq", "def"].forEach((rol) => $("host-" + rol).addEventListener("change",
+      () => LS.set(rol === "def" ? "cs_host_def" : "cs_host_atq", hostDe(rol))));
+    document.querySelectorAll("[data-probar]").forEach((b) => b.addEventListener("click", () => consultarHost(b.dataset.probar, true)));
+
     R.initPipeline();
     R.initAuditoria();
     R.limpiarDefensor();
-    R.crearFiltros(AGENTES, (ag, on) => R.setFiltro(ag, on));
+    R.crearFiltros(AGENTES, (ag, on) => R.setFiltro(ag, on), FILTROS_POR_ROL[estado.rol]);
     R.setModo(estado.modo);
     R.setAtqEstado("EN ESPERA", false);
     R.setDefEstado("PROTEGIENDO BD", true);
-    R.setOllama(estado.ollama);
+    R.setOllama("atq", estado.ollama.atq);
+    R.setOllama("def", estado.ollama.def);
     actualizarOrigen();
 
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => cambiarModo(t.dataset.modo)));

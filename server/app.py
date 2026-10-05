@@ -5,10 +5,13 @@ Los eventos de la batalla real se traducen desde el dict de src/lab/motor.py; na
 si Ollama falla, la ronda se reporta como ERROR y no entra en las métricas.
 """
 import asyncio
+import ipaddress
 import json
 import os
+import socket
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
@@ -36,14 +39,41 @@ async def _hilo(fn, *args):
     return await asyncio.get_running_loop().run_in_executor(None, lambda: fn(*args))
 
 
-async def _estado_completo():
-    disponible = await _hilo(cliente_ollama.ollama_disponible, HOST)
-    modelos = await _hilo(cliente_ollama.listar_modelos, HOST) if disponible else []
+def _normalizar_host(h):
+    """Valida y normaliza el host de una Ollama (p. ej. http://192.168.1.50:11434).
+
+    Como el servidor es abierto en la LAN, solo se aceptan destinos de red local (privados, loopback o
+    link-local): evita que el servidor sirva de puente hacia internet u otros destinos."""
+    h = (h or HOST).strip()
+    if "://" not in h:
+        h = "http://" + h
+    u = urlparse(h)
+    if u.scheme not in ("http", "https") or not u.hostname or u.username or u.password \
+            or u.path not in ("", "/") or u.query or u.fragment:
+        raise ValueError("Host inválido: use el formato http://IP:puerto")
+    puerto = u.port or 11434
+    try:
+        infos = socket.getaddrinfo(u.hostname, puerto, proto=socket.IPPROTO_TCP)
+    except OSError:
+        raise ValueError(f"No se pudo resolver el host {u.hostname}") from None
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0].split("%")[0])
+        if not (ip.is_private or ip.is_loopback or ip.is_link_local):
+            raise ValueError("Solo se permiten hosts de red local (IP privada o localhost).")
+    nombre = f"[{u.hostname}]" if ":" in u.hostname else u.hostname
+    return f"{u.scheme}://{nombre}:{puerto}"
+
+
+async def _estado_completo(host=None):
+    host = host or HOST
+    disponible = await _hilo(cliente_ollama.ollama_disponible, host)
+    modelos = await _hilo(cliente_ollama.listar_modelos, host) if disponible else []
     return {"disponible": disponible, "modelos": modelos}
 
 
 async def _hook_conexion():
-    return "event: ollama_estado\ndata: " + json.dumps(await _estado_completo(), ensure_ascii=False) + "\n\n"
+    est = {**await _estado_completo(), "host": HOST}
+    return "event: ollama_estado\ndata: " + json.dumps(est, ensure_ascii=False) + "\n\n"
 
 
 ms.ON_CONEXION.append(_hook_conexion)
@@ -61,18 +91,33 @@ class BatallaRealIn(BaseModel):
     rondas: int = Field(6, ge=1, le=50)
     usuario: str = Field("ana.perez", min_length=1, max_length=50)
     intensidad: int = Field(2, ge=1, le=3)  # 1 directo · 2 con contexto y rol · 3 sofisticado
+    host_atacante: str = Field("http://localhost:11434", max_length=200)  # Ollama del equipo rojo
+    host_defensor: str = Field("http://localhost:11434", max_length=200)  # Ollama del equipo azul
+
+
+def _error400(msg):
+    return JSONResponse({"error": msg, "mensaje": msg}, status_code=400)
 
 
 @app.get("/api/ollama/estado")
-async def ollama_estado():
-    return {"disponible": await _hilo(cliente_ollama.ollama_disponible, HOST), "host": HOST}
+async def ollama_estado(host: str | None = None):
+    try:
+        h = await _hilo(_normalizar_host, host)
+    except ValueError as exc:
+        return _error400(str(exc))
+    return {"disponible": await _hilo(cliente_ollama.ollama_disponible, h), "host": h}
 
 
 @app.get("/api/ollama/modelos")
-async def ollama_modelos():
-    est = await _estado_completo()
-    ms.emitir("ollama_estado", est)
-    return {"modelos": est["modelos"]}
+async def ollama_modelos(host: str | None = None):
+    try:
+        h = await _hilo(_normalizar_host, host)
+    except ValueError as exc:
+        return _error400(str(exc))
+    est = await _estado_completo(h)
+    if h == await _hilo(_normalizar_host, None):  # solo se difunde el estado de la Ollama por defecto
+        ms.emitir("ollama_estado", {**est, "host": h})
+    return {"modelos": est["modelos"], "host": h}
 
 
 @app.get("/api/usuarios")
@@ -89,17 +134,23 @@ async def iniciar_real(body: BatallaRealIn):
         return JSONResponse({"error": "Ya hay una ejecución en curso.", "mensaje": "Ya hay una ejecución en curso."},
                             status_code=409)
     ms.ESTADO["corriendo"] = True  # reserva inmediata (evita doble inicio durante las comprobaciones)
-    est = await _estado_completo()
-    if not est["disponible"]:
-        return _rechazo(f"Ollama no está disponible en {HOST}. Inícielo e inténtelo de nuevo.")
-    faltan = [m for m in (body.modelo_atq, body.modelo_def) if m not in est["modelos"]]
-    if faltan:
-        return _rechazo(f"Modelos no encontrados en Ollama: {', '.join(faltan)}")
+    try:
+        host_atq = await _hilo(_normalizar_host, body.host_atacante)
+        host_def = await _hilo(_normalizar_host, body.host_defensor)
+    except ValueError as exc:
+        return _rechazo(str(exc))
+    for equipo, host, modelo in (("atacante", host_atq, body.modelo_atq), ("defensor", host_def, body.modelo_def)):
+        est = await _estado_completo(host)
+        if not est["disponible"]:
+            return _rechazo(f"La Ollama del {equipo} no está disponible en {host}. Inícielo (y exponga OLLAMA_HOST si es otra PC).")
+        if modelo not in est["modelos"]:
+            return _rechazo(f"El modelo {modelo} no existe en la Ollama del {equipo} ({host}).")
     try:
         ident = repositorio.por_defecto().identidad(body.usuario)
     except KeyError:
         return _rechazo(f"Usuario desconocido: {body.usuario}")
-    ms.TAREA = asyncio.create_task(_correr_real(body.modelo_atq, body.modelo_def, body.rondas, ident, body.intensidad))
+    ms.TAREA = asyncio.create_task(_correr_real(body.modelo_atq, body.modelo_def, body.rondas, ident,
+                                                body.intensidad, host_atq, host_def))
     return {}
 
 
@@ -236,7 +287,8 @@ async def _emitir_ronda(r, matq, mdef, manual=False):
     return d
 
 
-async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2):
+async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host_atq=None, host_def=None):
+    host_atq, host_def = host_atq or HOST, host_def or HOST
     loop = asyncio.get_running_loop()
     previo = (ms.ESTADO["modelo_atq"], ms.ESTADO["modelo_def"])
     ms.ESTADO.update(modo="batalla", corriendo=True, modelo_atq=modelo_atq, modelo_def=modelo_def)
@@ -253,7 +305,8 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2):
             try:
                 r = await asyncio.wait_for(
                     loop.run_in_executor(None, lambda n=n, h=list(historial): motor.ejecutar_ronda(
-                        HOST, modelo_atq, modelo_def, ident, n, historial=h, intensidad=intensidad)),
+                        host_atq, modelo_atq, modelo_def, ident, n, historial=h, intensidad=intensidad,
+                        host_def=host_def)),
                     TIMEOUT_RONDA)
             except asyncio.TimeoutError:
                 r = {"ronda": n, "ataque": None, "defensa": None, "ejecucion": None, "veredicto": "ERROR",
@@ -281,9 +334,11 @@ class ManualRealIn(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=2000)
     modelo_def: str = Field(..., min_length=1, max_length=100)
     usuario: str = Field("ana.perez", min_length=1, max_length=50)
+    host_atacante: str = Field("http://localhost:11434", max_length=200)
+    host_defensor: str = Field("http://localhost:11434", max_length=200)  # el manual solo usa la Ollama del defensor
 
 
-async def _manual_real(body, ident):
+async def _manual_real(body, ident, host_def):
     """Un prompt humano -> defensor IA real -> capas -> veredicto. Devuelve (ok, decision | {error})."""
     ms.RONDA_MANUAL += 1
     n = ms.RONDA_MANUAL
@@ -296,7 +351,7 @@ async def _manual_real(body, ident):
         ms.emitir("auditoria", ms.aud("DEFENDER", "MODEL_REQUEST", body.modelo_def, "ENVIADO", "BAJO"))
         try:
             p = await asyncio.wait_for(asyncio.get_running_loop().run_in_executor(
-                None, lambda: motor.procesar_defensa(HOST, body.modelo_def, body.prompt, ident)), TIMEOUT_RONDA)
+                None, lambda: motor.procesar_defensa(host_def, body.modelo_def, body.prompt, ident)), TIMEOUT_RONDA)
         except asyncio.TimeoutError:
             p = {"defensa": None, "ejecucion": None, "veredicto": "ERROR", "nota": None,
                  "error": f"timeout de ronda ({TIMEOUT_RONDA} s)"}
@@ -315,16 +370,20 @@ async def manual_real(body: ManualRealIn):
         return JSONResponse({"error": "Ya hay una ejecución en curso.", "mensaje": "Ya hay una ejecución en curso."},
                             status_code=409)
     ms.ESTADO["corriendo"] = True  # reserva inmediata
-    est = await _estado_completo()
+    try:
+        host_def = await _hilo(_normalizar_host, body.host_defensor)
+    except ValueError as exc:
+        return _rechazo(str(exc))
+    est = await _estado_completo(host_def)
     if not est["disponible"]:
-        return _rechazo(f"Ollama no está disponible en {HOST}. Inícielo e inténtelo de nuevo.")
+        return _rechazo(f"La Ollama del defensor no está disponible en {host_def}. Inícielo (y exponga OLLAMA_HOST si es otra PC).")
     if body.modelo_def not in est["modelos"]:
-        return _rechazo(f"Modelo no encontrado en Ollama: {body.modelo_def}")
+        return _rechazo(f"El modelo {body.modelo_def} no existe en la Ollama del defensor ({host_def}).")
     try:
         ident = repositorio.por_defecto().identidad(body.usuario)
     except KeyError:
         return _rechazo(f"Usuario desconocido: {body.usuario}")
-    ms.TAREA = asyncio.create_task(_manual_real(body, ident))
+    ms.TAREA = asyncio.create_task(_manual_real(body, ident, host_def))
     res = (await asyncio.gather(ms.TAREA, return_exceptions=True))[0]
     if isinstance(res, BaseException):
         return JSONResponse({"error": "Prueba manual detenida.", "mensaje": "Prueba manual detenida."}, status_code=409)
@@ -335,4 +394,5 @@ async def manual_real(body: ManualRealIn):
 ms.montar_ui(app)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    ms.anunciar(ms.puerto())
+    uvicorn.run(app, host="0.0.0.0", port=ms.puerto())

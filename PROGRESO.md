@@ -98,3 +98,12 @@
 - Decisiones: la BD real es data/lab.db (no cybershield.db); la crea ./ejecutar o `python -m src.lab.seed`.
 - Decisiones: README con huecos TODO para los hallazgos finales; datos y métricas marcados como experimentales.
 - Pendiente / siguiente paso: pegar métricas reales en el README y subir a GitHub (push manual).
+
+## Fase LAN - Multi-PC, roles y Ollama remoto
+- Qué se hizo: servidor en 0.0.0.0 con URL de LAN, Ollama por host (atacante y defensor en PCs distintas) y vistas por equipo.
+- Archivos: server/{app,mock_server}.py, src/lab/motor.py, ui/{index.html,app.js,render.js,api.js,styles.css}, ejecutar, README.md, docs/CONTRATO_API.md
+- Decisiones: inferencia distribuida (cada PC su Ollama); host_atacante/host_defensor por petición; modelos validados en SU host.
+- Decisiones: acceso abierto en LAN sin autenticación; hosts restringidos a red local para evitar SSRF.
+- Decisiones: vistas por rol vía ?rol= y localStorage (rojo/azul/general); IP de Ollama guardadas por navegador.
+- Decisiones: el estado SSE difundido solo aplica si coincide con el host propio (no pisa a otros equipos).
+- Pendiente / siguiente paso: probar con dos PCs reales y medir latencia; añadir autenticación si se sale del laboratorio.

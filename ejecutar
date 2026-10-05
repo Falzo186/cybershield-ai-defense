@@ -92,5 +92,5 @@ fi
 
 # ---------- 5. Servidor ----------
 ok "Arrancando el laboratorio…"
-printf "${VERDE}    Abre: http://localhost:8000${NC}   (Ctrl+C para detener)\n"
+printf "${VERDE}    Abre: http://localhost:${PUERTO:-8000}${NC}   (Ctrl+C para detener)\n"
 exec python server/app.py

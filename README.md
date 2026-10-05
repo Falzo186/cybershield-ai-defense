@@ -132,6 +132,52 @@ docs/CONTRATO_API.md  contrato REST/SSE entre UI y backend
 PROGRESO.md         bitácora de desarrollo
 ```
 
+## Modo LAN (dos PCs)
+
+Dos PCs en la misma red local, **cada una con su propio Ollama** (inferencia distribuida):
+
+- **Centro de Control:** la PC que corre `./ejecutar` (`server/app.py`). Puede ser la roja, la azul o una tercera.
+- **El resto de PCs** solo abren el navegador en `http://<ip-del-centro-de-control>:8000`, eligen su **equipo** (🔴 Rojo, 🔵 Azul o Vista general) y escriben la IP de **su** Ollama.
+
+Al arrancar, el servidor imprime la URL para compartir: `Centro de Control en: http://192.168.1.X:8000`.
+El puerto se cambia con la variable `PUERTO` (por defecto 8000), p. ej. `PUERTO=9000 ./ejecutar`.
+
+### 1. Exponer Ollama en la red (en cada PC con Ollama)
+
+- **Windows (PowerShell):** `setx OLLAMA_HOST "0.0.0.0:11434"` y luego **reinicia Ollama** (salir desde la bandeja y abrirlo de nuevo).
+- **macOS / Linux:** `export OLLAMA_HOST=0.0.0.0:11434` antes de `ollama serve`.
+
+### 2. Abrir el puerto en el firewall
+
+- **Windows Defender Firewall** (PowerShell como administrador), solo red privada:
+  `netsh advfirewall firewall add rule name="Ollama LAN" dir=in action=allow protocol=TCP localport=11434 profile=private`
+  y, en el Centro de Control, `netsh advfirewall firewall add rule name="CyberShield 8000" dir=in action=allow protocol=TCP localport=8000 profile=private`.
+- **macOS:** Ajustes del Sistema → Red → Firewall → Opciones… → permitir conexiones entrantes para *Ollama* y *Python*.
+- **Linux (ufw):** `sudo ufw allow from 192.168.1.0/24 to any port 11434 proto tcp`.
+
+### 3. Saber la IP local de cada PC
+
+- Windows: `ipconfig` (busca "Dirección IPv4").
+- macOS: `ipconfig getifaddr en0` · Linux: `ip a` o `hostname -I`.
+
+### Ejemplo completo
+
+| PC | IP | Qué corre |
+|---|---|---|
+| Roja | `192.168.1.50` | Ollama con `qwen2.5:7b` (atacante) |
+| Azul | `192.168.1.60` | Ollama con `llama3.2:3b` (defensor) + **Centro de Control** (`./ejecutar`) |
+
+1. En la PC azul: `./ejecutar` → imprime `http://192.168.1.60:8000`.
+2. Cada navegador entra a `http://192.168.1.60:8000` y elige su equipo.
+3. En la vista **Roja**: IP de Ollama `http://192.168.1.50:11434` → *Probar conexión* → elige `qwen2.5:7b`; en el panel colapsado del defensor pon `http://192.168.1.60:11434` y elige su modelo.
+4. En la vista **Azul** se hace lo espejo. Cualquier vista puede pulsar *INICIAR BATALLA*; la **Vista general** muestra todo.
+
+Cada equipo guarda sus IP en su propio navegador (no se comparten). El servidor solo acepta como destino de Ollama
+direcciones de red local (IP privada o `localhost`).
+
+> ⚠️ **Solo para una red local de confianza (laboratorio).** El Centro de Control escucha en `0.0.0.0` **sin autenticación**:
+> cualquiera en tu red puede usarlo. No lo expongas a internet ni abras esos puertos en el router.
+
 ## Descargo académico
 
 Proyecto universitario con fines educativos. Las métricas (por ejemplo el *Defense Score*) son

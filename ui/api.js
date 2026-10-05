@@ -59,8 +59,9 @@ const API = (() => {
     detener: () => req("POST", "/api/detener", {}),
     manual: (prompt) => req("POST", "/api/manual", { prompt }),
     manualReal: (cuerpo) => req("POST", "/api/manual/real", cuerpo),
-    ollamaEstado: () => req("GET", "/api/ollama/estado"),
-    ollamaModelos: () => req("GET", "/api/ollama/modelos"),
+    // host (opcional): Ollama de cualquier IP de la LAN, p. ej. http://192.168.1.50:11434
+    ollamaEstado: (host) => req("GET", "/api/ollama/estado" + (host ? "?host=" + encodeURIComponent(host) : "")),
+    ollamaModelos: (host) => req("GET", "/api/ollama/modelos" + (host ? "?host=" + encodeURIComponent(host) : "")),
     usuarios: () => req("GET", "/api/usuarios"),
     conectar,
   };

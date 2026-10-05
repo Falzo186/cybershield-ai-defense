@@ -4,7 +4,9 @@ Datos 100% ficticios de "CyberShield Industries". No usa Ollama ni src/.
 """
 import asyncio
 import json
+import os
 import random
+import socket
 from datetime import datetime
 from pathlib import Path
 
@@ -358,6 +360,32 @@ def montar_ui(a):
     a.mount("/", StaticFiles(directory=UI_DIR, html=True), name="ui")
 
 
+def puerto():
+    """Puerto del Centro de Control (variable de entorno PUERTO, por defecto 8000)."""
+    try:
+        return int(os.getenv("PUERTO", "8000"))
+    except ValueError:
+        return 8000
+
+
+def ip_local():
+    """IP local de la PC en la LAN (sin dependencias; no envía tráfico real)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
+def anunciar(p):
+    print(f"Centro de Control en: http://{ip_local()}:{p}   (local: http://localhost:{p})", flush=True)
+    print("Escuchando en 0.0.0.0 SIN autenticación: usar solo en una red local de confianza.", flush=True)
+
+
 if __name__ == "__main__":
     montar_ui(app)
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    anunciar(puerto())
+    uvicorn.run(app, host="0.0.0.0", port=puerto())

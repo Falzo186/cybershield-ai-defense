@@ -16,6 +16,8 @@
       <span id="conn" class="conn conn-warn" role="status">
         <span id="conn-ico" aria-hidden="true">◐</span><span id="conn-txt">Reconectando…</span>
       </span>
+      <span id="equipo-tag" class="equipo-tag eq-ninguno" title="Equipo de esta sesión">SIN EQUIPO</span>
+      <a id="lnk-equipo" class="lnk" href="?cambiar=1">⇄ Cambiar de equipo</a>
     </div>
     <div class="hdr-bottom">
       <div class="tabs" role="tablist" aria-label="Modo de operación">
@@ -52,7 +54,11 @@
       <div id="sel-atq-box" class="sel-box" hidden>
         <label>Modelo del atacante <select id="sel-atq" class="sel" aria-label="Modelo del atacante"></select></label>
         <button type="button" class="btn btn-mini" data-refrescar>↻ Actualizar modelos</button>
-        <span class="ollama-ind ind-off" data-ollama-ind>🔴 OLLAMA DESCONECTADO</span>
+        <span class="ollama-ind ind-off" data-ollama-ind="atq">🔴 OLLAMA DESCONECTADO</span>
+        <label class="host">IP Ollama del equipo rojo
+          <input id="host-atq" class="sel mono" type="text" spellcheck="false" autocomplete="off" value="http://localhost:11434" aria-label="IP de Ollama del equipo rojo">
+        </label>
+        <button type="button" class="btn btn-mini" data-probar="atq">Probar conexión</button>
       </div>
 
       <div id="atq-vista">
@@ -107,7 +113,11 @@
       <div id="sel-def-box" class="sel-box" hidden>
         <label>Modelo del defensor <select id="sel-def" class="sel" aria-label="Modelo del defensor"></select></label>
         <button type="button" class="btn btn-mini" data-refrescar>↻ Actualizar modelos</button>
-        <span class="ollama-ind ind-off" data-ollama-ind>🔴 OLLAMA DESCONECTADO</span>
+        <span class="ollama-ind ind-off" data-ollama-ind="def">🔴 OLLAMA DESCONECTADO</span>
+        <label class="host">IP Ollama del equipo azul
+          <input id="host-def" class="sel mono" type="text" spellcheck="false" autocomplete="off" value="http://localhost:11434" aria-label="IP de Ollama del equipo azul">
+        </label>
+        <button type="button" class="btn btn-mini" data-probar="def">Probar conexión</button>
       </div>
       <div class="gauge-wrap">
         <svg id="gauge" class="gauge g-ok" viewBox="0 0 200 120" role="img" aria-label="Medidor de riesgo">
@@ -139,6 +149,19 @@
     </div>
     <div id="aud-log" class="mono log" role="log" aria-live="polite" tabindex="0"></div>
   </section>
+</div>
+
+<div id="pantalla-equipo" class="equipo-pantalla" hidden role="dialog" aria-modal="true" aria-labelledby="eq-t">
+  <div class="equipo-card">
+    <h1 id="eq-t">AI SECURITY LABORATORY</h1>
+    <p class="muted">Elige tu equipo para esta sesión</p>
+    <div class="equipo-botones">
+      <button type="button" class="eq-btn eq-rojo" data-equipo="rojo"><b>EQUIPO ROJO</b><span>Ataca · IA atacante</span></button>
+      <button type="button" class="eq-btn eq-azul" data-equipo="azul"><b>EQUIPO AZUL</b><span>Defiende · IA defensora</span></button>
+      <button type="button" class="eq-btn eq-general" data-equipo="general"><b>VISTA GENERAL</b><span>Dashboard completo</span></button>
+    </div>
+    <p class="muted">Laboratorio local · red de confianza · datos ficticios</p>
+  </div>
 </div>
 
 <div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-t">

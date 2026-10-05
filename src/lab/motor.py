@@ -87,7 +87,9 @@ def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None):
         return out
 
 
-def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=None, repo=None, intensidad=2):
+def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=None, repo=None, intensidad=2,
+                   host_def=None):
+    """host = Ollama del atacante; host_def = Ollama del defensor (por defecto el mismo)."""
     res = {"ronda": ronda, "ataque": None, "defensa": None, "ejecucion": None,
            "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False}
     try:
@@ -96,7 +98,7 @@ def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=Non
         if not atq["ok"]:
             res["error"] = "atacante: " + str(atq["error"])
             return res
-        res.update(procesar_defensa(host, modelo_def, atq["prompt"], identidad, repo))
+        res.update(procesar_defensa(host_def or host, modelo_def, atq["prompt"], identidad, repo))
         return res
     except Exception as exc:  # noqa: BLE001
         res["veredicto"] = "ERROR"

@@ -272,13 +272,15 @@ const R = (() => {
       $("aud-pausa").hidden = autoscroll;
     });
   }
-  function crearFiltros(agentes, onChange) {
+  function crearFiltros(agentes, onChange, activos) {
     const cont = $("filtros");
     cont.replaceChildren();
     agentes.forEach((ag) => {
       const b = el("button", "filtro", ag);
       b.type = "button";
-      b.setAttribute("aria-pressed", "true");
+      const activo = !activos || activos.includes(ag); // filtro inicial por equipo (opcional)
+      b.setAttribute("aria-pressed", String(activo));
+      if (!activo) onChange(ag, false);
       b.addEventListener("click", () => {
         const on = b.getAttribute("aria-pressed") !== "true";
         b.setAttribute("aria-pressed", String(on));
@@ -377,6 +379,19 @@ const R = (() => {
     toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
   }
 
+  // ---------- equipo (rojo / azul / general) ----------
+  const NOMBRE_EQUIPO = { rojo: "EQUIPO ROJO", azul: "EQUIPO AZUL", general: "VISTA GENERAL" };
+  function setEquipo(rol) {
+    const r = NOMBRE_EQUIPO[rol] ? rol : "";
+    document.body.dataset.rol = r;
+    $("equipo-tag").textContent = NOMBRE_EQUIPO[r] || "SIN EQUIPO";
+    $("equipo-tag").className = "equipo-tag eq-" + (r || "ninguno");
+  }
+  function mostrarSelector(visible) {
+    $("pantalla-equipo").hidden = !visible;
+    if (visible) { const b = document.querySelector("[data-equipo]"); if (b) b.focus(); }
+  }
+
   // ---------- origen de datos, Ollama, usuarios ----------
   function setOrigen(texto, clase) {
     const o = $("origen");
@@ -396,15 +411,14 @@ const R = (() => {
     valores.forEach((v) => { const o = el("option", null, v); o.value = v; s.append(o); });
     s.value = valores.includes(previo) ? previo : valores[0];
   }
-  function setOllama(est) {
+  // rol: "atq" | "def" — cada equipo tiene su propia Ollama (indicador y lista de modelos propios).
+  function setOllama(rol, est) {
     const on = !!est.disponible;
-    document.querySelectorAll("[data-ollama-ind]").forEach((n) => {
+    document.querySelectorAll('[data-ollama-ind="' + (rol === "def" ? "def" : "atq") + '"]').forEach((n) => {
       n.textContent = on ? "🟢 OLLAMA CONECTADO" : "🔴 OLLAMA DESCONECTADO";
       n.className = "ollama-ind " + (on ? "ind-on" : "ind-off");
     });
-    const modelos = Array.isArray(est.modelos) ? est.modelos : [];
-    llenarSelect("sel-atq", modelos, "(sin modelos)");
-    llenarSelect("sel-def", modelos, "(sin modelos)");
+    llenarSelect(rol === "def" ? "sel-def" : "sel-atq", Array.isArray(est.modelos) ? est.modelos : [], "(sin modelos)");
   }
   function setUsuarios(lista) {
     const s = $("sel-usuario");
@@ -457,7 +471,7 @@ const R = (() => {
     initAuditoria, crearFiltros, setFiltro, addAuditoria,
     terminalAdd, terminalDatos, terminalLimpiarDatos,
     setModo, setCorriendo, setConexion, setInfo, toast,
-    setVeredictoError, setOrigen, setManualOrigen, setOllama, setUsuarios, valorSelect,
+    setVeredictoError, setOrigen, setManualOrigen, setEquipo, mostrarSelector, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
   };
 })();

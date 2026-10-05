@@ -287,3 +287,40 @@ pre.det-val { background: var(--bg); border: 1px solid var(--borde); border-radi
 .hist.r-depth { border-left-color: var(--warn); } .hist.r-depth .hist-ico { color: var(--warn); }
 .hist-nota-depth { color: var(--warn); }
 @media (max-width: 600px) { .counters { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---------- LAN: selección de equipo y vistas por rol ---------- */
+.lnk { color: var(--def); font-size: 12px; text-decoration: underline; white-space: nowrap; }
+.equipo-tag { font: 700 11px var(--sans); letter-spacing: .06em; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--borde); color: var(--texto-sec); white-space: nowrap; }
+.equipo-tag.eq-rojo { color: var(--atq); border-color: var(--atq); }
+.equipo-tag.eq-azul { color: var(--def); border-color: var(--def); }
+.equipo-tag.eq-general { color: var(--texto); border-color: var(--texto-sec); }
+.host { display: flex; align-items: center; gap: 6px; }
+.host input { width: 210px; }
+
+.equipo-pantalla { position: fixed; inset: 0; z-index: 30; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.equipo-card { width: min(860px, 100%); text-align: center; }
+.equipo-card h1 { font-size: 22px; letter-spacing: .14em; margin-bottom: 6px; }
+.equipo-botones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 24px 0; }
+.eq-btn {
+  background: var(--panel); color: var(--texto); border: 2px solid var(--borde); border-radius: 12px;
+  padding: 36px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; align-items: center; font-family: var(--sans);
+}
+.eq-btn b { font-size: 20px; letter-spacing: .08em; }
+.eq-btn span { font-size: 13px; color: var(--texto-sec); }
+.eq-rojo { border-color: var(--atq); } .eq-rojo b { color: var(--atq); }
+.eq-azul { border-color: var(--def); } .eq-azul b { color: var(--def); }
+.eq-general { border-color: var(--texto-sec); }
+.eq-btn:hover, .eq-btn:focus-visible { background: var(--panel2); }
+@media (max-width: 700px) { .equipo-botones { grid-template-columns: 1fr; } .eq-btn { padding: 22px 12px; } }
+
+/* Vista ROJO: atacante grande; defensor colapsado (solo su configuración de Ollama). */
+@media (min-width: 1101px) {
+  body[data-rol="rojo"] .mid { grid-template-columns: 1.5fr 1.2fr .7fr; }
+  body[data-rol="azul"] .mid { grid-template-columns: .7fr 1.2fr 1.5fr; }
+}
+body[data-rol="rojo"] .def .gauge-wrap, body[data-rol="rojo"] .def > dl.det,
+body[data-rol="rojo"] .def > .kv, body[data-rol="rojo"] #def-parse { display: none; }
+body[data-rol="rojo"] #sel-atq-box[hidden] { display: flex !important; }
+/* Vista AZUL: defensor grande; atacante colapsado (conserva marcadores, terminal y su configuración). */
+body[data-rol="azul"] #atq-vista, body[data-rol="azul"] .atq > .kv { display: none; }
+body[data-rol="azul"] #sel-def-box[hidden] { display: flex !important; }
