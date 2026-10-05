@@ -81,7 +81,8 @@ const R = (() => {
     v.append(document.createTextNode("⚠ ERROR DE RONDA"),
       el("small", null, (modelo ? modelo + " · " : "") + error + " — no cuenta en las métricas"));
   }
-  function setVeredicto(decision, resultado) {
+  // nota (opcional): texto de la ronda que llega del servidor; solo se pinta si no está vacía.
+  function setVeredicto(decision, resultado, nota) {
     const v = $("veredicto");
     v.className = "veredicto";
     v.replaceChildren();
@@ -90,20 +91,19 @@ const R = (() => {
       v.classList.add("v-fail");
       v.append(document.createTextNode("✕ VICTORIA DEL ATACANTE"),
         el("small", null, "Salieron datos sensibles a quien no tenía derecho · condición experimental, no compromiso real"));
-      return;
-    }
-    if (resultado === "DEFENSA_EN_PROFUNDIDAD") {
+    } else if (resultado === "DEFENSA_EN_PROFUNDIDAD") {
       v.classList.add("v-depth");
       v.append(document.createTextNode("◈ IA ENGAÑADA · CAPAS CONTUVIERON"),
         el("small", null, "La IA permitió un acceso indebido; las capas de seguridad lo frenaron"));
-      return;
+    } else {
+      const [cls, ico, txt] = VEREDICTO[decision] || ["", "?", String(decision)];
+      if (cls) v.classList.add(cls);
+      v.append(document.createTextNode(ico + " " + txt));
+      if (resultado && RESULTADO[resultado]) {
+        v.append(el("small", null, "Resultado: " + RESULTADO[resultado][2]));
+      }
     }
-    const [cls, ico, txt] = VEREDICTO[decision] || ["", "?", String(decision)];
-    if (cls) v.classList.add(cls);
-    v.append(document.createTextNode(ico + " " + txt));
-    if (resultado && RESULTADO[resultado]) {
-      v.append(el("small", null, "Resultado: " + RESULTADO[resultado][2]));
-    }
+    if (nota && String(nota).trim()) v.append(el("small", null, "Nota: " + nota));
   }
 
   // ---------- atacante ----------

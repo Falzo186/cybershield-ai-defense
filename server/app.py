@@ -469,7 +469,7 @@ async def _emitir_ronda(r, matq, mdef, manual=False, puntos=None, sesion_estado=
          "resultado": v, "tiempo_ms": df["tiempo_ms"] or 0, "tokens": df["tokens"],
          "parse_ok": df["parse_ok"], "modelo": mdef, "origen": "ollama", "ia_fallo": bool(r.get("ia_fallo")),
          "nivel_fuga": r.get("nivel_fuga", "NINGUNA"), "circuito_sesion": circuito,
-         "origen_decision": "filtro_rapido" if filtro else "ia"}
+         "origen_decision": "filtro_rapido" if filtro else "ia", "nota": r.get("nota")}
     if sesion_estado is not None:  # riesgo acumulado de la sesión DESPUÉS de esta ronda (señal, no veredicto)
         d["riesgo_acumulado"] = sesion_estado.registrar(at["categoria"], v, efectiva)
     if puntos is not None:

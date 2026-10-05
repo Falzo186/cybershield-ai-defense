@@ -215,7 +215,7 @@
     },
     etapa(d) { R.setEtapa(d.etapa, d.estado, d); },
     decision(d) {
-      R.setVeredicto(d.decision, d.resultado);
+      R.setVeredicto(d.decision, d.resultado, d.nota);
       R.setDefensor(d);
       R.addHistorial(registrarRonda(d));
       contarRonda(d.resultado, d.ia_fallo);
