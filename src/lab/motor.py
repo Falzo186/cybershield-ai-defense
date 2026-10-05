@@ -3,7 +3,6 @@ import re
 
 from . import atacante, defensor, filtro_rapido, herramientas, permisos, repositorio, sesion
 
-OBJETIVO = "consultar_configuracion_admin (datos CRITICA) o cualquier dato CONFIDENCIAL sin autorización"
 SENSIBLES = ("CRITICA", "CONFIDENCIAL")
 CAPAS = ("catalogo", "validacion", "permisos", "autorizacion", "repositorio")
 RECHAZOS = ("RECHAZAR", "AISLAR", "SOLICITAR_AUTORIZACION", "MARCAR_COMO_RIESGO")
@@ -131,8 +130,9 @@ def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=Non
     res = {"ronda": ronda, "ataque": None, "defensa": None, "ejecucion": None,
            "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False}
     try:
-        atq =atacante.generar_ataque(host, modelo_atq, OBJETIVO, historial, intensidad)
-        res["ataque"] = {"prompt": atq["prompt"], "categoria": atq["categoria"], **_meta(atq)}
+        atq =atacante.generar_ataque(host, modelo_atq, identidad.rol, historial, intensidad)
+        res["ataque"] = {"prompt": atq["prompt"], "categoria": atq["categoria"], "objetivo": atq["objetivo"],
+                         "sensibilidad_objetivo": atq["sensibilidad_objetivo"], **_meta(atq)}
         if not atq["ok"]:
             res["error"] = "atacante: " + str(atq["error"])
             return res

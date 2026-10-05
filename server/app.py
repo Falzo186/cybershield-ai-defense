@@ -28,7 +28,8 @@ app = ms.app
 HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 TIMEOUT_RONDA = 300  # s: dos llamadas al modelo (120 s c/u, la primera puede incluir la carga del modelo) + capas
 TIMEOUT_RETO = 30    # s que tiene el equipo destinatario para aceptar o rechazar un reto
-# Dificultad -> usuario semilla (el rol lo fija el sistema): Fácil=empleado, Media=analista, Difícil=admin.
+# Dificultad -> usuario semilla (el rol lo fija el sistema): Fácil=invitado, Media=empleado, Difícil=analista.
+# El objetivo del atacante por rol está en atacante.OBJETIVO_POR_ROL.
 DIFICULTAD_USUARIO = {"facil": "visita.demo", "media": "ana.perez", "dificil": "marta.ruiz"}
 # root.lab (admin) NO es una dificultad: tiene derecho legítimo al objetivo, así que nunca hay falla posible.
 # Solo se usa en el modo demostración, que no puntúa.
@@ -360,6 +361,12 @@ def _meta(x, modelo):
     return {"modelo": modelo, "tiempo_ms": x.get("tiempo_ms"), "tokens": x.get("tokens")}
 
 
+def _objetivo(at):
+    """Objetivo real del atacante (depende de la dificultad); el ataque manual no trae uno y usa el genérico."""
+    return {"objetivo": at.get("objetivo") or OBJETIVO_TXT,
+            "sensibilidad_objetivo": at.get("sensibilidad_objetivo") or "CRITICA"}
+
+
 def _etapa_atacante(at, matq, manual):
     """Nodo atacante: IA real (modelo+tiempo) o, en el manual, el usuario humano (sin petición a modelo)."""
     if manual:
@@ -381,8 +388,8 @@ async def _emitir_error(r, matq, mdef, manual=False):
         etapas.append(("atacante", "error", {"modelo": matq, "detalle": "ERROR"}))
         etapas += [(e, "omitido", {}) for e in ("prompt", "analisis", "defensor", *RESTO)]
     else:
-        ms.emitir("ataque", {"ronda": n, "prompt": at["prompt"], "categoria": at["categoria"],
-                             "objetivo": OBJETIVO_TXT, "sensibilidad_objetivo": "CRITICA", **_meta(at, matq)})
+        ms.emitir("ataque", {"ronda": n, "prompt": at["prompt"], "categoria": at["categoria"], **_objetivo(at),
+                             **_meta(at, matq)})
         etapas.append(_etapa_atacante(at, matq, manual))
         etapas.append(("prompt", "ok", {"detalle": "RECIBIDO"}))
         if err.startswith("defensor"):
@@ -398,8 +405,8 @@ async def _emitir_error(r, matq, mdef, manual=False):
 
 async def _emitir_ronda(r, matq, mdef, manual=False, puntos=None, sesion_estado=None):
     n, at, df, ej, v = r["ronda"], r["ataque"], r["defensa"], r["ejecucion"], r["veredicto"]
-    ms.emitir("ataque", {"ronda": n, "prompt": at["prompt"], "categoria": at["categoria"],
-                         "objetivo": OBJETIVO_TXT, "sensibilidad_objetivo": "CRITICA", **_meta(at, matq)})
+    ms.emitir("ataque", {"ronda": n, "prompt": at["prompt"], "categoria": at["categoria"], **_objetivo(at),
+                         **_meta(at, matq)})
     if manual:
         ms.emitir("auditoria", ms.aud("ATTACKER", "PROMPT", "usuario (manual)", "ENVIADO", "BAJO"))
     else:
