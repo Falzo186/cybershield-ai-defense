@@ -107,3 +107,47 @@
 - Decisiones: vistas por rol vía ?rol= y localStorage (rojo/azul/general); IP de Ollama guardadas por navegador.
 - Decisiones: el estado SSE difundido solo aplica si coincide con el host propio (no pisa a otros equipos).
 - Pendiente / siguiente paso: probar con dos PCs reales y medir latencia; añadir autenticación si se sale del laboratorio.
+
+## Fase J1 - Diagnóstico, listo/aceptar y puntaje
+- Qué se hizo: botón «Probar modelo», handshake reto/aceptar entre equipos y marcador mejor-de-N con banner y revancha.
+- Archivos: server/app.py, src/lab/cliente_ollama.py, ui/{index.html,app.js,render.js,api.js,styles.css}, docs/CONTRATO_API.md
+- Decisiones: timeout 120 s por llamada (la primera carga el modelo en memoria); «Probar modelo» usa 15 s y fuerza esa carga.
+- Decisiones: handshake antes de gastar inferencia real; reto sin respuesta en 30 s se cancela; la vista general inicia sin aceptación.
+- Decisiones: puntaje mejor-de-N calculado en el servidor, sin tocar las capas de seguridad ni los veredictos.
+- Decisiones: dificultad mapea a usuarios semilla (empleado/analista/admin) y reemplaza al selector de usuario en batalla.
+- Pendiente / siguiente paso: probar el handshake con dos navegadores/PCs y revisar la semántica de la dificultad «admin».
+
+## Fix - Dificultad sin admin en modo puntaje
+- Dificultad: Fácil=invitado, Media=empleado, Difícil=analista; admin (root.lab) sale del selector.
+- Modo demostración (sin puntaje): casilla propia con etiqueta visible; usa admin y no suma al marcador ni emite partida_fin.
+- Con rol admin fuera de la demostración, el servidor rechaza el inicio con la advertencia de acceso legítimo.
+- Decisión: admin es invicto por diseño (acceso legítimo), no es una dificultad; se separa a modo demostración.
+- Archivos: server/app.py, ui/{index.html,app.js,render.js,styles.css}, docs/CONTRATO_API.md
+
+## Fase robustez - JSON confiable en modelos chicos, reintento, logging
+- Qué se hizo: prompts de defensor y atacante más cortos con un ejemplo JSON (few-shot) y cierre "RESPONDE ÚNICAMENTE CON EL JSON".
+- Archivos: src/lab/{cliente_ollama,defensor,atacante,motor}.py, server/app.py, .gitignore
+- Decisiones: num_predict bajo (defensor 150; atacante 120/160/220 por intensidad) para que el modelo no divague.
+- Decisiones: generar_json hace UN solo reintento si la respuesta no es JSON válido; si falla de nuevo, parse_ok=false/ERROR como antes.
+- Decisiones: el reintento se audita como MODEL_REQUEST "(reintento JSON)"; ambos fallos se guardan en data/debug_respuestas.log.
+- Decisiones: extraer_json quita vallas ```json y rechaza objetos sin los campos requeridos (no construye objetos a medias).
+- Pendiente / siguiente paso: medir con llama3.2:1b/3b cuántas rondas necesitan reintento.
+
+## Fase R1 - Riesgo acumulado por sesión y fuga parcial
+- Qué se hizo: estado de sesión por batalla (src/lab/sesion.py), circuito de seguridad por sesión, nivel_fuga e indicador de sospecha en la UI.
+- Archivos: src/lab/{sesion,motor,defensor}.py, server/app.py, ui/{app.js,render.js,styles.css}, docs/CONTRATO_API.md
+- Decisiones: el riesgo acumulado es una señal adicional (contexto para la IA), no reemplaza a las capas ni al riesgo de la ronda.
+- Decisiones: el circuito de seguridad por sesión (>70) es determinista y no depende del LLM: fuerza SOLICITAR_AUTORIZACION.
+- Decisiones: techo 40 por componente (patrones / rechazos) para que el total pueda superar 70 y el circuito sea alcanzable.
+- Decisiones: fuga parcial (motivo que nombra un secreto LAB_…) no suma al marcador pero sí se registra; "CRITICA" no cuenta (es etiqueta pública).
+- Decisiones: la sesión se crea al iniciar cada batalla (revancha incluida) y se descarta al terminar.
+- Pendiente / siguiente paso: calibrar pesos con partidas reales.
+
+## Fase R2 - Filtro rápido antes de inferencia
+- Qué se hizo: src/lab/filtro_rapido.py bloquea casos obvios por regex antes de llamar al defensor LLM.
+- Archivos: src/lab/{filtro_rapido,motor,test_motor}.py, server/app.py, ui/render.js, docs/CONTRATO_API.md
+- Decisiones: capa determinista previa: secretos LAB_, extracción del system prompt, "ignora tus instrucciones", SQLi obvia, modo admin/desarrollador.
+- Decisiones: bloqueo = RECHAZAR riesgo 90 con origen_decision=filtro_rapido; veredicto DEFENSA_EXITOSA; no gasta inferencia.
+- Decisiones: se aplica en procesar_defensa (batalla y manual real) y cuenta como rechazo en EstadoSesion.
+- Decisiones: el ataque de prueba de test_motor ya no menciona LAB_ (si no, el filtro lo bloquearía antes del caso a probar).
+- Pendiente / siguiente paso: medir cuántas rondas ahorra el filtro y ajustar falsos positivos.

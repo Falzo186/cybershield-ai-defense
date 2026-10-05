@@ -18,6 +18,8 @@
       </span>
       <span id="equipo-tag" class="equipo-tag eq-ninguno" title="Equipo de esta sesión">SIN EQUIPO</span>
       <a id="lnk-equipo" class="lnk" href="?cambiar=1">⇄ Cambiar de equipo</a>
+      <span id="marcador" class="marcador" role="status" aria-live="polite" title="Marcador de la partida: atacante — defensor">🔴 0 — 0 🔵</span>
+      <span id="demo-tag" class="demo-tag" hidden>DEMOSTRACIÓN · NO SUMA AL MARCADOR (admin: acceso legítimo por diseño)</span>
     </div>
     <div class="hdr-bottom">
       <div class="tabs" role="tablist" aria-label="Modo de operación">
@@ -36,6 +38,16 @@
             <option value="2" selected>2 · contexto y rol</option>
             <option value="3">3 · sofisticado</option>
           </select>
+        </label>
+        <label id="dificultad-wrap" class="rondas" hidden title="Fácil = invitado · Media = empleado · Difícil = analista (usuarios del sistema)">Dificultad
+          <select id="sel-dificultad" class="sel" aria-label="Dificultad">
+            <option value="facil" selected>Fácil (invitado)</option>
+            <option value="media">Media (empleado)</option>
+            <option value="dificil">Difícil (analista)</option>
+          </select>
+        </label>
+        <label id="demo-wrap" class="rondas" hidden title="Usa el usuario admin: su acceso al objetivo es legítimo, así que no puede haber falla ni puntaje">
+          <input id="chk-demo" type="checkbox"> Modo demostración (sin puntaje)
         </label>
         <label id="rondas-wrap" class="rondas" hidden>Rondas
           <input id="rondas" type="number" min="1" max="50" value="6">
@@ -59,7 +71,10 @@
           <input id="host-atq" class="sel mono" type="text" spellcheck="false" autocomplete="off" value="http://localhost:11434" aria-label="IP de Ollama del equipo rojo">
         </label>
         <button type="button" class="btn btn-mini" data-probar="atq">Probar conexión</button>
+        <button type="button" class="btn btn-mini" data-probar-modelo="atq" title="Hace una llamada mínima real al modelo seleccionado (fuerza su carga inicial)">Probar modelo</button>
+        <span id="probe-atq" class="probe-res" aria-live="polite"></span>
       </div>
+      <div id="ro-atq" class="ro-modelo mono" hidden>Modelo del equipo rojo (solo lectura): <b id="ro-atq-txt">🔴 pendiente · lo configura el equipo rojo</b></div>
 
       <div id="atq-vista">
         <div class="lbl">PROMPT ACTUAL</div>
@@ -118,7 +133,10 @@
           <input id="host-def" class="sel mono" type="text" spellcheck="false" autocomplete="off" value="http://localhost:11434" aria-label="IP de Ollama del equipo azul">
         </label>
         <button type="button" class="btn btn-mini" data-probar="def">Probar conexión</button>
+        <button type="button" class="btn btn-mini" data-probar-modelo="def" title="Hace una llamada mínima real al modelo seleccionado (fuerza su carga inicial)">Probar modelo</button>
+        <span id="probe-def" class="probe-res" aria-live="polite"></span>
       </div>
+      <div id="ro-def" class="ro-modelo mono" hidden>Modelo del equipo azul (solo lectura): <b id="ro-def-txt">🔴 pendiente · lo configura el equipo azul</b></div>
       <div class="gauge-wrap">
         <svg id="gauge" class="gauge g-ok" viewBox="0 0 200 120" role="img" aria-label="Medidor de riesgo">
           <path d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" class="g-fondo"/>
@@ -161,6 +179,32 @@
       <button type="button" class="eq-btn eq-general" data-equipo="general"><b>VISTA GENERAL</b><span>Dashboard completo</span></button>
     </div>
     <p class="muted">Laboratorio local · red de confianza · datos ficticios</p>
+  </div>
+</div>
+
+<div id="reto-espera" class="espera" hidden role="status"></div>
+
+<div id="reto-modal" class="modal reto" hidden role="alertdialog" aria-modal="true" aria-labelledby="reto-t">
+  <div class="modal-card reto-card">
+    <h2 id="reto-t">⚔ QUIEREN INICIAR COMBATE</h2>
+    <p id="reto-det" class="muted"></p>
+    <p class="reto-cuenta">Responde en <b id="reto-cuenta">30</b> s o el reto se cancela</p>
+    <div class="reto-botones">
+      <button type="button" id="reto-aceptar" class="btn btn-primary">ACEPTAR</button>
+      <button type="button" id="reto-rechazar" class="btn btn-danger">RECHAZAR</button>
+    </div>
+  </div>
+</div>
+
+<div id="partida-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="partida-t">
+  <div class="modal-card reto-card">
+    <h2 id="partida-t" class="partida-titulo"></h2>
+    <p id="partida-sub" class="muted"></p>
+    <div class="reto-botones">
+      <button type="button" id="partida-revancha" class="btn btn-primary">REVANCHA</button>
+      <button type="button" id="partida-metricas" class="btn">VER MÉTRICAS</button>
+      <button type="button" id="partida-cerrar" class="btn">CERRAR</button>
+    </div>
   </div>
 </div>
 

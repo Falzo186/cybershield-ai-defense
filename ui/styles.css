@@ -324,3 +324,35 @@ body[data-rol="rojo"] #sel-atq-box[hidden] { display: flex !important; }
 /* Vista AZUL: defensor grande; atacante colapsado (conserva marcadores, terminal y su configuración). */
 body[data-rol="azul"] #atq-vista, body[data-rol="azul"] .atq > .kv { display: none; }
 body[data-rol="azul"] #sel-def-box[hidden] { display: flex !important; }
+
+/* ---------- J1: marcador, reto, resultado de partida, diagnóstico ---------- */
+.marcador { font: 700 15px var(--mono); letter-spacing: .04em; padding: 3px 10px; border: 1px solid var(--borde); border-radius: 6px; background: var(--panel2); white-space: nowrap; }
+.probe-res { font: 12px var(--mono); flex-basis: 100%; word-break: break-word; }
+.probe-ok { color: var(--ok); } .probe-bad { color: var(--bad); } .probe-wait { color: var(--texto-sec); }
+.espera { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 25; background: var(--panel2); color: var(--warn); border: 1px solid var(--warn); border-radius: 8px; padding: 10px 16px; font-weight: 700; max-width: 92vw; }
+.reto { z-index: 40; }
+.reto-card { text-align: center; max-width: 560px; }
+.reto-card h2 { justify-content: center; font-size: 20px; }
+.reto-cuenta { color: var(--warn); }
+.reto-botones { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+.reto-botones .btn { font-size: 15px; padding: 12px 22px; }
+.partida-titulo { font-size: 24px !important; letter-spacing: .05em; }
+
+.demo-tag { font: 700 11px var(--sans); letter-spacing: .04em; padding: 3px 8px; border-radius: 4px; border: 1px dashed var(--warn); color: var(--warn); }
+
+/* Cada equipo controla SOLO su Ollama: el panel del rival muestra su modelo en solo lectura, sin controles. */
+.ro-modelo { font-size: 12px; color: var(--texto-sec); margin-bottom: 8px; word-break: break-word; }
+.ro-modelo b { color: var(--texto); font-weight: 500; }
+body[data-rol="rojo"] #sel-def-box, body[data-rol="azul"] #sel-atq-box { display: none !important; }
+body[data-rol="rojo"] #ro-def[hidden], body[data-rol="azul"] #ro-atq[hidden] { display: block !important; }
+
+/* ---------- R1: sospecha de sesión, circuito y fuga parcial ---------- */
+.sospecha { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin: 8px 0 4px; }
+.sospecha-barra { height: 10px; background: var(--panel2); border: 1px solid var(--borde); border-radius: 6px; overflow: hidden; }
+.sospecha-barra > div { height: 100%; width: 0; transition: width .4s ease; }
+.sospecha-verde { background: var(--ok); } .sospecha-ambar { background: var(--warn); } .sospecha-rojo { background: var(--bad); }
+#sospecha-txt { font-size: 11px; color: var(--texto-sec); }
+.hist.r-parcial { border-left-color: #ff9f43; background: rgba(255, 159, 67, .10); }
+.hist-nota-parcial { color: #ff9f43; }
+.hist-nota-circuito { color: var(--def); font-weight: 600; }
+@media (max-width: 600px) { .sospecha { grid-template-columns: 1fr; } }

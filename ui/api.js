@@ -20,7 +20,7 @@ const API = (() => {
   }
 
   const TIPOS = ["ronda_inicio", "ataque", "etapa", "decision", "auditoria", "metricas", "fin", "error",
-    "ollama_estado", "ronda_error"];
+    "ollama_estado", "ronda_error", "reto_enviado", "reto_respondido", "reto_cancelado", "partida_fin"];
 
   // handlers: {tipo: fn(data)}; onEstado("conectado"|"reconectando")
   function conectar(handlers, onEstado) {
@@ -63,6 +63,12 @@ const API = (() => {
     ollamaEstado: (host) => req("GET", "/api/ollama/estado" + (host ? "?host=" + encodeURIComponent(host) : "")),
     ollamaModelos: (host) => req("GET", "/api/ollama/modelos" + (host ? "?host=" + encodeURIComponent(host) : "")),
     usuarios: () => req("GET", "/api/usuarios"),
+    // Llamada mínima real a host/modelo -> {ok, tiempo_ms, respuesta, error}
+    // rol ("rojo"|"azul"): si la prueba sale bien, el servidor guarda ese modelo+host como lo último confirmado del equipo.
+    ollamaProbar: (host, modelo, rol) => req("GET", "/api/ollama/probar?modelo=" + encodeURIComponent(modelo) +
+      (host ? "&host=" + encodeURIComponent(host) : "") + (rol ? "&rol=" + encodeURIComponent(rol) : "")),
+    // modelo/host: lo que el equipo que acepta tiene en SU panel en este instante.
+    responderReto: (aceptado, rol, modelo, host) => req("POST", "/api/batalla/responder", { aceptado, rol, modelo, host }),
     conectar,
   };
 })();

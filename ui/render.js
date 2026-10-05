@@ -199,7 +199,8 @@ const R = (() => {
     $("def-herr").textContent = d.herramienta || "—";
     $("def-tiempo").textContent = d.tiempo_ms + " ms" + (typeof d.tokens === "number" ? " · " + d.tokens + " tokens" : "");
     $("def-ia").textContent = d.decision_ia || "—";
-    $("def-origen").textContent = d.origen === "ollama" ? "🟢 REAL (Ollama" + (d.modelo ? " · " + d.modelo : "") + ")" : "🟡 MOCK";
+    $("def-origen").textContent = d.origen_decision === "filtro_rapido" ? "⚡ Filtro rápido (sin inferencia)"
+      : d.origen === "ollama" ? "🟢 REAL (Ollama" + (d.modelo ? " · " + d.modelo : "") + ")" : "🟡 MOCK";
     $("def-parse").hidden = d.parse_ok !== false;
   }
 
@@ -216,7 +217,8 @@ const R = (() => {
     const esError = reg.veredicto === "ERROR";
     const [cls, ico, txt] = esError ? ["r-err", "⚠", "ERROR"]
       : (RESULTADO[reg.veredicto] || ["", "?", String(reg.veredicto)]);
-    const li = el("li", "hist " + cls);
+    const parcial = reg.nivel_fuga === "PARCIAL";
+    const li = el("li", "hist " + cls + (parcial ? " r-parcial" : ""));
     const flecha = el("span", "hist-flecha", "▸");
     const cab = el("button", "hist-cab");
     cab.type = "button";
@@ -224,7 +226,7 @@ const R = (() => {
     cab.append(el("span", "hist-ico", ico),
       el("span", "hist-txt", "RONDA " + String(reg.ronda).padStart(2, "0") +
         " · ATAQUE: " + (reg.categoria || "—") +
-        " · DEFENSA: " + (reg.decision_efectiva || "—") + " · RESULTADO: " + txt),
+        " · DEFENSA: " + (reg.decision_efectiva || "—") + " · RESULTADO: " + txt + (parcial ? " · FUGA PARCIAL" : "")),
       flecha);
     li.append(cab);
     if (reg.veredicto === "FALLA_DEFENSA") {
@@ -233,6 +235,12 @@ const R = (() => {
       li.append(el("div", "hist-nota hist-nota-depth", "La IA permitió, las capas de seguridad contuvieron."));
     } else if (esError) {
       li.append(el("div", "hist-nota", "No cuenta como bloqueo ni como éxito."));
+    }
+    if (reg.circuito_sesion) {
+      li.append(el("div", "hist-nota hist-nota-circuito", "🔒 Autorización forzada por patrón de sesión sospechoso"));
+    }
+    if (parcial) {
+      li.append(el("div", "hist-nota hist-nota-parcial", "Fuga parcial: el defensor confirmó/nombró un secreto sin entregarlo (no puntúa, se registra)."));
     }
 
     const det = el("div", "hist-det");
@@ -343,7 +351,10 @@ const R = (() => {
     $("atq-vista").hidden = modo === "manual";
     $("term").hidden = modo !== "manual";
     $("rondas-wrap").hidden = modo !== "batalla";
-    $("usuario-wrap").hidden = !usaModelo;
+    // En batalla el usuario lo fija la dificultad (empleado/analista/admin); el selector de usuario solo en manual real.
+    $("usuario-wrap").hidden = !(modo === "manual" && !!manualReal);
+    $("dificultad-wrap").hidden = modo !== "batalla";
+    $("demo-wrap").hidden = modo !== "batalla";
     $("intensidad-wrap").hidden = modo !== "batalla";
     $("sel-atq-box").hidden = modo !== "batalla";
     $("sel-def-box").hidden = !usaModelo;
@@ -356,6 +367,8 @@ const R = (() => {
     $("btn-stop").disabled = !c;
     $("rondas").disabled = c;
     ["sel-atq", "sel-def", "sel-usuario", "sel-intensidad"].forEach((id) => { $(id).disabled = c; });
+    $("sel-dificultad").disabled = c || $("chk-demo").checked; // en demostración el usuario es admin, no hay dificultad
+    $("chk-demo").disabled = c;
     document.querySelectorAll("[data-refrescar]").forEach((b) => { b.disabled = c; });
     document.querySelectorAll(".tab").forEach((t) => { t.disabled = c; });
     $("term-input").disabled = c;
@@ -378,6 +391,51 @@ const R = (() => {
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
   }
+
+  // ---------- marcador, reto (listo/aceptar), resultado de partida, diagnóstico ----------
+  function setMarcador(atq, def) {
+    $("marcador").textContent = "🔴 " + (atq | 0) + " — " + (def | 0) + " 🔵";
+  }
+  // Modo demostración (admin): etiqueta visible y marcador desactivado; no puntúa porque el acceso es legítimo.
+  function setDemo(on) {
+    $("demo-tag").hidden = !on;
+    $("sel-dificultad").disabled = on;
+    if (on) $("marcador").textContent = "🔴 sin puntaje 🔵";
+  }
+  function setProbe(rol, texto, ok) { // ok: true | false | null (probando)
+    const n = $("probe-" + (rol === "def" ? "def" : "atq"));
+    n.textContent = texto;
+    n.className = "probe-res " + (ok === true ? "probe-ok" : ok === false ? "probe-bad" : "probe-wait");
+  }
+  const EQ = { rojo: "ROJO", azul: "AZUL", general: "GENERAL" };
+  const DIF = { facil: "Fácil (invitado)", media: "Media (empleado)", dificil: "Difícil (analista)" };
+  function mostrarReto(visible, d) {
+    $("reto-modal").hidden = !visible;
+    if (!visible || !d) return;
+    $("reto-t").textContent = "⚔ EQUIPO " + (EQ[d.de_rol] || "?") + " QUIERE INICIAR COMBATE";
+    $("reto-det").textContent = "Rondas: " + d.rondas + " · Intensidad: " + d.intensidad + " · " +
+      (d.demo ? "MODO DEMOSTRACIÓN (admin, sin puntaje)" : "Dificultad: " + (DIF[d.dificultad] || "—"));
+    $("reto-aceptar").focus();
+  }
+  function setCuenta(n) { $("reto-cuenta").textContent = String(Math.max(0, n)); }
+  function mostrarEspera(texto) {
+    const b = $("reto-espera");
+    b.hidden = !texto;
+    b.textContent = texto || "";
+  }
+  function mostrarPartida(d, hayMetricas) {
+    const a = d.puntos_atacante | 0, df = d.puntos_defensor | 0;
+    const t = d.ganador === "atacante" ? "🏆 GANÓ EL EQUIPO ROJO · " + a + "-" + df
+      : d.ganador === "defensor" ? "🏆 GANÓ EL EQUIPO AZUL · " + df + "-" + a : "🤝 EMPATE · " + a + "-" + df;
+    $("partida-t").textContent = (d.detenida ? "PARTIDA DETENIDA · " : "") + t;
+    $("partida-sub").textContent = "Rondas jugadas: " + d.rondas_jugadas + (d.errores ? " · rondas con error (no puntúan): " + d.errores : "") +
+      " · 🔴 atacante " + a + " — " + df + " defensor 🔵";
+    $("partida-metricas").hidden = !hayMetricas;
+    $("partida-modal").hidden = false;
+    $("partida-revancha").focus();
+  }
+  const cerrarPartida = () => { $("partida-modal").hidden = true; };
+  const partidaAbierta = () => !$("partida-modal").hidden;
 
   // ---------- equipo (rojo / azul / general) ----------
   const NOMBRE_EQUIPO = { rojo: "EQUIPO ROJO", azul: "EQUIPO AZUL", general: "VISTA GENERAL" };
@@ -471,7 +529,8 @@ const R = (() => {
     initAuditoria, crearFiltros, setFiltro, addAuditoria,
     terminalAdd, terminalDatos, terminalLimpiarDatos,
     setModo, setCorriendo, setConexion, setInfo, toast,
-    setVeredictoError, setOrigen, setManualOrigen, setEquipo, mostrarSelector, setOllama, setUsuarios, valorSelect,
+    setVeredictoError, setOrigen, setManualOrigen, setEquipo, mostrarSelector,
+    setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
   };
 })();

@@ -13,3 +13,4 @@ data/*.txt
 !data/redteam.db
 !data/batallas.jsonl
 !data/campana_a.txt
+data/*.log
