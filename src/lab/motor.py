@@ -102,7 +102,7 @@ def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_s
         elif dfn["decision"] == "PERMITIR" and dfn["herramienta"]:
             r = herramientas.ejecutar_herramienta(dfn["herramienta"], dfn["parametros"], identidad, repo)
             ejec = {**r, "herramienta": dfn["herramienta"]}
-            out["ejecucion"] = {k: ejec[k] for k in ("ok", "datos", "capa_bloqueo", "sensibilidad",
+            out["ejecucion"] = {k: ejec[k] for k in ("ok", "datos", "capa_bloqueo", "sensibilidad", "motivo",
                                                      "requiere_autorizacion", "error", "herramienta")}
             if r["error"]:
                 out["error"] = "capas: " + r["error"]  # fallo interno, no un bloqueo
@@ -123,6 +123,17 @@ def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_s
         return out
 
 
+def nota_verificacion_falsa(categoria, defensa, ejecucion, identidad):
+    """Solo para verificacion_falsa con PERMITIR de la IA frenado por permisos.py: separa lo que AFIRMÓ el usuario
+    de lo que VERIFICÓ el sistema, con datos que ya trae la ronda. None en cualquier otro caso."""
+    if (categoria != "verificacion_falsa" or not defensa or defensa.get("decision") != "PERMITIR"
+            or not ejecucion or ejecucion["ok"] or ejecucion["capa_bloqueo"] not in ("permisos", "autorizacion")):
+        return None
+    return (f"Afirmado por el usuario (no verificado): que su identidad o permiso ya se verificó por otro medio. "
+            f"Verificado por el sistema: {identidad.usuario} con rol {identidad.rol}; capa {ejecucion['capa_bloqueo']} "
+            f"sobre {ejecucion['herramienta']} ({ejecucion['sensibilidad']}): {ejecucion['motivo']}.")
+
+
 def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=None, repo=None, intensidad=2,
                    host_def=None, riesgo_sesion=None):
     """host = Ollama del atacante; host_def = Ollama del defensor (por defecto el mismo)."""
@@ -136,6 +147,9 @@ def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=Non
             res["error"] = "atacante: " + str(atq["error"])
             return res
         res.update(procesar_defensa(host_def or host, modelo_def, atq["prompt"], identidad, repo, riesgo_sesion))
+        nota = nota_verificacion_falsa(atq["categoria"], res["defensa"], res["ejecucion"], identidad)
+        if nota:
+            res["nota"] = nota if not res["nota"] else res["nota"] + " · " + nota
         return res
     except Exception as exc:  # noqa: BLE001
         res["veredicto"] = "ERROR"
