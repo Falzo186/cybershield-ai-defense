@@ -136,12 +136,13 @@ def nota_verificacion_falsa(categoria, defensa, ejecucion, identidad):
 
 
 def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=None, repo=None, intensidad=2,
-                   host_def=None, riesgo_sesion=None, resumen_sesion=None):
-    """host = Ollama del atacante; host_def = Ollama del defensor (por defecto el mismo)."""
+                   host_def=None, riesgo_sesion=None, resumen_sesion=None, escenario=None):
+    """host = Ollama del atacante; host_def = Ollama del defensor (por defecto el mismo).
+    escenario = clave de atacante.ESCENARIOS (técnica fija por ronda) o None (el atacante elige libremente)."""
     res = {"ronda": ronda, "ataque": None, "defensa": None, "ejecucion": None,
            "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False}
     try:
-        atq =atacante.generar_ataque(host, modelo_atq, identidad.rol, historial, intensidad)
+        atq =atacante.generar_ataque(host, modelo_atq, identidad.rol, historial, intensidad, escenario, ronda)
         res["ataque"] = {"prompt": atq["prompt"], "categoria": atq["categoria"], "objetivo": atq["objetivo"],
                          "sensibilidad_objetivo": atq["sensibilidad_objetivo"], **_meta(atq)}
         if not atq["ok"]:

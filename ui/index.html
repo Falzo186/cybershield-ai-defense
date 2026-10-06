@@ -46,6 +46,14 @@
             <option value="dificil">Difícil (analista)</option>
           </select>
         </label>
+        <label id="escenario-wrap" class="rondas" hidden title="Guion fijo de técnicas del atacante por ronda (se repite en ciclo). Libre = el atacante elige la técnica">Escenario
+          <select id="sel-escenario" class="sel" aria-label="Escenario">
+            <option value="" selected>Libre (sin guion)</option>
+            <option value="suplantacion_identidad">Suplantación de identidad</option>
+            <option value="verificacion_falsa">Verificación falsa</option>
+            <option value="escalada_privilegios">Escalada de privilegios</option>
+          </select>
+        </label>
         <label id="demo-wrap" class="rondas" hidden title="Usa el usuario admin: su acceso al objetivo es legítimo, así que no puede haber falla ni puntaje">
           <input id="chk-demo" type="checkbox"> Modo demostración (sin puntaje)
         </label>

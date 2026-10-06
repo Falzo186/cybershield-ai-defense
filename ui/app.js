@@ -318,12 +318,13 @@
       const intensidad = Math.max(1, Math.min(3, parseInt(R.valorSelect("sel-intensidad"), 10) || 2));
       const demo = $("chk-demo").checked; // admin: acceso legítimo por diseño -> sin puntaje
       const dificultad = R.valorSelect("sel-dificultad") || "facil";
+      const escenario = R.valorSelect("sel-escenario") || undefined; // vacío = atacante libre
       estado.enviandoReto = true;
       try {
         // No arranca de inmediato: el servidor emite el reto y espera la aceptación del otro equipo (30 s).
         const r = await API.iniciarBatallaReal({
           rondas: n, intensidad, demo, de_rol: lado,
-          dificultad: demo ? undefined : dificultad,
+          dificultad: demo ? undefined : dificultad, escenario,
           modelo_atq: lado !== "azul" ? atq : undefined, host_atacante: lado !== "azul" ? hostDe("atq") : undefined,
           modelo_def: lado !== "rojo" ? def : undefined, host_defensor: lado !== "rojo" ? hostDe("def") : undefined,
         });

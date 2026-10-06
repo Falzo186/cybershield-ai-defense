@@ -22,7 +22,7 @@ from fastapi.responses import JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 import mock_server as ms  # noqa: E402
-from src.lab import cliente_ollama, motor, repositorio, sesion  # noqa: E402
+from src.lab import atacante, cliente_ollama, motor, repositorio, sesion  # noqa: E402
 
 app = ms.app
 HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -110,6 +110,8 @@ class BatallaRealIn(BaseModel):
     de_rol: str = Field("general", pattern="^(rojo|azul|general)$")       # vista que pulsa «Iniciar batalla»
     dificultad: str | None = Field(None, pattern="^(facil|media|dificil)$")  # sustituye a `usuario` si se envía
     demo: bool = False  # modo demostración: usuario admin, SIN puntaje
+    # Guion fijo de técnicas por ronda (atacante.ESCENARIOS); None = el atacante elige libremente.
+    escenario: str | None = Field(None, pattern="^(" + "|".join(atacante.ESCENARIOS) + ")$")
 
 
 class RespuestaRetoIn(BaseModel):
@@ -238,7 +240,7 @@ def _arrancar(p, cfg):
     ms.ESTADO["corriendo"] = True
     ms.TAREA = asyncio.create_task(_correr_real(cfg["modelo_atq"], cfg["modelo_def"], p["rondas"], p["ident"],
                                                 p["intensidad"], cfg["host_atq"], cfg["host_def"], p["demo"],
-                                                p.get("dificultad")))
+                                                p.get("dificultad"), p.get("escenario")))
 
 
 async def _proponer_reto(body, ident):
@@ -246,9 +248,10 @@ async def _proponer_reto(body, ident):
     global RETO
     a_rol = {"rojo": "azul", "azul": "rojo"}.get(body.de_rol)  # la vista general no necesita aceptación
     evento = {"de_rol": body.de_rol, "a_rol": a_rol, "rondas": body.rondas, "intensidad": body.intensidad,
-              "dificultad": body.dificultad, "demo": body.demo, "segundos": TIMEOUT_RETO}
+              "dificultad": body.dificultad, "demo": body.demo, "escenario": body.escenario,
+              "segundos": TIMEOUT_RETO}
     params = {"rondas": body.rondas, "ident": ident, "intensidad": body.intensidad, "demo": body.demo,
-              "dificultad": body.dificultad}
+              "dificultad": body.dificultad, "escenario": body.escenario}
     if a_rol is None:  # vista general: arranca ya, con ambos lados verificados
         cfg, err = await _config_final()
         if err:
@@ -507,7 +510,7 @@ async def _emitir_ronda(r, matq, mdef, manual=False, puntos=None, sesion_estado=
 
 
 async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host_atq=None, host_def=None, demo=False,
-                       dificultad=None):
+                       dificultad=None, escenario=None):
     host_atq, host_def = host_atq or HOST, host_def or HOST
     # Modelo y host que REALMENTE se usan en esta batalla (se envían en cada ronda_inicio para inspección).
     asignacion = {"atacante": {"modelo": modelo_atq, "host": host_atq},
@@ -523,9 +526,9 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
     informe = {"veredictos_por_tipo": {k: 0 for k in ("FALLA_DEFENSA", "DEFENSA_EXITOSA", "DEFENSA_EN_PROFUNDIDAD",
                                                       "PERMITIDO_CORRECTO", "ERROR")},
                "fugas_parciales": 0, "activaciones_circuito_sesion": 0, "bloqueos_filtro_rapido": 0,
-               "dificultad": dificultad, "usuario": f"{ident.usuario} ({ident.rol})",
+               "dificultad": dificultad, "escenario": escenario, "usuario": f"{ident.usuario} ({ident.rol})",
                "modelos_usados": {"atacante": f"{modelo_atq} @ {host_atq}", "defensor": f"{modelo_def} @ {host_def}"}}
-    ms.emitir("auditoria", ms.aud("SYSTEM", "INICIO", f"batalla real · {ident.usuario} ({ident.rol}) · intensidad {intensidad}", "OK", "BAJO"))
+    ms.emitir("auditoria", ms.aud("SYSTEM", "INICIO", f"batalla real · {ident.usuario} ({ident.rol}) · intensidad {intensidad} · escenario {escenario or 'libre'}", "OK", "BAJO"))
     ms.emitir("auditoria", ms.aud("SYSTEM", "ASIGNACION", f"atacante {modelo_atq} @ {host_atq} · defensor {modelo_def} @ {host_def}", "OK", "BAJO"))
     try:
         for n in range(1, rondas + 1):
@@ -539,7 +542,7 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
                     loop.run_in_executor(None, lambda n=n, h=list(historial): motor.ejecutar_ronda(
                         host_atq, modelo_atq, modelo_def, ident, n, historial=h, intensidad=intensidad,
                         host_def=host_def, riesgo_sesion=estado_sesion.riesgo_acumulado,
-                        resumen_sesion=estado_sesion.resumen())),
+                        resumen_sesion=estado_sesion.resumen(), escenario=escenario)),
                     TIMEOUT_RONDA)
             except asyncio.TimeoutError:
                 r = {"ronda": n, "ataque": None, "defensa": None, "ejecucion": None, "veredicto": "ERROR",

@@ -354,6 +354,7 @@ const R = (() => {
     // En batalla el usuario lo fija la dificultad (empleado/analista/admin); el selector de usuario solo en manual real.
     $("usuario-wrap").hidden = !(modo === "manual" && !!manualReal);
     $("dificultad-wrap").hidden = modo !== "batalla";
+    $("escenario-wrap").hidden = modo !== "batalla";
     $("demo-wrap").hidden = modo !== "batalla";
     $("intensidad-wrap").hidden = modo !== "batalla";
     $("sel-atq-box").hidden = modo !== "batalla";
@@ -366,7 +367,7 @@ const R = (() => {
     $("main-wrap").title = !c && mainBloqueado ? (tooltip || "") : "";
     $("btn-stop").disabled = !c;
     $("rondas").disabled = c;
-    ["sel-atq", "sel-def", "sel-usuario", "sel-intensidad"].forEach((id) => { $(id).disabled = c; });
+    ["sel-atq", "sel-def", "sel-usuario", "sel-intensidad", "sel-escenario"].forEach((id) => { $(id).disabled = c; });
     $("sel-dificultad").disabled = c || $("chk-demo").checked; // en demostración el usuario es admin, no hay dificultad
     $("chk-demo").disabled = c;
     document.querySelectorAll("[data-refrescar]").forEach((b) => { b.disabled = c; });
@@ -414,7 +415,8 @@ const R = (() => {
     if (!visible || !d) return;
     $("reto-t").textContent = "⚔ EQUIPO " + (EQ[d.de_rol] || "?") + " QUIERE INICIAR COMBATE";
     $("reto-det").textContent = "Rondas: " + d.rondas + " · Intensidad: " + d.intensidad + " · " +
-      (d.demo ? "MODO DEMOSTRACIÓN (admin, sin puntaje)" : "Dificultad: " + (DIF[d.dificultad] || "—"));
+      (d.demo ? "MODO DEMOSTRACIÓN (admin, sin puntaje)" : "Dificultad: " + (DIF[d.dificultad] || "—")) +
+      " · Escenario: " + (d.escenario || "libre");
     $("reto-aceptar").focus();
   }
   function setCuenta(n) { $("reto-cuenta").textContent = String(Math.max(0, n)); }
