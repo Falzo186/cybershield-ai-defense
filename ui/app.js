@@ -22,6 +22,7 @@
     enviandoReto: false,  // evita doble clic mientras el servidor valida y emite el reto
     ultimaFin: null,      // {m, e}: métricas de la última batalla real (para «Ver métricas»)
     cuenta: null,         // intervalo de la cuenta atrás del reto
+    informe: null,        // informe agregado de la última partida (exportable)
     contadores: { intentos: 0, exitosos: 0, bloqueados: 0, ia: 0 }, // se acumulan ronda a ronda (ERROR no cuenta)
     rondas: [],           // historial en memoria (se exporta a JSON)
   };
@@ -68,17 +69,28 @@
     return reg;
   }
 
-  function exportarHistorial() {
-    if (!estado.rondas.length) { R.toast("Aún no hay rondas que exportar."); return; }
-    const blob = new Blob([JSON.stringify(estado.rondas, null, 2)], { type: "application/json" });
+  // Descarga un objeto como archivo .json desde el navegador (Blob + enlace), sin backend.
+  function descargarJSON(prefijo, datos) {
+    const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "historial-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+    a.download = prefijo + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
     document.body.append(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportarHistorial() {
+    if (!estado.rondas.length) { R.toast("Aún no hay rondas que exportar."); return; }
+    descargarJSON("historial-", estado.rondas);
+  }
+
+  // Informe agregado de la última partida (llega en partida_fin.informe).
+  function exportarInforme() {
+    if (!estado.informe) { R.toast("El informe estará disponible al terminar una partida."); return; }
+    descargarJSON("informe_sesion_", estado.informe);
   }
 
   // Etiqueta de origen: solo dice OLLAMA en batalla y, mientras corre, únicamente si llegan eventos reales.
@@ -259,7 +271,12 @@
       limpiarReto();
       R.toast("Reto cancelado: " + (d.motivo || "sin respuesta"));
     },
-    partida_fin(d) { R.mostrarPartida(d, !!estado.ultimaFin); },
+    partida_fin(d) {
+      estado.informe = d.informe || null;
+      $("btn-informe").disabled = !estado.informe;
+      $("partida-informe").hidden = !estado.informe;
+      R.mostrarPartida(d, !!estado.ultimaFin);
+    },
     auditoria(d) { R.addAuditoria(d); },
     metricas(d) { aplicarMetricas(d); },
     fin(d) {
@@ -541,6 +558,8 @@
     $("reto-rechazar").addEventListener("click", () => responderReto(false));
     $("partida-revancha").addEventListener("click", revancha);
     $("partida-cerrar").addEventListener("click", R.cerrarPartida);
+    $("partida-informe").addEventListener("click", exportarInforme);
+    $("btn-informe").addEventListener("click", exportarInforme);
     $("partida-metricas").addEventListener("click", () => {
       if (estado.ultimaFin) { R.cerrarPartida(); R.mostrarModal(estado.ultimaFin.m, estado.ultimaFin.e); }
     });

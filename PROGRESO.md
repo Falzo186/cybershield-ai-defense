@@ -151,3 +151,11 @@
 - Decisiones: se aplica en procesar_defensa (batalla y manual real) y cuenta como rechazo en EstadoSesion.
 - Decisiones: el ataque de prueba de test_motor ya no menciona LAB_ (si no, el filtro lo bloquearía antes del caso a probar).
 - Pendiente / siguiente paso: medir cuántas rondas ahorra el filtro y ajustar falsos positivos.
+
+## Fase cierre - Contexto de sesión en el defensor e informe exportable
+- Qué se hizo: el defensor recibe el resumen del patrón de la sesión; al terminar la partida se genera un informe agregado exportable.
+- Archivos: src/lab/{sesion,defensor,motor}.py, server/app.py, ui/{index.html,app.js}, docs/CONTRATO_API.md
+- Decisiones: el patrón de sesión es contexto para la IA ("señal, no sentencia"); las capas siguen siendo la autoridad final.
+- Decisiones: el informe se adjunta a partida_fin (payload ampliado, sin romper lo existente); la demostración no puntúa ni genera informe.
+- Decisiones: botón "📄 Exportar informe de sesión" en el banner de resultado y junto a "Exportar historial".
+- Pendiente / siguiente paso: usar los informes exportados para rellenar los hallazgos del README.

@@ -237,7 +237,8 @@ async def _config_final():
 def _arrancar(p, cfg):
     ms.ESTADO["corriendo"] = True
     ms.TAREA = asyncio.create_task(_correr_real(cfg["modelo_atq"], cfg["modelo_def"], p["rondas"], p["ident"],
-                                                p["intensidad"], cfg["host_atq"], cfg["host_def"], p["demo"]))
+                                                p["intensidad"], cfg["host_atq"], cfg["host_def"], p["demo"],
+                                                p.get("dificultad")))
 
 
 async def _proponer_reto(body, ident):
@@ -246,7 +247,8 @@ async def _proponer_reto(body, ident):
     a_rol = {"rojo": "azul", "azul": "rojo"}.get(body.de_rol)  # la vista general no necesita aceptación
     evento = {"de_rol": body.de_rol, "a_rol": a_rol, "rondas": body.rondas, "intensidad": body.intensidad,
               "dificultad": body.dificultad, "demo": body.demo, "segundos": TIMEOUT_RETO}
-    params = {"rondas": body.rondas, "ident": ident, "intensidad": body.intensidad, "demo": body.demo}
+    params = {"rondas": body.rondas, "ident": ident, "intensidad": body.intensidad, "demo": body.demo,
+              "dificultad": body.dificultad}
     if a_rol is None:  # vista general: arranca ya, con ambos lados verificados
         cfg, err = await _config_final()
         if err:
@@ -323,11 +325,20 @@ async def responder_reto(body: RespuestaRetoIn):
     return {"estado": "iniciada"}
 
 
-def _partida_fin(puntos, jugadas, errores, detenida=False):
+def _cerrar_informe(informe, puntos, jugadas, errores, estado_sesion):
+    """Informe agregado de la sesión completa (se adjunta a partida_fin y la UI lo exporta como JSON)."""
+    a, d = puntos["atacante"], puntos["defensor"]
+    return {**informe, "rondas_totales": jugadas + errores, "rondas_validas": jugadas,
+            "puntos_atacante": a, "puntos_defensor": d,
+            "ganador": "atacante" if a > d else "defensor" if d > a else "empate",
+            "riesgo_acumulado_final": estado_sesion.riesgo_acumulado}
+
+
+def _partida_fin(puntos, jugadas, errores, detenida=False, informe=None):
     a, d = puntos["atacante"], puntos["defensor"]
     ms.emitir("partida_fin", {"puntos_atacante": a, "puntos_defensor": d, "rondas_jugadas": jugadas,
                               "ganador": "atacante" if a > d else "defensor" if d > a else "empate",
-                              "errores": errores, "detenida": detenida})
+                              "errores": errores, "detenida": detenida, "informe": informe})
 
 
 # ---------- batalla real ----------
@@ -495,7 +506,8 @@ async def _emitir_ronda(r, matq, mdef, manual=False, puntos=None, sesion_estado=
     return d
 
 
-async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host_atq=None, host_def=None, demo=False):
+async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host_atq=None, host_def=None, demo=False,
+                       dificultad=None):
     host_atq, host_def = host_atq or HOST, host_def or HOST
     # Modelo y host que REALMENTE se usan en esta batalla (se envían en cada ronda_inicio para inspección).
     asignacion = {"atacante": {"modelo": modelo_atq, "host": host_atq},
@@ -508,6 +520,11 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
     errores, historial, jugadas = 0, [], 0
     puntos = None if demo else {"atacante": 0, "defensor": 0}  # la demostración (admin) no puntúa
     estado_sesion = sesion.EstadoSesion()  # nuevo en cada batalla (revancha incluida); se descarta al terminar
+    informe = {"veredictos_por_tipo": {k: 0 for k in ("FALLA_DEFENSA", "DEFENSA_EXITOSA", "DEFENSA_EN_PROFUNDIDAD",
+                                                      "PERMITIDO_CORRECTO", "ERROR")},
+               "fugas_parciales": 0, "activaciones_circuito_sesion": 0, "bloqueos_filtro_rapido": 0,
+               "dificultad": dificultad, "usuario": f"{ident.usuario} ({ident.rol})",
+               "modelos_usados": {"atacante": f"{modelo_atq} @ {host_atq}", "defensor": f"{modelo_def} @ {host_def}"}}
     ms.emitir("auditoria", ms.aud("SYSTEM", "INICIO", f"batalla real · {ident.usuario} ({ident.rol}) · intensidad {intensidad}", "OK", "BAJO"))
     ms.emitir("auditoria", ms.aud("SYSTEM", "ASIGNACION", f"atacante {modelo_atq} @ {host_atq} · defensor {modelo_def} @ {host_def}", "OK", "BAJO"))
     try:
@@ -521,29 +538,36 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
                 r = await asyncio.wait_for(
                     loop.run_in_executor(None, lambda n=n, h=list(historial): motor.ejecutar_ronda(
                         host_atq, modelo_atq, modelo_def, ident, n, historial=h, intensidad=intensidad,
-                        host_def=host_def, riesgo_sesion=estado_sesion.riesgo_acumulado)),
+                        host_def=host_def, riesgo_sesion=estado_sesion.riesgo_acumulado,
+                        resumen_sesion=estado_sesion.resumen())),
                     TIMEOUT_RONDA)
             except asyncio.TimeoutError:
                 r = {"ronda": n, "ataque": None, "defensa": None, "ejecucion": None, "veredicto": "ERROR",
                      "error": f"timeout de ronda ({TIMEOUT_RONDA} s)"}
             if r["veredicto"] == "ERROR":
                 errores += 1
+                informe["veredictos_por_tipo"]["ERROR"] += 1
                 await _emitir_error(r, modelo_atq, modelo_def)  # no se registra en métricas; la batalla continúa
             else:
-                await _emitir_ronda(r, modelo_atq, modelo_def, puntos=puntos, sesion_estado=estado_sesion)
+                d = await _emitir_ronda(r, modelo_atq, modelo_def, puntos=puntos, sesion_estado=estado_sesion)
+                informe["veredictos_por_tipo"][d["resultado"]] = informe["veredictos_por_tipo"].get(d["resultado"], 0) + 1
+                informe["fugas_parciales"] += int(d.get("nivel_fuga") == "PARCIAL")
+                informe["activaciones_circuito_sesion"] += int(bool(d.get("circuito_sesion")))
+                informe["bloqueos_filtro_rapido"] += int(d.get("origen_decision") == "filtro_rapido")
                 jugadas += 1
                 historial.append({"categoria": r["ataque"]["categoria"], "resultado": r["veredicto"]})
             await asyncio.sleep(0.6)
         ms.emitir("fin", {"modo": "batalla", "origen": "ollama", "metricas": ms.snapshot(), "errores": errores,
                           "demo": demo})
         if puntos is not None:
-            _partida_fin(puntos, jugadas, errores)
+            _partida_fin(puntos, jugadas, errores, informe=_cerrar_informe(informe, puntos, jugadas, errores, estado_sesion))
     except asyncio.CancelledError:
         ms.emitir("auditoria", ms.aud("SYSTEM", "DETENIDO", "batalla real", "CANCELADO", "BAJO"))
         ms.emitir("fin", {"modo": "batalla", "origen": "ollama", "detenido": True,
                           "metricas": ms.snapshot(), "errores": errores})
         if puntos is not None:
-            _partida_fin(puntos, jugadas, errores, detenida=True)
+            _partida_fin(puntos, jugadas, errores, detenida=True,
+                         informe=_cerrar_informe(informe, puntos, jugadas, errores, estado_sesion))
     except Exception as exc:  # noqa: BLE001
         ms.emitir("error", {"mensaje": f"Error interno de la batalla real: {exc}"})
     finally:

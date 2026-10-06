@@ -62,7 +62,7 @@ def nivel_fuga(veredicto, decision_efectiva, motivo):
     return "NINGUNA"
 
 
-def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None):
+def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None, resumen_sesion=None):
     """Defensor IA -> capas deterministas -> veredicto, para UNA solicitud. Nunca lanza.
 
     La decisión del modelo es una PROPUESTA; las capas deciden con la identidad REAL del sistema.
@@ -80,7 +80,8 @@ def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_s
                               "modelo": None, "intentos": 0, "origen_decision": "filtro_rapido"}
             out.update(veredicto="DEFENSA_EXITOSA", origen_decision="filtro_rapido")
             return out
-        dfn = defensor.analizar(host, modelo_def, solicitud, identidad, herramientas.catalogo(), riesgo_sesion)
+        dfn = defensor.analizar(host, modelo_def, solicitud, identidad, herramientas.catalogo(), riesgo_sesion,
+                                resumen_sesion)
         out["defensa"] = {k: dfn[k] for k in ("decision", "riesgo", "motivo", "politica", "herramienta",
                                               "parametros", "parse_ok")} | _meta(dfn)
         if not dfn["ok"]:
@@ -135,7 +136,7 @@ def nota_verificacion_falsa(categoria, defensa, ejecucion, identidad):
 
 
 def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=None, repo=None, intensidad=2,
-                   host_def=None, riesgo_sesion=None):
+                   host_def=None, riesgo_sesion=None, resumen_sesion=None):
     """host = Ollama del atacante; host_def = Ollama del defensor (por defecto el mismo)."""
     res = {"ronda": ronda, "ataque": None, "defensa": None, "ejecucion": None,
            "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False}
@@ -146,7 +147,8 @@ def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=Non
         if not atq["ok"]:
             res["error"] = "atacante: " + str(atq["error"])
             return res
-        res.update(procesar_defensa(host_def or host, modelo_def, atq["prompt"], identidad, repo, riesgo_sesion))
+        res.update(procesar_defensa(host_def or host, modelo_def, atq["prompt"], identidad, repo, riesgo_sesion,
+                                    resumen_sesion))
         nota = nota_verificacion_falsa(atq["categoria"], res["defensa"], res["ejecucion"], identidad)
         if nota:
             res["nota"] = nota if not res["nota"] else res["nota"] + " · " + nota

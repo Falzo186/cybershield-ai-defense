@@ -27,6 +27,17 @@ class EstadoSesion:
     def circuito_activo(self):
         return self.riesgo_acumulado > UMBRAL_CIRCUITO
 
+    def resumen(self):
+        """Una línea legible del patrón de la sesión para el defensor, p. ej.
+        'Esta sesión: 3 intentos de rol_falso, 1 de autoridad; 2 rechazos seguidos; riesgo acumulado 45/100'."""
+        if not self.rondas_evaluadas:
+            return None
+        cats = sorted(self.categorias_vistas.items(), key=lambda kv: -kv[1])
+        partes = [f"{n} intento{'s' if n != 1 else ''} de {c}" if i == 0 else f"{n} de {c}"
+                  for i, (c, n) in enumerate(cats)]
+        return (f"Esta sesión: {', '.join(partes)}; {self.rechazos_consecutivos} rechazos seguidos; "
+                f"riesgo acumulado {int(self.riesgo_acumulado)}/100")
+
     def registrar(self, categoria, veredicto, decision_efectiva):
         """Actualiza la sesión con una ronda ya evaluada (las rondas ERROR no se registran)."""
         self.rondas_evaluadas += 1

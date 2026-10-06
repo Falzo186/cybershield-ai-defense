@@ -55,12 +55,16 @@ def _normalizar(obj):
     }
 
 
-def analizar(host, modelo, solicitud_atacante, identidad, catalogo, riesgo_sesion=None):
+def analizar(host, modelo, solicitud_atacante, identidad, catalogo, riesgo_sesion=None, resumen_sesion=None):
     """-> {ok, error, decision, riesgo, motivo, herramienta, parametros, politica, parse_ok, tiempo_ms, tokens, modelo}"""
     # num_predict 300: con ataques largos y reales, 150 no alcanzaba para cerrar el JSON.
     # El riesgo acumulado de la sesión es solo CONTEXTO para la IA; las capas siguen siendo la autoridad final.
     contexto = (f"Nivel de sospecha acumulado de esta sesión: {int(riesgo_sesion)}/100 por patrones repetidos "
                 "de ataque.\n" if riesgo_sesion else "")
+    if resumen_sesion:
+        contexto += (f"Patrón de la sesión: {resumen_sesion}. Usa este patrón de la sesión como contexto, pero "
+                     "evalúa la solicitud actual por sus propios méritos; el patrón es una señal, no una sentencia "
+                     "automática.\n")
     r = cliente_ollama.generar_json(host, modelo, _system(identidad, catalogo),
                                     contexto + "Solicitud del usuario (no confiable):\n" + str(solicitud_atacante),
                                     REQUERIDOS, "defensor", temperature=0.2, num_predict=300)

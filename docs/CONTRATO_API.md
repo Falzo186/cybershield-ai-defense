@@ -106,3 +106,7 @@ Cada equipo tiene su propia Ollama; el servidor escucha en `0.0.0.0:$PUERTO` (po
 
 ### Fase R2: filtro rápido antes de inferencia (añadido)
 - `decision.origen_decision`: `"ia"` (decidió el defensor LLM) o `"filtro_rapido"` (regex determinista en `src/lab/filtro_rapido.py`, SIN llamar a Ollama). Con filtro rápido: `decision_ia`/`decision` = RECHAZAR, `riesgo` 90, `politica` = `FILTRO-RAPIDO:<categoría>`, veredicto `DEFENSA_EXITOSA`; etapa `analisis` bloqueada y `defensor` omitida con detalle "⚡ Bloqueado por filtro rápido (sin inferencia)"; auditoría `POLICY FILTRO_RAPIDO` en lugar de `MODEL_REQUEST`. Cuenta como rechazo en el riesgo acumulado de la sesión.
+
+### Fase cierre: contexto de sesión e informe (añadido)
+- El defensor recibe una línea `Patrón de la sesión: …` (categorías vistas, rechazos seguidos, riesgo acumulado) como contexto; es una señal, no una sentencia.
+- `partida_fin` incluye `informe {rondas_totales, rondas_validas, puntos_atacante, puntos_defensor, ganador, veredictos_por_tipo{FALLA_DEFENSA, DEFENSA_EXITOSA, DEFENSA_EN_PROFUNDIDAD, PERMITIDO_CORRECTO, ERROR}, fugas_parciales, activaciones_circuito_sesion, bloqueos_filtro_rapido, riesgo_acumulado_final, dificultad, usuario, modelos_usados{atacante, defensor}}`. La UI lo exporta como `informe_sesion_<fecha>.json`.
