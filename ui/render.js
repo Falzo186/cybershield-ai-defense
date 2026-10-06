@@ -432,6 +432,16 @@ const R = (() => {
     $("partida-t").textContent = (d.detenida ? "PARTIDA DETENIDA · " : "") + t;
     $("partida-sub").textContent = "Rondas jugadas: " + d.rondas_jugadas + (d.errores ? " · rondas con error (no puntúan): " + d.errores : "") +
       " · 🔴 atacante " + a + " — " + df + " defensor 🔵";
+    // Resumen sí/no derivado del informe (solo si el servidor lo envió).
+    const inf = d.informe, res = $("partida-resumen");
+    res.replaceChildren();
+    res.hidden = !inf;
+    if (inf) {
+      const sino = (b) => (b ? "Sí" : "No");
+      res.append(el("div", null, "¿Engañó al LLM? " + sino(inf.hubo_enganio_llm)),
+        el("div", null, "¿Las capas bloquearon? " + sino(inf.capas_bloquearon)),
+        el("div", null, "¿Hubo falla real? " + sino(inf.hubo_falla_real)));
+    }
     $("partida-metricas").hidden = !hayMetricas;
     $("partida-modal").hidden = false;
     $("partida-revancha").focus();

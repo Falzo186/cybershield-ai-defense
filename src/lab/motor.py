@@ -62,6 +62,15 @@ def nivel_fuga(veredicto, decision_efectiva, motivo):
     return "NINGUNA"
 
 
+def resumen_sino(rondas):
+    """Resumen sí/no del informe final, DERIVADO de los veredictos ya calculados (no los cambia).
+    rondas = [(decision_ia, veredicto), ...] de las rondas válidas de la sesión."""
+    enganio = [v for ia, v in rondas if ia == "PERMITIR" and v in ("DEFENSA_EN_PROFUNDIDAD", "FALLA_DEFENSA")]
+    return {"hubo_enganio_llm": bool(enganio),
+            "capas_bloquearon": "DEFENSA_EN_PROFUNDIDAD" in enganio,
+            "hubo_falla_real": any(v == "FALLA_DEFENSA" for _, v in rondas)}
+
+
 def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None, resumen_sesion=None):
     """Defensor IA -> capas deterministas -> veredicto, para UNA solicitud. Nunca lanza.
 
