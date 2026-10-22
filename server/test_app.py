@@ -94,6 +94,22 @@ def main():
         r.status_code == 404 and len(repositorio.por_defecto().auditoria(500)) == antes + 1)
     chk("la página no refleja la petición", "<script" not in c.get("/l/%3Cscript%3Exx").text)
 
+    # --- reglas evento -> consecuencia (riesgo de la partida) ---
+    chk("el clic aplicó CLIC_ENLACE (+15)", srv.ESTADO_PARTIDA.riesgo_acumulado == 15)
+    cid = b["correos"][0]["id"]
+    chk("rojo no reporta correos", c.post(f"/api/correo/{cid}/reportar", headers=H(tr)).status_code == 403)
+    chk("espectador no reporta correos", c.post(f"/api/correo/{cid}/reportar").status_code == 403)
+    r = c.post(f"/api/correo/{cid}/reportar", headers=H(ta))
+    chk("azul reporta su correo -> correo_reportado (-10)",
+        r.status_code == 200 and r.json()["regla"]["riesgo"] == -10 and srv.ESTADO_PARTIDA.riesgo_acumulado == 5)
+    chk("reportar dos veces -> 409 sin volver a restar",
+        c.post(f"/api/correo/{cid}/reportar", headers=H(ta)).status_code == 409 and srv.ESTADO_PARTIDA.riesgo_acumulado == 5)
+    ajeno = [x for x in repositorio.por_defecto().buzon(srv.PARTIDA_ID, "ana.perez")][0]["id"]
+    chk("azul no reporta el correo de otro usuario -> 404",
+        c.post(f"/api/correo/{ajeno}/reportar", headers=H(ta)).status_code == 404)
+    chk("el buzón muestra el correo como reportado",
+        [x["reportado"] for x in c.get("/api/buzon", headers=H(ta)).json()["correos"] if x["id"] == cid] == [1])
+
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)
 

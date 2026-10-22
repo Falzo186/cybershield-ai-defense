@@ -128,3 +128,11 @@ Nada sale del laboratorio: sin SMTP, plantillas fijas (`src/lab/correos.py`) y e
 ### Marca de tiempo de la tabla `auditoria` (ajuste)
 - `auditoria.ts` (tabla SQLite) se guarda en ISO 8601 completo con zona horaria, p. ej. `2026-10-22T13:47:05-06:00`. Las filas anteriores conservan `HH:MM:SS`: la tabla es append-only (los triggers impiden reescribirlas).
 - El evento SSE `auditoria` sigue enviando `ts:"HH:MM:SS"` para la vista en vivo; no se lee de la tabla.
+
+### Reglas evento -> consecuencia (añadido)
+Deterministas, en `sesion.REGLAS_EVENTO`, sobre un `EstadoSesion` de la partida Rojo/Azul (`ESTADO_PARTIDA`, distinto del de cada batalla IA vs IA). El componente de eventos se acota a 0-100.
+- `CLIC_ENLACE` (al abrir `/l/{id}`) -> riesgo +15.
+- `correo_reportado` -> riesgo −10 y completa las misiones con esa condición.
+- `POST /api/correo/{id}/reportar` (solo token `azul`): reporta un correo de SU buzón en esta partida. 404 si no es suyo, 409 si ya estaba reportado. -> `{reportado:true, regla:{evento, riesgo, mision, riesgo_acumulado}}`. Registra `CORREO_REPORTADO` en `auditoria`.
+- `GET /api/buzon`: cada correo trae `reportado` (0/1).
+- SSE `regla_evento` `{evento, riesgo, mision, riesgo_acumulado, usuario}` y `auditoria` SYSTEM `REGLA`.

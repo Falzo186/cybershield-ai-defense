@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS correos(
 CREATE TABLE IF NOT EXISTS enlaces(
     id TEXT PRIMARY KEY, correo_id INTEGER NOT NULL REFERENCES correos(id),
     ruta_local TEXT NOT NULL CHECK(ruta_local = '/l/' || id));
+CREATE TABLE IF NOT EXISTS reportes(
+    correo_id INTEGER PRIMARY KEY REFERENCES correos(id), usuario TEXT NOT NULL REFERENCES usuarios(usuario),
+    ts TEXT NOT NULL);
 CREATE TRIGGER IF NOT EXISTS auditoria_sin_update BEFORE UPDATE ON auditoria
     BEGIN SELECT RAISE(ABORT, 'auditoria es append-only'); END;
 CREATE TRIGGER IF NOT EXISTS auditoria_sin_delete BEFORE DELETE ON auditoria

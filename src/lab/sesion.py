@@ -8,6 +8,14 @@ UMBRAL_CIRCUITO = 70    # por encima, toda propuesta PERMITIR se fuerza a SOLICI
 TECHO_COMPONENTE = 40   # cada componente (patrones repetidos / rechazos seguidos) aporta como máximo 40
 CONTENIDOS = ("DEFENSA_EXITOSA", "DEFENSA_EN_PROFUNDIDAD")
 
+# Evento del laboratorio -> consecuencia FIJA (determinista, sin aprendizaje). Lista editable:
+#   riesgo: puntos que suma/resta al riesgo de la sesión · mision: si el evento completa las misiones cuya
+#   condicion_evento es ese mismo evento. (pdf_reportado se añadirá cuando exista el evento de PDFs.)
+REGLAS_EVENTO = {
+    "CLIC_ENLACE": {"riesgo": +15, "mision": False},       # alguien de Azul abrió un enlace de entrenamiento
+    "correo_reportado": {"riesgo": -10, "mision": True},   # Azul reportó un correo sospechoso
+}
+
 
 class EstadoSesion:
     def __init__(self):
@@ -18,10 +26,23 @@ class EstadoSesion:
         self._patrones = 0   # +8 por cada repetición de una categoría ya vista (techo 40)
         self._rechazos = 0   # +5 por cada rechazo consecutivo a partir del tercero (techo 40)
         self._ajuste = 0     # -10 por cada par de PERMITIDO_CORRECTO seguidos (comportamiento normal)
+        self._eventos = 0    # suma de REGLAS_EVENTO aplicadas, acotada a 0-100 (un reporte no deja "saldo a favor")
+        self.eventos_vistos = {}
 
     @property
     def riesgo_acumulado(self):
-        return float(max(0, min(100, self._patrones + self._rechazos + self._ajuste)))
+        return float(max(0, min(100, self._patrones + self._rechazos + self._ajuste + self._eventos)))
+
+    def aplicar_evento(self, evento):
+        """Aplica la regla fija de REGLAS_EVENTO. -> {evento, riesgo, mision, riesgo_acumulado} o None si el evento
+        no tiene regla (no cambia nada)."""
+        regla = REGLAS_EVENTO.get(evento)
+        if regla is None:
+            return None
+        self._eventos = max(0, min(100, self._eventos + regla["riesgo"]))
+        self.eventos_vistos[evento] = self.eventos_vistos.get(evento, 0) + 1
+        return {"evento": evento, "riesgo": regla["riesgo"], "mision": regla["mision"],
+                "riesgo_acumulado": self.riesgo_acumulado}
 
     @property
     def circuito_activo(self):

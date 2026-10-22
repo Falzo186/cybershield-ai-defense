@@ -64,6 +64,9 @@ SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "
 PARTIDA_ID = datetime.now().strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(2)
 USUARIO_AZUL_DEFECTO = "ana.perez"
 USUARIO_EQUIPO = {}  # equipo -> usuario semilla con el que juega (hoy solo azul: dueño del buzón)
+# Riesgo de la partida Rojo/Azul (buzón): cada evento aplica su consecuencia fija de sesion.REGLAS_EVENTO.
+# Es independiente del EstadoSesion de cada batalla IA vs IA (ese se crea y descarta por batalla).
+ESTADO_PARTIDA = sesion.EstadoSesion()
 
 
 async def _hilo(fn, *args):
@@ -289,6 +292,32 @@ async def buzon():
     return {"usuario": usuario, "correos": repositorio.por_defecto().buzon(PARTIDA_ID, usuario) if usuario else []}
 
 
+def _aplicar_regla(evento, usuario):
+    """Evento -> consecuencia fija (sesion.REGLAS_EVENTO) sobre el riesgo de la partida. Se difunde por SSE."""
+    r = ESTADO_PARTIDA.aplicar_evento(evento)
+    if r is None:
+        return None
+    ms.emitir("regla_evento", {**r, "usuario": usuario})
+    ms.emitir("auditoria", ms.aud("SYSTEM", "REGLA", f"{evento} → riesgo {r['riesgo']:+d}",
+                                  f"riesgo partida {int(r['riesgo_acumulado'])}/100", "BAJO"))
+    return r
+
+
+@app.post("/api/correo/{correo_id}/reportar")
+async def reportar_correo(correo_id: int, request: Request):
+    """Solo Azul: reporta como sospechoso un correo de SU buzón (una vez por correo) -> regla correo_reportado."""
+    if request.state.equipo != "azul":
+        return _prohibido("Solo el equipo azul puede reportar correos de su buzón.")
+    usuario = USUARIO_EQUIPO.get("azul")
+    nuevo = repositorio.por_defecto().reportar_correo(PARTIDA_ID, usuario, correo_id)
+    if nuevo is None:
+        return _prohibido("Ese correo no está en su buzón de esta partida.", 404)
+    if not nuevo:
+        return _prohibido("Ese correo ya fue reportado.", 409)
+    ms.emitir("auditoria", ms.aud("DEFENDER", "CORREO_REPORTADO", f"correo {correo_id} · {usuario}", "OK", "BAJO"))
+    return {"reportado": True, "regla": _aplicar_regla("correo_reportado", usuario)}
+
+
 _PAGINA_ENLACE = """<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Laboratorio · enlace de prueba</title>
 <style>body{{font-family:system-ui,sans-serif;background:#0f1720;color:#e6edf3;display:grid;place-items:center;
@@ -312,6 +341,7 @@ async def abrir_enlace(enlace_id: str):
                             status_code=404, headers=_CABECERAS_ENLACE)
     ms.emitir("auditoria", ms.aud("SYSTEM", "CLIC_ENLACE", f"correo {clic['correo_id']} · {clic['para_usuario']}",
                                   "CLIC", "ALTO"))
+    _aplicar_regla("CLIC_ENLACE", clic["para_usuario"])
     return HTMLResponse(_PAGINA_ENLACE.format(
         titulo="Este fue un enlace de prueba del laboratorio",
         texto="Has abierto un enlace de un correo de entrenamiento. No ha ocurrido nada real, pero el clic quedó "

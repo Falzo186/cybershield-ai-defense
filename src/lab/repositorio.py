@@ -128,8 +128,9 @@ class Repositorio:
 
     def buzon(self, partida, usuario, limite=LIMITE_FILAS):
         filas = self.conn.execute(
-            "SELECT c.id, c.de, c.asunto, c.cuerpo, c.plantilla_id, c.ts, e.ruta_local AS enlace "
-            "FROM correos c JOIN enlaces e ON e.correo_id = c.id "
+            "SELECT c.id, c.de, c.asunto, c.cuerpo, c.plantilla_id, c.ts, e.ruta_local AS enlace, "
+            "r.correo_id IS NOT NULL AS reportado "
+            "FROM correos c JOIN enlaces e ON e.correo_id = c.id LEFT JOIN reportes r ON r.correo_id = c.id "
             "WHERE c.partida = ? AND c.para_usuario = ? ORDER BY c.id DESC LIMIT ?",
             (partida, usuario, limite)).fetchall()
         return [dict(f) for f in filas]
@@ -144,6 +145,21 @@ class Repositorio:
         self.registrar(self.identidad(fila["para_usuario"]), "CLIC_ENLACE", f"correo:{fila['correo_id']}",
                        "CLIC", "ALTO")
         return dict(fila)
+
+    def reportar_correo(self, partida, usuario, correo_id):
+        """Azul marca un correo SUYO de esta partida como sospechoso. Un correo se reporta una sola vez.
+        -> True (reporte nuevo) · False (ya estaba reportado) · None (no existe o no es de ese usuario/partida)."""
+        fila = self.conn.execute("SELECT 1 FROM correos WHERE id=? AND partida=? AND para_usuario=?",
+                                 (correo_id, partida, usuario)).fetchone()
+        if fila is None:
+            return None
+        with self.conn:
+            cur = self.conn.execute("INSERT OR IGNORE INTO reportes(correo_id,usuario,ts) VALUES(?,?,?)",
+                                    (correo_id, usuario, datetime.now().astimezone().isoformat(timespec="seconds")))
+        if not cur.rowcount:
+            return False
+        self.registrar(self.identidad(usuario), "CORREO_REPORTADO", f"correo:{correo_id}", "REPORTADO", "BAJO")
+        return True
 
     def auditoria(self, limite=50):
         filas = self.conn.execute("SELECT * FROM auditoria ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
