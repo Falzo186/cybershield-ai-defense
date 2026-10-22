@@ -20,6 +20,13 @@ CREATE TABLE IF NOT EXISTS autorizaciones(
 CREATE TABLE IF NOT EXISTS auditoria(
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, usuario TEXT, rol TEXT,
     accion TEXT NOT NULL, recurso TEXT, resultado TEXT NOT NULL, nivel_riesgo TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS correos(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, partida TEXT NOT NULL, de TEXT NOT NULL,
+    para_usuario TEXT NOT NULL REFERENCES usuarios(usuario), asunto TEXT NOT NULL, cuerpo TEXT NOT NULL,
+    plantilla_id TEXT NOT NULL, ts TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS enlaces(
+    id TEXT PRIMARY KEY, correo_id INTEGER NOT NULL REFERENCES correos(id),
+    ruta_local TEXT NOT NULL CHECK(ruta_local = '/l/' || id));
 CREATE TRIGGER IF NOT EXISTS auditoria_sin_update BEFORE UPDATE ON auditoria
     BEGIN SELECT RAISE(ABORT, 'auditoria es append-only'); END;
 CREATE TRIGGER IF NOT EXISTS auditoria_sin_delete BEFORE DELETE ON auditoria

@@ -116,3 +116,11 @@ Cada equipo tiene su propia Ollama; el servidor escucha en `0.0.0.0:$PUERTO` (po
 - Toda ruta `/api/*` exige la cabecera `X-Equipo-Token`, salvo `GET /api/eventos` y `GET /api/estado` (espectador, solo lectura). Sin token válido -> 403.
 - El rol declarado (`de_rol`, `rol`, `?rol=` de `/api/ollama/probar`) debe coincidir con el equipo del token (la vista `general` puede confirmar ambos modelos); si no -> 403. Quien responde un reto es el dueño del token.
 - `POST /api/detener` solo con el token de `general` (árbitro); con otro token -> 403. La UI oculta las acciones sin token (y DETENER fuera de la vista general). `?rol=espectador` abre la vista de solo lectura, que nunca reclama token.
+
+### Buzón interno de correos de entrenamiento (añadido)
+Nada sale del laboratorio: sin SMTP, plantillas fijas (`src/lab/correos.py`) y enlaces locales generados por el servidor.
+- `POST /api/equipo/reclamar` acepta `usuario` (solo `azul`; por defecto `ana.perez`): usuario semilla dueño del buzón. Respuesta `+usuario`.
+- `GET /api/correo/plantillas` (cualquier token) -> `{plantillas:[{id, nombre}]}`.
+- `POST /api/correo` (solo token `rojo`) `{plantilla, para_usuario?}` -> `{id, para_usuario, asunto, plantilla_id, ts}`. Sin `para_usuario` va al usuario de azul (409 si azul no entró). La respuesta NO incluye el enlace. Emite `auditoria` ATTACKER `CORREO_ENVIADO`.
+- `GET /api/buzon` (solo token `azul`) -> `{usuario, correos:[{id, de, asunto, cuerpo, plantilla_id, ts, enlace:"/l/<id>"}]}`, solo de la partida actual (proceso del servidor).
+- `GET /l/{id}` (público) -> página fija de entrenamiento; registra `CLIC_ENLACE` en la tabla `auditoria` (con la identidad del destinatario) y emite `auditoria` SYSTEM. Enlace inexistente -> 404 sin registro.

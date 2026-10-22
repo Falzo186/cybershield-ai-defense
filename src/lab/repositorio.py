@@ -3,11 +3,12 @@
 Es la última capa de defensa: aunque la IA o la capa de herramientas fallen, aquí se vuelve a
 comprobar el acceso. No existe ningún camino para ejecutar SQL arbitrario.
 """
+import secrets
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from . import permisos, schema, seed
+from . import correos, permisos, schema, seed
 from .permisos import Identidad
 
 RUTA_DB = Path(__file__).resolve().parents[2] / "data" / "lab.db"
@@ -105,6 +106,44 @@ class Repositorio:
         self.registrar(identidad, "CONSULTA", tabla, "PERMITIDO", NIVEL_RIESGO[sens])
         return [dict(f) for f in filas]
 
+    # ---------- buzón de entrenamiento (fuera de TABLAS: ninguna herramienta de la IA puede leerlo) ----------
+    def crear_correo(self, partida, plantilla_id, para_usuario):
+        """Correo desde una plantilla FIJA. El enlace lo genera el servidor (id aleatorio, ruta local /l/<id>).
+        KeyError si la plantilla o el usuario no existen. -> {id, para_usuario, asunto, plantilla_id, ts}"""
+        self.identidad(para_usuario)
+        enlace_id = secrets.token_urlsafe(9)
+        ruta = "/l/" + enlace_id
+        ahora = datetime.now()
+        de, asunto, cuerpo = correos.componer(plantilla_id, para_usuario, ruta, ahora.strftime("%d/%m/%Y"))
+        ts = ahora.isoformat(timespec="seconds")
+        with self.conn:  # correo y enlace en una sola transacción
+            cur = self.conn.execute(
+                "INSERT INTO correos(partida,de,para_usuario,asunto,cuerpo,plantilla_id,ts) VALUES(?,?,?,?,?,?,?)",
+                (partida, de, para_usuario, asunto, cuerpo, plantilla_id, ts))
+            self.conn.execute("INSERT INTO enlaces(id,correo_id,ruta_local) VALUES(?,?,?)",
+                              (enlace_id, cur.lastrowid, ruta))
+        return {"id": cur.lastrowid, "para_usuario": para_usuario, "asunto": asunto, "plantilla_id": plantilla_id,
+                "ts": ts}
+
+    def buzon(self, partida, usuario, limite=LIMITE_FILAS):
+        filas = self.conn.execute(
+            "SELECT c.id, c.de, c.asunto, c.cuerpo, c.plantilla_id, c.ts, e.ruta_local AS enlace "
+            "FROM correos c JOIN enlaces e ON e.correo_id = c.id "
+            "WHERE c.partida = ? AND c.para_usuario = ? ORDER BY c.id DESC LIMIT ?",
+            (partida, usuario, limite)).fetchall()
+        return [dict(f) for f in filas]
+
+    def registrar_clic(self, enlace_id):
+        """Registra en auditoría el clic en un enlace de entrenamiento. -> {correo_id, para_usuario} o None."""
+        fila = self.conn.execute(
+            "SELECT c.id AS correo_id, c.para_usuario FROM enlaces e JOIN correos c ON c.id = e.correo_id "
+            "WHERE e.id = ?", (enlace_id,)).fetchone()
+        if fila is None:
+            return None
+        self.registrar(self.identidad(fila["para_usuario"]), "CLIC_ENLACE", f"correo:{fila['correo_id']}",
+                       "CLIC", "ALTO")
+        return dict(fila)
+
     def auditoria(self, limite=50):
         filas = self.conn.execute("SELECT * FROM auditoria ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
         return [dict(f) for f in filas]
@@ -115,6 +154,7 @@ def abrir(ruta=None):
     if ruta != ":memory:":
         Path(ruta).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(ruta, check_same_thread=False)
+    conn.execute("PRAGMA foreign_keys = ON")  # correos/enlaces referencian usuarios/correos
     schema.crear(conn)
     seed.sembrar(conn)
     return Repositorio(conn)

@@ -12,6 +12,7 @@ import os
 import secrets
 import socket
 import sys
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -21,11 +22,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import uvicorn  # noqa: E402
 from fastapi import Request  # noqa: E402
-from fastapi.responses import JSONResponse  # noqa: E402
+from fastapi.responses import HTMLResponse, JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 import mock_server as ms  # noqa: E402
-from src.lab import atacante, cliente_ollama, motor, repositorio, sesion  # noqa: E402
+from src.lab import atacante, cliente_ollama, correos, motor, repositorio, sesion  # noqa: E402
 
 app = ms.app
 HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -56,8 +57,13 @@ EQUIPOS = ("rojo", "azul", "general")
 TOKENS = {}  # equipo -> token emitido
 RUTAS_PUBLICAS = ("/api/eventos", "/api/estado")
 RUTA_RECLAMAR = "/api/equipo/reclamar"
-# Rutas reservadas a UN equipo (además de exigir token). Detener la partida es cosa del árbitro.
-SOLO_EQUIPO = {"/api/detener": "general"}
+# Rutas reservadas a UN equipo (además de exigir token). Detener la partida es cosa del árbitro; Rojo envía
+# correos de entrenamiento y Azul los lee en su buzón.
+SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul"}
+# Partida = proceso del servidor: los correos se guardan con este id y el buzón solo muestra los de esta partida.
+PARTIDA_ID = datetime.now().strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(2)
+USUARIO_AZUL_DEFECTO = "ana.perez"
+USUARIO_EQUIPO = {}  # equipo -> usuario semilla con el que juega (hoy solo azul: dueño del buzón)
 
 
 async def _hilo(fn, *args):
@@ -148,6 +154,7 @@ def _rol_no_coincide(request, declarado):
 
 class ReclamarEquipoIn(BaseModel):
     equipo: str = Field(..., pattern="^(" + "|".join(EQUIPOS) + ")$")
+    usuario: str | None = Field(None, min_length=1, max_length=50)  # solo azul: usuario semilla dueño del buzón
 
 
 @app.post(RUTA_RECLAMAR)
@@ -156,9 +163,17 @@ async def reclamar_equipo(body: ReclamarEquipoIn):
     if body.equipo in TOKENS:
         return _prohibido(f"El equipo {body.equipo.upper()} ya está tomado en esta partida. "
                           "Entre como espectador o reinicie el servidor para una partida nueva.", 409)
+    usuario = None
+    if body.equipo == "azul":  # la identidad sale de la tabla usuarios (el sistema), no de lo que diga el cliente
+        usuario = body.usuario or USUARIO_AZUL_DEFECTO
+        try:
+            repositorio.por_defecto().identidad(usuario)
+        except KeyError:
+            return _error400(f"Usuario desconocido: {usuario}")
+        USUARIO_EQUIPO["azul"] = usuario
     TOKENS[body.equipo] = secrets.token_urlsafe(24)  # sin await entre comprobar y asignar: no hay carrera
     ms.emitir("auditoria", ms.aud("SYSTEM", "EQUIPO_RECLAMADO", body.equipo, "OK", "BAJO"))
-    return {"equipo": body.equipo, "token": TOKENS[body.equipo]}
+    return {"equipo": body.equipo, "token": TOKENS[body.equipo], "usuario": usuario}
 
 
 # ---------- endpoints ----------
@@ -240,6 +255,68 @@ async def usuarios():
     filas = repositorio.por_defecto().conn.execute(
         "SELECT usuario, rol FROM usuarios ORDER BY usuario").fetchall()
     return {"usuarios": [{"usuario": f["usuario"], "rol": f["rol"]} for f in filas]}
+
+
+# ---------- buzón interno de correos de entrenamiento (nada sale del laboratorio) ----------
+class CorreoIn(BaseModel):
+    plantilla: str = Field(..., pattern="^(" + "|".join(correos.PLANTILLAS) + ")$")
+    para_usuario: str | None = Field(None, min_length=1, max_length=50)  # por defecto, el usuario del equipo azul
+
+
+@app.get("/api/correo/plantillas")
+async def plantillas_correo():
+    return {"plantillas": correos.catalogo()}
+
+
+@app.post("/api/correo")
+async def enviar_correo(body: CorreoIn):
+    """Solo Rojo (SOLO_EQUIPO). La respuesta NO incluye el enlace: así Rojo no puede fabricar clics."""
+    para = body.para_usuario or USUARIO_EQUIPO.get("azul")
+    if not para:
+        return _prohibido("Falta destinatario: el equipo AZUL aún no ha entrado en la partida.", 409)
+    try:
+        c = repositorio.por_defecto().crear_correo(PARTIDA_ID, body.plantilla, para)
+    except KeyError:
+        return _error400(f"Usuario desconocido: {para}")
+    ms.emitir("auditoria", ms.aud("ATTACKER", "CORREO_ENVIADO", f"{body.plantilla} → {para}", "OK", "MEDIO"))
+    return c
+
+
+@app.get("/api/buzon")
+async def buzon():
+    """Solo Azul (SOLO_EQUIPO): correos de esta partida dirigidos a su usuario."""
+    usuario = USUARIO_EQUIPO.get("azul")
+    return {"usuario": usuario, "correos": repositorio.por_defecto().buzon(PARTIDA_ID, usuario) if usuario else []}
+
+
+_PAGINA_ENLACE = """<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Laboratorio · enlace de prueba</title>
+<style>body{{font-family:system-ui,sans-serif;background:#0f1720;color:#e6edf3;display:grid;place-items:center;
+min-height:100vh;margin:0;padding:16px}}main{{max-width:520px;border:1px solid #3b4a5a;border-radius:10px;
+padding:28px}}h1{{font-size:22px;margin:0 0 12px}}p{{line-height:1.5;color:#b6c2cf}}</style></head>
+<body><main><h1>{titulo}</h1><p>{texto}</p></main></body></html>"""
+_CABECERAS_ENLACE = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+                     "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
+
+
+@app.get("/l/{enlace_id}")
+async def abrir_enlace(enlace_id: str):
+    """Enlace de un correo de entrenamiento: registra el clic en auditoría y muestra una página FIJA (no refleja
+    nada de la petición). Solo existen los enlaces que generó el servidor."""
+    clic = None
+    if 8 <= len(enlace_id) <= 32 and all(ch.isalnum() or ch in "-_" for ch in enlace_id):
+        clic = repositorio.por_defecto().registrar_clic(enlace_id)
+    if clic is None:
+        return HTMLResponse(_PAGINA_ENLACE.format(titulo="Enlace no válido",
+                                                  texto="Este enlace no pertenece al laboratorio."),
+                            status_code=404, headers=_CABECERAS_ENLACE)
+    ms.emitir("auditoria", ms.aud("SYSTEM", "CLIC_ENLACE", f"correo {clic['correo_id']} · {clic['para_usuario']}",
+                                  "CLIC", "ALTO"))
+    return HTMLResponse(_PAGINA_ENLACE.format(
+        titulo="Este fue un enlace de prueba del laboratorio",
+        texto="Has abierto un enlace de un correo de entrenamiento. No ha ocurrido nada real, pero el clic quedó "
+              "registrado. Antes de abrir un enlace, revisa el remitente, la urgencia del mensaje y a dónde "
+              "apunta realmente."), headers=_CABECERAS_ENLACE)
 
 
 @app.post("/api/batalla/real/iniciar")
