@@ -56,6 +56,8 @@ EQUIPOS = ("rojo", "azul", "general")
 TOKENS = {}  # equipo -> token emitido
 RUTAS_PUBLICAS = ("/api/eventos", "/api/estado")
 RUTA_RECLAMAR = "/api/equipo/reclamar"
+# Rutas reservadas a UN equipo (además de exigir token). Detener la partida es cosa del árbitro.
+SOLO_EQUIPO = {"/api/detener": "general"}
 
 
 async def _hilo(fn, *args):
@@ -131,6 +133,9 @@ async def _verificar_equipo(request: Request, call_next):
     request.state.equipo = _equipo_de_token(request.headers.get("X-Equipo-Token"))
     if request.state.equipo is None and not (request.method == "GET" and ruta in RUTAS_PUBLICAS):
         return _prohibido("Falta un token de equipo válido. Sin equipo (espectador) solo se puede leer eventos y estado.")
+    dueno = SOLO_EQUIPO.get(ruta)
+    if dueno and request.state.equipo != dueno:
+        return _prohibido(f"Solo el equipo {dueno} puede usar {ruta}.")
     return await call_next(request)
 
 

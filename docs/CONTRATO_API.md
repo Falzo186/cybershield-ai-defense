@@ -115,3 +115,4 @@ Cada equipo tiene su propia Ollama; el servidor escucha en `0.0.0.0:$PUERTO` (po
 - `POST /api/equipo/reclamar` `{equipo:"rojo"|"azul"|"general"}` -> `{equipo, token}`. El token de cada equipo se entrega UNA sola vez por partida (proceso del servidor); un segundo reclamo -> 409.
 - Toda ruta `/api/*` exige la cabecera `X-Equipo-Token`, salvo `GET /api/eventos` y `GET /api/estado` (espectador, solo lectura). Sin token válido -> 403.
 - El rol declarado (`de_rol`, `rol`, `?rol=` de `/api/ollama/probar`) debe coincidir con el equipo del token (la vista `general` puede confirmar ambos modelos); si no -> 403. Quien responde un reto es el dueño del token.
+- `POST /api/detener` solo con el token de `general` (árbitro); con otro token -> 403. La UI oculta las acciones sin token (y DETENER fuera de la vista general). `?rol=espectador` abre la vista de solo lectura, que nunca reclama token.

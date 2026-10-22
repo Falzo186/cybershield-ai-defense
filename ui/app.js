@@ -510,7 +510,7 @@
   }
 
   // ---------- equipo (rol) y persistencia local ----------
-  const ROLES = ["rojo", "azul", "general"];
+  const ROLES = ["rojo", "azul", "general", "espectador"];
   const HOST_DEFECTO = "http://localhost:11434";
   // Auditoría inicial por equipo (los toggles siguen siendo editables).
   const FILTROS_POR_ROL = { rojo: ["ATTACKER", "SYSTEM"], azul: ["DEFENDER", "POLICY", "SYSTEM"] };
@@ -538,8 +538,9 @@
     set(k, v) { try { sessionStorage.setItem(k, v); } catch (_) { /* almacenamiento bloqueado */ } },
   };
 
+  // -> true si la vista quedó con token de equipo. El espectador nunca reclama: solo observa.
   async function prepararToken(rol) {
-    if (!rol) return;
+    if (!rol || rol === "espectador") return false;
     let token = SS.get("cs_token_" + rol);
     if (!token) {
       try {
@@ -547,10 +548,11 @@
         SS.set("cs_token_" + rol, token);
       } catch (e) {
         R.toast(e.message + " (sin token solo puede observar).");
-        return;
+        return false;
       }
     }
     API.setToken(token);
+    return true;
   }
 
   function elegirEquipo(rol) {
@@ -628,8 +630,10 @@
     });
 
     // Primero el token (las rutas /api, salvo eventos y estado, lo exigen); después, datos y SSE.
-    prepararToken(estado.rol).then(() => {
-      cargarUsuarios();
+    R.setPermisos(false, estado.rol); // acciones ocultas hasta tener token
+    prepararToken(estado.rol).then((conToken) => {
+      R.setPermisos(conToken, estado.rol);
+      if (conToken) cargarUsuarios();
       API.conectar(handlers, (est) => {
         const antes = estado.conexion;
         estado.conexion = est;

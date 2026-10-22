@@ -450,7 +450,17 @@ const R = (() => {
   const partidaAbierta = () => !$("partida-modal").hidden;
 
   // ---------- equipo (rojo / azul / general) ----------
-  const NOMBRE_EQUIPO = { rojo: "EQUIPO ROJO", azul: "EQUIPO AZUL", general: "VISTA GENERAL" };
+  const NOMBRE_EQUIPO = { rojo: "EQUIPO ROJO", azul: "EQUIPO AZUL", general: "VISTA GENERAL", espectador: "ESPECTADOR" };
+  // Controles que el servidor rechazaría (403) sin token de equipo. Exportar y cambiar de pestaña son locales.
+  const ACCIONES_EQUIPO = "#main-wrap, #term-form, [data-refrescar], [data-probar], [data-probar-modelo], " +
+    "#reto-aceptar, #reto-rechazar, #partida-revancha";
+  // Sin token válido (sin reclamar o espectador) las acciones se ocultan; DETENER es solo del árbitro (general).
+  // Se usa style.display (no `hidden`) porque .btn fija su propio display.
+  function setPermisos(conToken, rol) {
+    const ocultar = (sel, si) => document.querySelectorAll(sel).forEach((n) => { n.style.display = si ? "none" : ""; });
+    ocultar(ACCIONES_EQUIPO, !conToken);
+    ocultar("#btn-stop", !conToken || rol !== "general");
+  }
   function setEquipo(rol) {
     const r = NOMBRE_EQUIPO[rol] ? rol : "";
     document.body.dataset.rol = r;
@@ -541,7 +551,7 @@ const R = (() => {
     initAuditoria, crearFiltros, setFiltro, addAuditoria,
     terminalAdd, terminalDatos, terminalLimpiarDatos,
     setModo, setCorriendo, setConexion, setInfo, toast,
-    setVeredictoError, setOrigen, setManualOrigen, setEquipo, mostrarSelector,
+    setVeredictoError, setOrigen, setManualOrigen, setEquipo, setPermisos, mostrarSelector,
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
   };
