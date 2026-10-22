@@ -3,7 +3,7 @@
 DDL = """
 CREATE TABLE IF NOT EXISTS usuarios(
     usuario TEXT PRIMARY KEY,
-    rol TEXT NOT NULL CHECK(rol IN ('invitado','empleado','analista','admin')));
+    rol TEXT NOT NULL CHECK(rol IN ('invitado','empleado','analista','admin','espectador')));
 CREATE TABLE IF NOT EXISTS productos(
     sku TEXT PRIMARY KEY, nombre TEXT NOT NULL, stock INTEGER NOT NULL, precio REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS clientes(
@@ -27,6 +27,24 @@ CREATE TRIGGER IF NOT EXISTS auditoria_sin_delete BEFORE DELETE ON auditoria
 """
 
 
+def _migrar_roles(conn):
+    """Una BD creada antes de 'espectador' conserva el CHECK viejo (CREATE IF NOT EXISTS no lo cambia): se
+    reconstruye la tabla usuarios con el CHECK nuevo, copiando las filas."""
+    sql = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='usuarios'").fetchone()
+    if sql is None or "'espectador'" in sql[0]:
+        return
+    conn.executescript("""
+        BEGIN;
+        ALTER TABLE usuarios RENAME TO usuarios_v1;
+        CREATE TABLE usuarios(
+            usuario TEXT PRIMARY KEY,
+            rol TEXT NOT NULL CHECK(rol IN ('invitado','empleado','analista','admin','espectador')));
+        INSERT INTO usuarios SELECT usuario, rol FROM usuarios_v1;
+        DROP TABLE usuarios_v1;
+        COMMIT;""")
+
+
 def crear(conn):
+    _migrar_roles(conn)
     conn.executescript(DDL)
     conn.commit()

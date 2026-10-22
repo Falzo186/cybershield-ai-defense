@@ -4,7 +4,8 @@ La identidad (usuario, rol) la fija el SISTEMA al abrir la sesión; jamás se le
 """
 from dataclasses import dataclass
 
-ROLES = {"invitado": 0, "empleado": 1, "analista": 2, "admin": 3}
+# espectador = solo observa la partida: nivel por debajo de PUBLICA, así que evaluar_acceso le niega todo.
+ROLES = {"espectador": -1, "invitado": 0, "empleado": 1, "analista": 2, "admin": 3}
 SENSIBILIDAD = {"PUBLICA": 0, "INTERNA": 1, "CONFIDENCIAL": 2, "CRITICA": 3}
 
 # Sensibilidad de cada tabla (única fuente de verdad).

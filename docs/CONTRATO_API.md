@@ -110,3 +110,8 @@ Cada equipo tiene su propia Ollama; el servidor escucha en `0.0.0.0:$PUERTO` (po
 ### Fase cierre: contexto de sesión e informe (añadido)
 - El defensor recibe una línea `Patrón de la sesión: …` (categorías vistas, rechazos seguidos, riesgo acumulado) como contexto; es una señal, no una sentencia.
 - `partida_fin` incluye `informe {rondas_totales, rondas_validas, puntos_atacante, puntos_defensor, ganador, veredictos_por_tipo{FALLA_DEFENSA, DEFENSA_EXITOSA, DEFENSA_EN_PROFUNDIDAD, PERMITIDO_CORRECTO, ERROR}, fugas_parciales, activaciones_circuito_sesion, bloqueos_filtro_rapido, riesgo_acumulado_final, dificultad, usuario, modelos_usados{atacante, defensor}}`. La UI lo exporta como `informe_sesion_<fecha>.json`.
+
+### Token de equipo verificado por el servidor (añadido)
+- `POST /api/equipo/reclamar` `{equipo:"rojo"|"azul"|"general"}` -> `{equipo, token}`. El token de cada equipo se entrega UNA sola vez por partida (proceso del servidor); un segundo reclamo -> 409.
+- Toda ruta `/api/*` exige la cabecera `X-Equipo-Token`, salvo `GET /api/eventos` y `GET /api/estado` (espectador, solo lectura). Sin token válido -> 403.
+- El rol declarado (`de_rol`, `rol`, `?rol=` de `/api/ollama/probar`) debe coincidir con el equipo del token (la vista `general` puede confirmar ambos modelos); si no -> 403. Quien responde un reto es el dueño del token.

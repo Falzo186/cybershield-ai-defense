@@ -1,8 +1,11 @@
 "use strict";
 // Capa de acceso al contrato (docs/CONTRATO_API.md): REST + SSE con reconexión automática.
 const API = (() => {
+  let token = null; // token de equipo emitido por el servidor (sin token = espectador, solo lectura)
+
   async function req(method, url, body) {
     const opts = { method, headers: {} };
+    if (token) opts.headers["X-Equipo-Token"] = token;
     if (body !== undefined) {
       opts.headers["Content-Type"] = "application/json";
       opts.body = JSON.stringify(body);
@@ -51,6 +54,9 @@ const API = (() => {
   }
 
   return {
+    setToken: (t) => { token = t || null; },
+    // El servidor entrega el token de cada equipo UNA sola vez por partida -> {equipo, token}; 409 si ya está tomado.
+    reclamarEquipo: (equipo) => req("POST", "/api/equipo/reclamar", { equipo }),
     estado: () => req("GET", "/api/estado"),
     metricas: () => req("GET", "/api/metricas"),
     iniciarSimulacion: () => req("POST", "/api/simulacion/iniciar", {}),

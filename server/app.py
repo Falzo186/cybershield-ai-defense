@@ -5,9 +5,11 @@ Los eventos de la batalla real se traducen desde el dict de src/lab/motor.py; na
 si Ollama falla, la ronda se reporta como ERROR y no entra en las métricas.
 """
 import asyncio
+import hmac
 import ipaddress
 import json
 import os
+import secrets
 import socket
 import sys
 from pathlib import Path
@@ -18,6 +20,7 @@ sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import uvicorn  # noqa: E402
+from fastapi import Request  # noqa: E402
 from fastapi.responses import JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
@@ -45,6 +48,14 @@ OBJETIVO_TXT = "Configuración admin (objetivo del laboratorio)"
 CAPA_ETAPA = {"catalogo": "politicas", "validacion": "politicas", "permisos": "politicas",
               "autorizacion": "autorizacion", "repositorio": "bd"}
 RESTO = ["politicas", "autorizacion", "herramienta", "bd"]
+# Tokens de equipo: el rol lo verifica el SERVIDOR con lo que él emitió, nunca con lo que el cliente declara.
+# Cada equipo recibe su token UNA sola vez al reclamar su vista; viven lo que dura la partida (el proceso del
+# servidor). "general" es la vista árbitro (controla ambos lados), por eso también lleva token. El espectador no
+# reclama nada: sin token solo puede hacer GET a RUTAS_PUBLICAS.
+EQUIPOS = ("rojo", "azul", "general")
+TOKENS = {}  # equipo -> token emitido
+RUTAS_PUBLICAS = ("/api/eventos", "/api/estado")
+RUTA_RECLAMAR = "/api/equipo/reclamar"
 
 
 async def _hilo(fn, *args):
@@ -94,6 +105,55 @@ ms.ON_CONEXION.append(_hook_conexion)
 def _rechazo(msg):
     ms.ESTADO["corriendo"] = False
     return JSONResponse({"error": msg, "mensaje": msg}, status_code=409)
+
+
+def _prohibido(msg, status=403):
+    return JSONResponse({"error": msg, "mensaje": msg}, status_code=status)
+
+
+# ---------- verificación del equipo por token ----------
+def _equipo_de_token(token):
+    """-> equipo dueño del token, o None. Comparación en tiempo constante."""
+    if not token:
+        return None
+    for equipo, emitido in TOKENS.items():
+        if hmac.compare_digest(token.encode(), emitido.encode()):
+            return equipo
+    return None
+
+
+@app.middleware("http")
+async def _verificar_equipo(request: Request, call_next):
+    """Toda ruta /api exige un token válido, salvo reclamar equipo y el GET de solo lectura del espectador."""
+    ruta = request.url.path
+    if not ruta.startswith("/api/") or ruta == RUTA_RECLAMAR:
+        return await call_next(request)
+    request.state.equipo = _equipo_de_token(request.headers.get("X-Equipo-Token"))
+    if request.state.equipo is None and not (request.method == "GET" and ruta in RUTAS_PUBLICAS):
+        return _prohibido("Falta un token de equipo válido. Sin equipo (espectador) solo se puede leer eventos y estado.")
+    return await call_next(request)
+
+
+def _rol_no_coincide(request, declarado):
+    """El rol que declara el cliente debe ser el del token emitido. -> respuesta 403 o None."""
+    if declarado != request.state.equipo:
+        return _prohibido(f"El token pertenece al equipo {request.state.equipo}, no a «{declarado}».")
+    return None
+
+
+class ReclamarEquipoIn(BaseModel):
+    equipo: str = Field(..., pattern="^(" + "|".join(EQUIPOS) + ")$")
+
+
+@app.post(RUTA_RECLAMAR)
+async def reclamar_equipo(body: ReclamarEquipoIn):
+    """Entrega el token del equipo UNA sola vez por partida; un segundo reclamo del mismo equipo se rechaza."""
+    if body.equipo in TOKENS:
+        return _prohibido(f"El equipo {body.equipo.upper()} ya está tomado en esta partida. "
+                          "Entre como espectador o reinicie el servidor para una partida nueva.", 409)
+    TOKENS[body.equipo] = secrets.token_urlsafe(24)  # sin await entre comprobar y asignar: no hay carrera
+    ms.emitir("auditoria", ms.aud("SYSTEM", "EQUIPO_RECLAMADO", body.equipo, "OK", "BAJO"))
+    return {"equipo": body.equipo, "token": TOKENS[body.equipo]}
 
 
 # ---------- endpoints ----------
@@ -147,8 +207,10 @@ async def ollama_modelos(host: str | None = None):
 
 
 @app.get("/api/ollama/probar")
-async def ollama_probar(host: str | None = None, modelo: str = "", rol: str | None = None):
+async def ollama_probar(request: Request, host: str | None = None, modelo: str = "", rol: str | None = None):
     """Diagnóstico: llamada MÍNIMA y real a host/modelo (también fuerza la carga inicial del modelo)."""
+    if rol in ("rojo", "azul") and request.state.equipo not in (rol, "general"):
+        return _prohibido(f"Solo el equipo {rol} (o la vista general) puede confirmar su modelo.")
     modelo = modelo.strip()
     if not modelo or len(modelo) > 100:
         return _error400("Indique el modelo a probar.")
@@ -176,7 +238,9 @@ async def usuarios():
 
 
 @app.post("/api/batalla/real/iniciar")
-async def iniciar_real(body: BatallaRealIn):
+async def iniciar_real(body: BatallaRealIn, request: Request):
+    if err := _rol_no_coincide(request, body.de_rol):
+        return err
     if ms.ESTADO["corriendo"] or RETO is not None:
         return JSONResponse({"error": "Ya hay una ejecución en curso.", "mensaje": "Ya hay una ejecución en curso."},
                             status_code=409)
@@ -287,19 +351,21 @@ async def _expira_reto(reto):
 
 
 @app.post("/api/batalla/responder")
-async def responder_reto(body: RespuestaRetoIn):
+async def responder_reto(body: RespuestaRetoIn, request: Request):
     global RETO
+    if body.rol and (err := _rol_no_coincide(request, body.rol)):
+        return err
+    quien = request.state.equipo  # quien responde es el dueño del token, no el rol que diga el cuerpo
     reto = RETO
     if reto is None:
         return JSONResponse({"error": "No hay ningún reto pendiente.", "mensaje": "No hay ningún reto pendiente."},
                             status_code=409)
-    if body.rol and body.rol not in (reto["a_rol"], "general"):
+    if quien not in (reto["a_rol"], "general"):
         msg = "Solo el equipo destinatario (o la vista general) puede responder al reto."
         return JSONResponse({"error": msg, "mensaje": msg}, status_code=409)
     RETO = None
     reto["timer"].cancel()
     ms.ESTADO["esperando_aceptacion"] = False
-    quien = body.rol or reto["a_rol"]
     de_rol = reto["evento"]["de_rol"]
     if not body.aceptado:
         ms.emitir("reto_respondido", {"aceptado": False, "de_rol": quien})

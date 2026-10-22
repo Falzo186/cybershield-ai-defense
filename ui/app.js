@@ -532,6 +532,27 @@
     return rol;
   }
 
+  // El token se guarda por pestaña (sessionStorage): sobrevive a recargas, pero no se comparte entre equipos.
+  const SS = {
+    get(k) { try { return sessionStorage.getItem(k); } catch (_) { return null; } },
+    set(k, v) { try { sessionStorage.setItem(k, v); } catch (_) { /* almacenamiento bloqueado */ } },
+  };
+
+  async function prepararToken(rol) {
+    if (!rol) return;
+    let token = SS.get("cs_token_" + rol);
+    if (!token) {
+      try {
+        token = (await API.reclamarEquipo(rol)).token;
+        SS.set("cs_token_" + rol, token);
+      } catch (e) {
+        R.toast(e.message + " (sin token solo puede observar).");
+        return;
+      }
+    }
+    API.setToken(token);
+  }
+
   function elegirEquipo(rol) {
     if (!ROLES.includes(rol)) return;
     LS.set("cs_rol", rol);
@@ -606,12 +627,15 @@
       else if (ev.key === "Tab") { ev.preventDefault(); $("modal-cerrar").focus(); }
     });
 
-    cargarUsuarios();
-    API.conectar(handlers, (est) => {
-      const antes = estado.conexion;
-      estado.conexion = est;
-      R.setConexion(est);
-      if (est === "conectado" && antes !== "conectado") sincronizar();
+    // Primero el token (las rutas /api, salvo eventos y estado, lo exigen); después, datos y SSE.
+    prepararToken(estado.rol).then(() => {
+      cargarUsuarios();
+      API.conectar(handlers, (est) => {
+        const antes = estado.conexion;
+        estado.conexion = est;
+        R.setConexion(est);
+        if (est === "conectado" && antes !== "conectado") sincronizar();
+      });
     });
   }
 
