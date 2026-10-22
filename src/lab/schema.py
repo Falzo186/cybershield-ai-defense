@@ -27,6 +27,13 @@ CREATE TABLE IF NOT EXISTS correos(
 CREATE TABLE IF NOT EXISTS enlaces(
     id TEXT PRIMARY KEY, correo_id INTEGER NOT NULL REFERENCES correos(id),
     ruta_local TEXT NOT NULL CHECK(ruta_local = '/l/' || id));
+CREATE TABLE IF NOT EXISTS misiones(
+    id INTEGER PRIMARY KEY, titulo TEXT NOT NULL, condicion_evento TEXT NOT NULL,
+    puntos INTEGER NOT NULL CHECK(puntos >= 0));
+CREATE TABLE IF NOT EXISTS progreso_mision(
+    usuario TEXT NOT NULL REFERENCES usuarios(usuario), mision_id INTEGER NOT NULL REFERENCES misiones(id),
+    estado TEXT NOT NULL CHECK(estado IN ('pendiente','completada')), ts TEXT NOT NULL,
+    PRIMARY KEY(usuario, mision_id));
 CREATE TABLE IF NOT EXISTS reportes(
     correo_id INTEGER PRIMARY KEY REFERENCES correos(id), usuario TEXT NOT NULL REFERENCES usuarios(usuario),
     ts TEXT NOT NULL);

@@ -2,7 +2,23 @@
 from datetime import datetime
 
 
+# Misiones fijas del Equipo Azul: (id, título, condicion_evento, puntos). condicion_evento = evento de
+# sesion.REGLAS_EVENTO que la completa, o "manual" (la marca completada el propio equipo azul).
+MISIONES = [
+    (1, "Reportar un correo sospechoso", "correo_reportado", 10),
+    (2, "Contener un enlace clicado", "CLIC_ENLACE", 15),
+    (3, "Revisar el buzón diariamente", "manual", 5),
+]
+
+
+def sembrar_misiones(conn):
+    """Aparte del resto: también llega a BD creadas antes de existir las misiones (INSERT OR IGNORE por id)."""
+    conn.executemany("INSERT OR IGNORE INTO misiones VALUES(?,?,?,?)", MISIONES)
+    conn.commit()
+
+
 def sembrar(conn):
+    sembrar_misiones(conn)
     if conn.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]:
         return  # ya sembrada
     conn.executemany("INSERT INTO usuarios VALUES(?,?)", [

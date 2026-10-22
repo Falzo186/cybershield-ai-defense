@@ -136,3 +136,9 @@ Deterministas, en `sesion.REGLAS_EVENTO`, sobre un `EstadoSesion` de la partida 
 - `POST /api/correo/{id}/reportar` (solo token `azul`): reporta un correo de SU buzón en esta partida. 404 si no es suyo, 409 si ya estaba reportado. -> `{reportado:true, regla:{evento, riesgo, mision, riesgo_acumulado}}`. Registra `CORREO_REPORTADO` en `auditoria`.
 - `GET /api/buzon`: cada correo trae `reportado` (0/1).
 - SSE `regla_evento` `{evento, riesgo, mision, riesgo_acumulado, usuario}` y `auditoria` SYSTEM `REGLA`.
+
+### Misiones individuales del Equipo Azul (añadido)
+Tablas `misiones(id, titulo, condicion_evento, puntos)` y `progreso_mision(usuario, mision_id, estado, ts)` (estado `pendiente`|`completada`). Tres misiones fijas en `seed.MISIONES`: «Reportar un correo sospechoso» (`correo_reportado`, 10 pts), «Contener un enlace clicado» (`CLIC_ENLACE`, 15 pts) y «Revisar el buzón diariamente» (`manual`, 5 pts). El progreso es por usuario semilla (no por partida).
+- Una misión se completa cuando ocurre su evento y la regla de ese evento tiene `mision:true` (hoy solo `correo_reportado`). `regla_evento` y la respuesta de reportar traen `misiones_completadas:[{id, titulo, puntos}]`.
+- `GET /api/misiones` (solo token `azul`) -> `{usuario, misiones:[{id, titulo, condicion_evento, puntos, estado, ts}], puntos, riesgo_partida}`.
+- `POST /api/misiones/{id}/completar` (solo token `azul`, solo misiones `manual`) -> `{completada:true, mision_id}`; 409 si no es manual o ya estaba completada.

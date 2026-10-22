@@ -59,7 +59,7 @@ RUTAS_PUBLICAS = ("/api/eventos", "/api/estado")
 RUTA_RECLAMAR = "/api/equipo/reclamar"
 # Rutas reservadas a UN equipo (además de exigir token). Detener la partida es cosa del árbitro; Rojo envía
 # correos de entrenamiento y Azul los lee en su buzón.
-SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul"}
+SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul"}
 # Partida = proceso del servidor: los correos se guardan con este id y el buzón solo muestra los de esta partida.
 PARTIDA_ID = datetime.now().strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(2)
 USUARIO_AZUL_DEFECTO = "ana.perez"
@@ -297,6 +297,13 @@ def _aplicar_regla(evento, usuario):
     r = ESTADO_PARTIDA.aplicar_evento(evento)
     if r is None:
         return None
+    r["misiones_completadas"] = []
+    if r["mision"] and usuario:
+        r["misiones_completadas"] = [{"id": m["id"], "titulo": m["titulo"], "puntos": m["puntos"]}
+                                     for m in repositorio.por_defecto().completar_misiones_evento(usuario, evento)]
+        for m in r["misiones_completadas"]:
+            ms.emitir("auditoria", ms.aud("DEFENDER", "MISION_COMPLETADA", f"{m['titulo']} · {usuario}",
+                                          f"+{m['puntos']} pts", "BAJO"))
     ms.emitir("regla_evento", {**r, "usuario": usuario})
     ms.emitir("auditoria", ms.aud("SYSTEM", "REGLA", f"{evento} → riesgo {r['riesgo']:+d}",
                                   f"riesgo partida {int(r['riesgo_acumulado'])}/100", "BAJO"))
@@ -316,6 +323,33 @@ async def reportar_correo(correo_id: int, request: Request):
         return _prohibido("Ese correo ya fue reportado.", 409)
     ms.emitir("auditoria", ms.aud("DEFENDER", "CORREO_REPORTADO", f"correo {correo_id} · {usuario}", "OK", "BAJO"))
     return {"reportado": True, "regla": _aplicar_regla("correo_reportado", usuario)}
+
+
+# ---------- misiones individuales del Equipo Azul ----------
+@app.get("/api/misiones")
+async def misiones():
+    """Solo Azul (SOLO_EQUIPO): progreso de su usuario en las misiones fijas y riesgo actual de la partida."""
+    usuario = USUARIO_EQUIPO.get("azul")
+    lista = repositorio.por_defecto().misiones(usuario) if usuario else []
+    return {"usuario": usuario, "misiones": lista,
+            "puntos": sum(m["puntos"] for m in lista if m["estado"] == "completada"),
+            "riesgo_partida": ESTADO_PARTIDA.riesgo_acumulado}
+
+
+@app.post("/api/misiones/{mision_id}/completar")
+async def completar_mision(mision_id: int, request: Request):
+    """Solo Azul y solo misiones 'manual' (p. ej. revisar el buzón); las demás las completa su evento."""
+    if request.state.equipo != "azul":
+        return _prohibido("Solo el equipo azul puede completar sus misiones.")
+    usuario = USUARIO_EQUIPO.get("azul")
+    r = repositorio.por_defecto().completar_mision_manual(usuario, mision_id)
+    if r is None:
+        return _prohibido("Esa misión no existe o se completa sola con su evento.", 409)
+    if not r:
+        return _prohibido("Esa misión ya estaba completada.", 409)
+    ms.emitir("auditoria", ms.aud("DEFENDER", "MISION_COMPLETADA", f"misión {mision_id} (manual) · {usuario}",
+                                  "OK", "BAJO"))
+    return {"completada": True, "mision_id": mision_id}
 
 
 _PAGINA_ENLACE = """<!doctype html><html lang="es"><head><meta charset="utf-8">

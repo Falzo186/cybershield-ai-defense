@@ -161,6 +161,42 @@ class Repositorio:
         self.registrar(self.identidad(usuario), "CORREO_REPORTADO", f"correo:{correo_id}", "REPORTADO", "BAJO")
         return True
 
+    # ---------- misiones del Equipo Azul ----------
+    def misiones(self, usuario):
+        """Todas las misiones con el progreso de ese usuario ('pendiente' si aún no hay fila)."""
+        filas = self.conn.execute(
+            "SELECT m.id, m.titulo, m.condicion_evento, m.puntos, COALESCE(p.estado, 'pendiente') AS estado, p.ts "
+            "FROM misiones m LEFT JOIN progreso_mision p ON p.mision_id = m.id AND p.usuario = ? ORDER BY m.id",
+            (usuario,)).fetchall()
+        return [dict(f) for f in filas]
+
+    def _completar(self, usuario, mision):
+        """Marca completada si no lo estaba. -> True si es una completación nueva."""
+        with self.conn:
+            cur = self.conn.execute(
+                "INSERT INTO progreso_mision(usuario,mision_id,estado,ts) VALUES(?,?,'completada',?) "
+                "ON CONFLICT(usuario, mision_id) DO UPDATE SET estado='completada', ts=excluded.ts "
+                "WHERE progreso_mision.estado <> 'completada'",
+                (usuario, mision["id"], datetime.now().astimezone().isoformat(timespec="seconds")))
+        if not cur.rowcount:
+            return False
+        self.registrar(self.identidad(usuario), "MISION_COMPLETADA", f"mision:{mision['id']}", "COMPLETADA", "BAJO")
+        return True
+
+    def completar_misiones_evento(self, usuario, evento):
+        """Completa las misiones cuya condición es ese evento. 'manual' nunca se completa por evento.
+        -> misiones completadas AHORA (las ya completadas no se repiten)."""
+        if evento == "manual":
+            return []
+        return [m for m in self.misiones(usuario) if m["condicion_evento"] == evento and self._completar(usuario, m)]
+
+    def completar_mision_manual(self, usuario, mision_id):
+        """Solo misiones con condición 'manual'. -> True (nueva) · False (ya completada) · None (no existe o no es manual)."""
+        m = next((m for m in self.misiones(usuario) if m["id"] == mision_id), None)
+        if m is None or m["condicion_evento"] != "manual":
+            return None
+        return self._completar(usuario, m)
+
     def auditoria(self, limite=50):
         filas = self.conn.execute("SELECT * FROM auditoria ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
         return [dict(f) for f in filas]

@@ -110,6 +110,22 @@ def main():
     chk("el buzón muestra el correo como reportado",
         [x["reportado"] for x in c.get("/api/buzon", headers=H(ta)).json()["correos"] if x["id"] == cid] == [1])
 
+    # --- misiones del Equipo Azul ---
+    chk("el reporte completó 'Reportar un correo sospechoso'",
+        [m["titulo"] for m in r.json()["regla"]["misiones_completadas"]] == ["Reportar un correo sospechoso"])
+    chk("rojo no ve misiones", c.get("/api/misiones", headers=H(tr)).status_code == 403)
+    chk("espectador no ve misiones", c.get("/api/misiones").status_code == 403)
+    m = c.get("/api/misiones", headers=H(ta)).json()
+    estados = {x["id"]: x["estado"] for x in m["misiones"]}
+    chk("azul ve su progreso (1 completada, CLIC_ENLACE no completa misiones, manual pendiente)",
+        m["usuario"] == "luis.gomez" and estados == {1: "completada", 2: "pendiente", 3: "pendiente"}
+        and m["puntos"] == 10 and m["riesgo_partida"] == 5)
+    chk("rojo no completa misiones", c.post("/api/misiones/3/completar", headers=H(tr)).status_code == 403)
+    chk("azul no completa a mano una misión por evento", c.post("/api/misiones/2/completar", headers=H(ta)).status_code == 409)
+    chk("azul completa la misión manual", c.post("/api/misiones/3/completar", headers=H(ta)).status_code == 200)
+    chk("la manual no se completa dos veces", c.post("/api/misiones/3/completar", headers=H(ta)).status_code == 409)
+    chk("puntos actualizados", c.get("/api/misiones", headers=H(ta)).json()["puntos"] == 15)
+
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)
 
