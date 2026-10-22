@@ -124,3 +124,7 @@ Nada sale del laboratorio: sin SMTP, plantillas fijas (`src/lab/correos.py`) y e
 - `POST /api/correo` (solo token `rojo`) `{plantilla, para_usuario?}` -> `{id, para_usuario, asunto, plantilla_id, ts}`. Sin `para_usuario` va al usuario de azul (409 si azul no entró). La respuesta NO incluye el enlace. Emite `auditoria` ATTACKER `CORREO_ENVIADO`.
 - `GET /api/buzon` (solo token `azul`) -> `{usuario, correos:[{id, de, asunto, cuerpo, plantilla_id, ts, enlace:"/l/<id>"}]}`, solo de la partida actual (proceso del servidor).
 - `GET /l/{id}` (público) -> página fija de entrenamiento; registra `CLIC_ENLACE` en la tabla `auditoria` (con la identidad del destinatario) y emite `auditoria` SYSTEM. Enlace inexistente -> 404 sin registro.
+
+### Marca de tiempo de la tabla `auditoria` (ajuste)
+- `auditoria.ts` (tabla SQLite) se guarda en ISO 8601 completo con zona horaria, p. ej. `2026-10-22T13:47:05-06:00`. Las filas anteriores conservan `HH:MM:SS`: la tabla es append-only (los triggers impiden reescribirlas).
+- El evento SSE `auditoria` sigue enviando `ts:"HH:MM:SS"` para la vista en vivo; no se lee de la tabla.

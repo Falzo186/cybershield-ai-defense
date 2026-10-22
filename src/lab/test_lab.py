@@ -1,4 +1,6 @@
 """Pruebas offline de las capas del laboratorio (BD en memoria). Ejecutar: python -m src.lab.test_lab"""
+from datetime import date, datetime
+
 from . import herramientas as H
 from . import repositorio
 from .repositorio import PermisoDenegado
@@ -76,6 +78,8 @@ def main():
     except Exception:  # noqa: BLE001
         borro = False
     chk("auditoria es append-only y tiene registros", not borro and len(repo.auditoria()) > 0)
+    ts = datetime.fromisoformat(repo.auditoria(1)[0]["ts"])
+    chk("auditoria.ts es ISO 8601 completo (fecha, hora y zona)", ts.date() == date.today() and ts.tzinfo is not None)
 
     r = H.ejecutar_herramienta("consultar_inventario", {}, None, repo)
     chk("fallo interno -> error explicito, no se disfraza de bloqueo",

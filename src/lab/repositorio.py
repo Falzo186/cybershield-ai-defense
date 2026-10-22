@@ -77,7 +77,8 @@ class Repositorio:
     def registrar(self, identidad, accion, recurso, resultado, nivel):
         self.conn.execute(
             "INSERT INTO auditoria(ts,usuario,rol,accion,recurso,resultado,nivel_riesgo) VALUES(?,?,?,?,?,?,?)",
-            (datetime.now().strftime("%H:%M:%S"), getattr(identidad, "usuario", None),
+            # ISO 8601 completo con zona horaria (p. ej. 2026-10-22T13:47:05-06:00): ordenable y listo para un SIEM.
+            (datetime.now().astimezone().isoformat(timespec="seconds"), getattr(identidad, "usuario", None),
              getattr(identidad, "rol", None), accion, recurso, resultado, nivel))
         self.conn.commit()
 
