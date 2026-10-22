@@ -129,22 +129,48 @@ class Repositorio:
     def buzon(self, partida, usuario, limite=LIMITE_FILAS):
         filas = self.conn.execute(
             "SELECT c.id, c.de, c.asunto, c.cuerpo, c.plantilla_id, c.ts, e.ruta_local AS enlace, "
-            "r.correo_id IS NOT NULL AS reportado "
+            "r.correo_id IS NOT NULL AS reportado, k.correo_id IS NOT NULL AS contenido, "
+            "EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'CLIC_ENLACE' AND a.recurso = 'correo:' || c.id) "
+            "AS clicado "
             "FROM correos c JOIN enlaces e ON e.correo_id = c.id LEFT JOIN reportes r ON r.correo_id = c.id "
+            "LEFT JOIN contenciones k ON k.correo_id = c.id "
             "WHERE c.partida = ? AND c.para_usuario = ? ORDER BY c.id DESC LIMIT ?",
             (partida, usuario, limite)).fetchall()
         return [dict(f) for f in filas]
 
     def registrar_clic(self, enlace_id):
-        """Registra en auditoría el clic en un enlace de entrenamiento. -> {correo_id, para_usuario} o None."""
+        """Registra en auditoría el clic en un enlace de entrenamiento. Si Azul ya lo contuvo, el clic queda
+        BLOQUEADO (no es un CLIC_ENLACE). -> {correo_id, para_usuario, contenido} o None."""
         fila = self.conn.execute(
-            "SELECT c.id AS correo_id, c.para_usuario FROM enlaces e JOIN correos c ON c.id = e.correo_id "
+            "SELECT c.id AS correo_id, c.para_usuario, k.correo_id IS NOT NULL AS contenido "
+            "FROM enlaces e JOIN correos c ON c.id = e.correo_id LEFT JOIN contenciones k ON k.correo_id = c.id "
             "WHERE e.id = ?", (enlace_id,)).fetchone()
         if fila is None:
             return None
-        self.registrar(self.identidad(fila["para_usuario"]), "CLIC_ENLACE", f"correo:{fila['correo_id']}",
-                       "CLIC", "ALTO")
-        return dict(fila)
+        clic = {"correo_id": fila["correo_id"], "para_usuario": fila["para_usuario"], "contenido": bool(fila["contenido"])}
+        if clic["contenido"]:
+            self.registrar(self.identidad(clic["para_usuario"]), "CLIC_BLOQUEADO", f"correo:{clic['correo_id']}",
+                           "BLOQUEADO", "BAJO")
+        else:
+            self.registrar(self.identidad(clic["para_usuario"]), "CLIC_ENLACE", f"correo:{clic['correo_id']}",
+                           "CLIC", "ALTO")
+        return clic
+
+    def contener_enlace(self, partida, usuario, correo_id):
+        """Azul contiene (bloquea) el enlace de un correo SUYO de esta partida que ya fue clicado.
+        -> "contenido" (nuevo) · "ya_contenido" · "sin_clic" (no hay clic que contener) · None (no es suyo)."""
+        fila = next((c for c in self.buzon(partida, usuario, limite=-1) if c["id"] == correo_id), None)
+        if fila is None:
+            return None
+        if fila["contenido"]:
+            return "ya_contenido"
+        if not fila["clicado"]:
+            return "sin_clic"
+        with self.conn:
+            self.conn.execute("INSERT INTO contenciones(correo_id,usuario,ts) VALUES(?,?,?)",
+                              (correo_id, usuario, datetime.now().astimezone().isoformat(timespec="seconds")))
+        self.registrar(self.identidad(usuario), "ENLACE_CONTENIDO", f"correo:{correo_id}", "CONTENIDO", "BAJO")
+        return "contenido"
 
     def reportar_correo(self, partida, usuario, correo_id):
         """Azul marca un correo SUYO de esta partida como sospechoso. Un correo se reporta una sola vez.

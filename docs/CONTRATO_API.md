@@ -138,7 +138,13 @@ Deterministas, en `sesion.REGLAS_EVENTO`, sobre un `EstadoSesion` de la partida 
 - SSE `regla_evento` `{evento, riesgo, mision, riesgo_acumulado, usuario}` y `auditoria` SYSTEM `REGLA`.
 
 ### Misiones individuales del Equipo Azul (añadido)
-Tablas `misiones(id, titulo, condicion_evento, puntos)` y `progreso_mision(usuario, mision_id, estado, ts)` (estado `pendiente`|`completada`). Tres misiones fijas en `seed.MISIONES`: «Reportar un correo sospechoso» (`correo_reportado`, 10 pts), «Contener un enlace clicado» (`CLIC_ENLACE`, 15 pts) y «Revisar el buzón diariamente» (`manual`, 5 pts). El progreso es por usuario semilla (no por partida).
-- Una misión se completa cuando ocurre su evento y la regla de ese evento tiene `mision:true` (hoy solo `correo_reportado`). `regla_evento` y la respuesta de reportar traen `misiones_completadas:[{id, titulo, puntos}]`.
+Tablas `misiones(id, titulo, condicion_evento, puntos)` y `progreso_mision(usuario, mision_id, estado, ts)` (estado `pendiente`|`completada`). Tres misiones fijas en `seed.MISIONES`: «Reportar un correo sospechoso» (`correo_reportado`, 10 pts), «Contener un enlace clicado» (`enlace_contenido`, 15 pts) y «Revisar el buzón diariamente» (`manual`, 5 pts). El progreso es por usuario semilla (no por partida).
+- Una misión se completa cuando ocurre su evento y la regla de ese evento tiene `mision:true` (hoy `correo_reportado` y `enlace_contenido`). `regla_evento` y la respuesta de reportar traen `misiones_completadas:[{id, titulo, puntos}]`.
 - `GET /api/misiones` (solo token `azul`) -> `{usuario, misiones:[{id, titulo, condicion_evento, puntos, estado, ts}], puntos, riesgo_partida}`.
 - `POST /api/misiones/{id}/completar` (solo token `azul`, solo misiones `manual`) -> `{completada:true, mision_id}`; 409 si no es manual o ya estaba completada.
+
+### Contener un enlace clicado (añadido)
+- `POST /api/correo/{id}/contener` (solo token `azul`): bloquea el enlace de un correo de SU buzón que ya tuvo un `CLIC_ENLACE`. 409 si no hubo clic o ya estaba contenido; 404 si no es suyo. -> `{contenido:true, regla}`. Regla `enlace_contenido`: riesgo −15 (anula el clic) y completa «Contener un enlace clicado». Tabla `contenciones`.
+- Un clic posterior en `/l/{id}` muestra «Enlace bloqueado por el Equipo Azul», se registra como `CLIC_BLOQUEADO` y no aplica ninguna regla.
+- `GET /api/buzon`: cada correo trae también `clicado` y `contenido` (0/1).
+- Las definiciones de `seed.MISIONES` se actualizan en BD existentes al arrancar (el progreso se conserva).

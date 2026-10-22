@@ -126,6 +126,27 @@ def main():
     chk("la manual no se completa dos veces", c.post("/api/misiones/3/completar", headers=H(ta)).status_code == 409)
     chk("puntos actualizados", c.get("/api/misiones", headers=H(ta)).json()["puntos"] == 15)
 
+    # --- contener un enlace clicado ---
+    sin_clic = [x for x in c.get("/api/buzon", headers=H(ta)).json()["correos"] if x["id"] != cid][0]
+    chk("contener un enlace no clicado -> 409",
+        c.post(f"/api/correo/{sin_clic['id']}/contener", headers=H(ta)).status_code == 409)
+    chk("rojo no contiene enlaces", c.post(f"/api/correo/{cid}/contener", headers=H(tr)).status_code == 403)
+    chk("azul no contiene el correo de otro usuario -> 404",
+        c.post(f"/api/correo/{ajeno}/contener", headers=H(ta)).status_code == 404)
+    r = c.post(f"/api/correo/{cid}/contener", headers=H(ta))
+    chk("azul contiene el enlace clicado -> enlace_contenido (-15) completa la misión",
+        r.status_code == 200 and r.json()["regla"]["riesgo"] == -15
+        and [m["id"] for m in r.json()["regla"]["misiones_completadas"]] == [2]
+        and srv.ESTADO_PARTIDA.riesgo_acumulado == 0)
+    chk("contener dos veces -> 409", c.post(f"/api/correo/{cid}/contener", headers=H(ta)).status_code == 409)
+    m = c.get("/api/misiones", headers=H(ta)).json()
+    chk("las 3 misiones completadas (30 pts)",
+        {x["estado"] for x in m["misiones"]} == {"completada"} and m["puntos"] == 30)
+    r = c.get(enlace)
+    chk("un clic sobre el enlace contenido se bloquea y no suma riesgo",
+        "bloqueado" in r.text.lower() and srv.ESTADO_PARTIDA.riesgo_acumulado == 0
+        and repositorio.por_defecto().auditoria(1)[0]["accion"] == "CLIC_BLOQUEADO")
+
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)
 

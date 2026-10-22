@@ -46,7 +46,8 @@ def main():
     clic = repo.registrar_clic(enlace_id)
     aud = repo.auditoria(1)[0]
     chk("clic registrado en auditoría con la identidad del destinatario",
-        clic == {"correo_id": c["id"], "para_usuario": "ana.perez"} and len(repo.auditoria(500)) == antes + 1
+        clic == {"correo_id": c["id"], "para_usuario": "ana.perez", "contenido": False}
+        and len(repo.auditoria(500)) == antes + 1
         and aud["accion"] == "CLIC_ENLACE" and aud["usuario"] == "ana.perez")
     chk("enlace inexistente -> None y sin auditoría",
         repo.registrar_clic("noexiste123") is None and len(repo.auditoria(500)) == antes + 1)

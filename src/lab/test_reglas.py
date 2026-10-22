@@ -38,6 +38,11 @@ def main():
     s.aplicar_evento("CLIC_ENLACE")
     chk("los eventos se suman al riesgo de las rondas", s.riesgo_acumulado == 8 + 15)
     chk("pdf_reportado aún no tiene regla (no existe el evento)", "pdf_reportado" not in sesion.REGLAS_EVENTO)
+    s = sesion.EstadoSesion()
+    s.aplicar_evento("CLIC_ENLACE")
+    r = s.aplicar_evento("enlace_contenido")
+    chk("enlace_contenido resta 15 (anula el clic) y marca misión",
+        r["riesgo"] == -15 and r["mision"] is True and s.riesgo_acumulado == 0)
 
     # --- reporte de correos en el repositorio ---
     repo = repositorio.abrir(":memory:")
@@ -52,6 +57,19 @@ def main():
     chk("no se reporta un correo de otra partida", repo.reportar_correo("p1", "ana.perez", viejo["id"]) is None)
     chk("el buzón marca el correo como reportado",
         [x["reportado"] for x in repo.buzon("p1", "ana.perez")] == [1])
+
+    # --- contención de enlaces (solo después de un clic) ---
+    chk("contener sin clic previo -> sin_clic", repo.contener_enlace("p1", "ana.perez", c["id"]) == "sin_clic")
+    chk("contener el correo de otro usuario -> None", repo.contener_enlace("p1", "ana.perez", otro["id"]) is None)
+    enlace_id = repo.buzon("p1", "ana.perez")[0]["enlace"][3:]
+    repo.registrar_clic(enlace_id)
+    chk("el buzón marca el correo como clicado", repo.buzon("p1", "ana.perez")[0]["clicado"] == 1)
+    chk("contener tras el clic -> contenido", repo.contener_enlace("p1", "ana.perez", c["id"]) == "contenido")
+    chk("la contención queda en auditoría", repo.auditoria(1)[0]["accion"] == "ENLACE_CONTENIDO")
+    chk("contener dos veces -> ya_contenido", repo.contener_enlace("p1", "ana.perez", c["id"]) == "ya_contenido")
+    clic = repo.registrar_clic(enlace_id)
+    chk("un clic sobre un enlace contenido queda BLOQUEADO",
+        clic["contenido"] is True and repo.auditoria(1)[0]["accion"] == "CLIC_BLOQUEADO")
 
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)

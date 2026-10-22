@@ -40,8 +40,15 @@ def main():
         estado_libre = False
     chk("la BD solo acepta estados pendiente/completada", not estado_libre)
 
+    chk("'Contener un enlace clicado' se completa con enlace_contenido",
+        [m["id"] for m in repo.completar_misiones_evento("ana.perez", "enlace_contenido")] == [2])
+    chk("CLIC_ENLACE no completa ninguna misión", repo.completar_misiones_evento("luis.gomez", "CLIC_ENLACE") == [])
+
+    repo.conn.execute("UPDATE misiones SET condicion_evento='CLIC_ENLACE' WHERE id=2")  # definición vieja
     seed.sembrar_misiones(repo.conn)
-    chk("volver a sembrar no duplica misiones", len(repo.misiones("ana.perez")) == 3)
+    chk("volver a sembrar no duplica y actualiza la definición",
+        len(repo.misiones("ana.perez")) == 3 and repo.misiones("ana.perez")[1]["condicion_evento"] == "enlace_contenido")
+    chk("re-sembrar conserva el progreso", repo.misiones("ana.perez")[1]["estado"] == "completada")
 
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)

@@ -14,6 +14,7 @@ CONTENIDOS = ("DEFENSA_EXITOSA", "DEFENSA_EN_PROFUNDIDAD")
 REGLAS_EVENTO = {
     "CLIC_ENLACE": {"riesgo": +15, "mision": False},       # alguien de Azul abrió un enlace de entrenamiento
     "correo_reportado": {"riesgo": -10, "mision": True},   # Azul reportó un correo sospechoso
+    "enlace_contenido": {"riesgo": -15, "mision": True},   # Azul contuvo un enlace ya clicado (anula su +15)
 }
 
 

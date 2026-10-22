@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS progreso_mision(
     usuario TEXT NOT NULL REFERENCES usuarios(usuario), mision_id INTEGER NOT NULL REFERENCES misiones(id),
     estado TEXT NOT NULL CHECK(estado IN ('pendiente','completada')), ts TEXT NOT NULL,
     PRIMARY KEY(usuario, mision_id));
+CREATE TABLE IF NOT EXISTS contenciones(
+    correo_id INTEGER PRIMARY KEY REFERENCES correos(id), usuario TEXT NOT NULL REFERENCES usuarios(usuario),
+    ts TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS reportes(
     correo_id INTEGER PRIMARY KEY REFERENCES correos(id), usuario TEXT NOT NULL REFERENCES usuarios(usuario),
     ts TEXT NOT NULL);

@@ -325,6 +325,25 @@ async def reportar_correo(correo_id: int, request: Request):
     return {"reportado": True, "regla": _aplicar_regla("correo_reportado", usuario)}
 
 
+_CONTENER_ERROR = {"sin_clic": ("Ese enlace no se ha clicado: no hay nada que contener.", 409),
+                   "ya_contenido": ("Ese enlace ya estaba contenido.", 409),
+                   None: ("Ese correo no está en su buzón de esta partida.", 404)}
+
+
+@app.post("/api/correo/{correo_id}/contener")
+async def contener_enlace(correo_id: int, request: Request):
+    """Solo Azul: tras un CLIC_ENLACE, bloquea ese enlace (los clics siguientes ya no cuentan) -> regla
+    enlace_contenido, que completa la misión «Contener un enlace clicado»."""
+    if request.state.equipo != "azul":
+        return _prohibido("Solo el equipo azul puede contener enlaces de su buzón.")
+    usuario = USUARIO_EQUIPO.get("azul")
+    r = repositorio.por_defecto().contener_enlace(PARTIDA_ID, usuario, correo_id)
+    if r != "contenido":
+        return _prohibido(*_CONTENER_ERROR[r])
+    ms.emitir("auditoria", ms.aud("DEFENDER", "ENLACE_CONTENIDO", f"correo {correo_id} · {usuario}", "OK", "BAJO"))
+    return {"contenido": True, "regla": _aplicar_regla("enlace_contenido", usuario)}
+
+
 # ---------- misiones individuales del Equipo Azul ----------
 @app.get("/api/misiones")
 async def misiones():
@@ -373,6 +392,13 @@ async def abrir_enlace(enlace_id: str):
         return HTMLResponse(_PAGINA_ENLACE.format(titulo="Enlace no válido",
                                                   texto="Este enlace no pertenece al laboratorio."),
                             status_code=404, headers=_CABECERAS_ENLACE)
+    if clic["contenido"]:  # Azul ya lo contuvo: el clic no tiene consecuencia
+        ms.emitir("auditoria", ms.aud("SYSTEM", "CLIC_BLOQUEADO",
+                                      f"correo {clic['correo_id']} · {clic['para_usuario']}", "BLOQUEADO", "BAJO"))
+        return HTMLResponse(_PAGINA_ENLACE.format(
+            titulo="Enlace bloqueado por el Equipo Azul",
+            texto="Este enlace de entrenamiento fue contenido después de un clic, así que ya no tiene efecto. "
+                  "El intento quedó registrado."), headers=_CABECERAS_ENLACE)
     ms.emitir("auditoria", ms.aud("SYSTEM", "CLIC_ENLACE", f"correo {clic['correo_id']} · {clic['para_usuario']}",
                                   "CLIC", "ALTO"))
     _aplicar_regla("CLIC_ENLACE", clic["para_usuario"])

@@ -6,14 +6,17 @@ from datetime import datetime
 # sesion.REGLAS_EVENTO que la completa, o "manual" (la marca completada el propio equipo azul).
 MISIONES = [
     (1, "Reportar un correo sospechoso", "correo_reportado", 10),
-    (2, "Contener un enlace clicado", "CLIC_ENLACE", 15),
+    (2, "Contener un enlace clicado", "enlace_contenido", 15),  # acción de Azul DESPUÉS de un CLIC_ENLACE
     (3, "Revisar el buzón diariamente", "manual", 5),
 ]
 
 
 def sembrar_misiones(conn):
-    """Aparte del resto: también llega a BD creadas antes de existir las misiones (INSERT OR IGNORE por id)."""
-    conn.executemany("INSERT OR IGNORE INTO misiones VALUES(?,?,?,?)", MISIONES)
+    """Aparte del resto: también llega a BD creadas antes de existir las misiones. MISIONES es la fuente de
+    verdad: si una misión ya existe, se actualiza su definición (el progreso de los usuarios no se toca)."""
+    conn.executemany("INSERT INTO misiones VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
+                     "titulo=excluded.titulo, condicion_evento=excluded.condicion_evento, puntos=excluded.puntos",
+                     MISIONES)
     conn.commit()
 
 
