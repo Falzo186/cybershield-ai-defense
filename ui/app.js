@@ -162,6 +162,36 @@
     try { R.setUsuarios((await API.usuarios()).usuarios || []); } catch (_) { R.setUsuarios([]); }
   }
 
+  // ---------- buzón de correos de entrenamiento ----------
+  async function abrirBuzon() {
+    R.mostrarBuzon(true, estado.rol);
+    if (estado.rol === "azul") { cargarBuzon(); return; }
+    try {
+      const [p, u] = await Promise.all([API.plantillasCorreo(), API.usuarios()]);
+      R.setPlantillas(p.plantillas || []);
+      R.setDestinatarios(u.usuarios || []);
+    } catch (e) { R.toast(e.message); }
+  }
+
+  async function enviarCorreo() {
+    const plantilla = R.valorSelect("sel-plantilla");
+    if (!plantilla) { R.toast("Elige una plantilla."); return; }
+    $("btn-correo").disabled = true;
+    try {
+      const c = await API.enviarCorreo(plantilla, R.valorSelect("sel-destinatario"));
+      R.toast("✓ Correo enviado a " + c.para_usuario + ": «" + c.asunto + "»");
+    } catch (e) { R.toast(e.message); }
+    $("btn-correo").disabled = false;
+  }
+
+  async function cargarBuzon() {
+    try {
+      const b = await API.buzon();
+      R.setBuzon(b.usuario, b.correos || [], R.mostrarCorreo);
+      R.mostrarCorreo(null);
+    } catch (e) { if (R.buzonAbierto()) R.toast(e.message); }
+  }
+
   function aplicarMetricas(m) {
     estado.metricas = m; // los marcadores los acumula contarRonda(), no se pisan con la métrica del servidor
   }
@@ -277,7 +307,11 @@
       $("partida-informe").hidden = !estado.informe;
       R.mostrarPartida(d, !!estado.ultimaFin);
     },
-    auditoria(d) { R.addAuditoria(d); },
+    auditoria(d) {
+      R.addAuditoria(d);
+      // Correo nuevo en la partida: el equipo azul refresca su buzón (el contador del botón se actualiza solo).
+      if (d.accion === "CORREO_ENVIADO" && estado.rol === "azul" && API.tieneToken()) cargarBuzon();
+    },
     metricas(d) { aplicarMetricas(d); },
     fin(d) {
       if (d.modo !== "manual") setCorriendo(false);
@@ -542,6 +576,11 @@
   async function prepararToken(rol) {
     if (!rol || rol === "espectador") return false;
     let token = SS.get("cs_token_" + rol);
+    if (token) { // un token guardado puede ser de una partida anterior (servidor reiniciado): se comprueba
+      API.setToken(token);
+      try { await API.usuarios(); } catch (e) { if (e.status === 403) token = null; }
+      API.setToken(null);
+    }
     if (!token) {
       try {
         token = (await API.reclamarEquipo(rol)).token;
@@ -588,6 +627,12 @@
       if (estado.ultimaFin) { R.cerrarPartida(); R.mostrarModal(estado.ultimaFin.m, estado.ultimaFin.e); }
     });
     document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && R.partidaAbierta()) R.cerrarPartida(); });
+    $("btn-buzon").addEventListener("click", abrirBuzon);
+    $("buzon-cerrar").addEventListener("click", () => R.mostrarBuzon(false));
+    $("buzon-modal").addEventListener("click", (ev) => { if (ev.target === $("buzon-modal")) R.mostrarBuzon(false); });
+    $("btn-buzon-refrescar").addEventListener("click", cargarBuzon);
+    $("correo-form").addEventListener("submit", (ev) => { ev.preventDefault(); enviarCorreo(); });
+    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && R.buzonAbierto()) R.mostrarBuzon(false); });
 
     R.initPipeline();
     R.initAuditoria();
@@ -634,6 +679,7 @@
     prepararToken(estado.rol).then((conToken) => {
       R.setPermisos(conToken, estado.rol);
       if (conToken) cargarUsuarios();
+      if (conToken && estado.rol === "azul") cargarBuzon(); // contador inicial del botón ✉ BUZÓN (n)
       API.conectar(handlers, (est) => {
         const antes = estado.conexion;
         estado.conexion = est;

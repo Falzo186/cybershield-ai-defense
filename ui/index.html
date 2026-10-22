@@ -18,6 +18,7 @@
       </span>
       <span id="equipo-tag" class="equipo-tag eq-ninguno" title="Equipo de esta sesión">SIN EQUIPO</span>
       <a id="lnk-equipo" class="lnk" href="?cambiar=1">⇄ Cambiar de equipo</a>
+      <button type="button" id="btn-buzon" class="btn btn-mini" aria-haspopup="dialog">✉ CORREOS</button>
       <span id="marcador" class="marcador" role="status" aria-live="polite" title="Marcador de la partida: atacante — defensor">🔴 0 — 0 🔵</span>
       <span id="demo-tag" class="demo-tag" hidden>DEMOSTRACIÓN · NO SUMA AL MARCADOR (admin: acceso legítimo por diseño)</span>
     </div>
@@ -231,6 +232,27 @@
     </table>
     <p class="nota">El Defense Score es un indicador experimental del laboratorio; no constituye una garantía de seguridad.</p>
     <button type="button" id="modal-cerrar" class="btn btn-primary">CERRAR (Esc)</button>
+  </div>
+</div>
+
+<div id="buzon-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="buzon-t">
+  <div class="modal-card buzon-card">
+    <h2 id="buzon-t">✉ CORREOS DE ENTRENAMIENTO</h2>
+    <p class="nota">Laboratorio: nada se envía fuera. Los enlaces son locales y solo registran el clic.</p>
+    <form id="correo-form" class="correo-form" hidden>
+      <label>Plantilla <select id="sel-plantilla" class="sel" aria-label="Plantilla del correo"></select></label>
+      <label>Destinatario <select id="sel-destinatario" class="sel" aria-label="Destinatario del correo"></select></label>
+      <button type="submit" id="btn-correo" class="btn btn-primary">Enviar correo de entrenamiento</button>
+    </form>
+    <div id="buzon-azul" hidden>
+      <div class="buzon-head">
+        <span id="buzon-usuario" class="muted"></span>
+        <button type="button" id="btn-buzon-refrescar" class="btn btn-mini">↻ Actualizar</button>
+      </div>
+      <ul id="buzon-lista" class="buzon-lista" aria-label="Correos recibidos"></ul>
+      <article id="buzon-detalle" class="buzon-detalle" hidden aria-live="polite"></article>
+    </div>
+    <button type="button" id="buzon-cerrar" class="btn">CERRAR (Esc)</button>
   </div>
 </div>
 

@@ -460,6 +460,7 @@ const R = (() => {
     const ocultar = (sel, si) => document.querySelectorAll(sel).forEach((n) => { n.style.display = si ? "none" : ""; });
     ocultar(ACCIONES_EQUIPO, !conToken);
     ocultar("#btn-stop", !conToken || rol !== "general");
+    ocultar("#btn-buzon", !conToken || (rol !== "rojo" && rol !== "azul")); // correos: Rojo envía, Azul recibe
   }
   function setEquipo(rol) {
     const r = NOMBRE_EQUIPO[rol] ? rol : "";
@@ -511,6 +512,93 @@ const R = (() => {
   }
   const valorSelect = (id) => $(id).value;
 
+  // ---------- buzón de correos de entrenamiento (Rojo envía, Azul lee) ----------
+  const RUTA_ENLACE = /^\/l\/[A-Za-z0-9_-]{8,32}$/; // solo enlaces locales generados por el servidor
+  let focoBuzon = null;
+
+  // "2026-10-22T13:36:27" -> "22/10/2026 13:36" (texto tal cual si no es ISO)
+  function fechaCorta(ts) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(ts || "");
+    return m ? m[3] + "/" + m[2] + "/" + m[1] + " " + m[4] + ":" + m[5] : (ts || "—");
+  }
+
+  function mostrarBuzon(visible, rol) {
+    const m = $("buzon-modal");
+    if (visible) {
+      focoBuzon = document.activeElement;
+      $("buzon-t").textContent = rol === "rojo" ? "✉ ENVIAR CORREO DE ENTRENAMIENTO" : "✉ BUZÓN DEL EQUIPO AZUL";
+      $("correo-form").hidden = rol !== "rojo";
+      $("buzon-azul").hidden = rol !== "azul";
+      m.hidden = false;
+      $(rol === "rojo" ? "sel-plantilla" : "btn-buzon-refrescar").focus();
+    } else if (!m.hidden) {
+      m.hidden = true;
+      if (focoBuzon && focoBuzon.focus) focoBuzon.focus();
+    }
+  }
+  const buzonAbierto = () => !$("buzon-modal").hidden;
+
+  function setPlantillas(lista) {
+    const s = $("sel-plantilla");
+    s.replaceChildren();
+    lista.forEach((p) => { const o = el("option", null, p.nombre); o.value = p.id; s.append(o); });
+  }
+
+  // Destinatarios = usuarios semilla; "" = el usuario con el que juega el equipo azul (lo resuelve el servidor).
+  function setDestinatarios(usuarios) {
+    const s = $("sel-destinatario");
+    s.replaceChildren();
+    const def = el("option", null, "Usuario del equipo azul");
+    def.value = "";
+    s.append(def);
+    usuarios.filter((u) => u.rol !== "espectador").forEach((u) => {
+      const o = el("option", null, u.usuario + " · " + u.rol);
+      o.value = u.usuario;
+      s.append(o);
+    });
+  }
+
+  function setBotonBuzon(n) {
+    $("btn-buzon").textContent = typeof n === "number" ? "✉ BUZÓN (" + n + ")" : "✉ CORREOS";
+  }
+
+  function setBuzon(usuario, correos, onAbrir) {
+    $("buzon-usuario").textContent = usuario ? "Buzón de " + usuario : "Sin usuario asignado";
+    const ul = $("buzon-lista");
+    ul.replaceChildren();
+    if (!correos.length) ul.append(el("li", "buzon-vacio", "No hay correos en esta partida."));
+    correos.forEach((c) => {
+      const b = el("button", "buzon-item");
+      b.type = "button";
+      b.append(el("b", null, c.asunto), el("span", "fecha", fechaCorta(c.ts)), el("span", "de", c.de));
+      b.addEventListener("click", () => {
+        ul.querySelectorAll(".buzon-item").forEach((x) => x.removeAttribute("aria-current"));
+        b.setAttribute("aria-current", "true");
+        onAbrir(c);
+      });
+      const li = el("li");
+      li.append(b);
+      ul.append(li);
+    });
+    setBotonBuzon(correos.length);
+  }
+
+  function mostrarCorreo(c) {
+    const d = $("buzon-detalle");
+    d.replaceChildren();
+    d.hidden = !c;
+    if (!c) return;
+    d.append(el("h3", null, c.asunto), el("div", "meta", "De: " + c.de + " · " + fechaCorta(c.ts)),
+      el("pre", null, c.cuerpo));
+    if (RUTA_ENLACE.test(c.enlace || "")) {
+      const a = el("a", null, "Abrir enlace de entrenamiento (" + c.enlace + ")");
+      a.href = c.enlace;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      d.append(a);
+    }
+  }
+
   // ---------- modal de resultados ----------
   let focoPrevio = null;
   function mostrarModal(m, errores) {
@@ -554,5 +642,6 @@ const R = (() => {
     setVeredictoError, setOrigen, setManualOrigen, setEquipo, setPermisos, mostrarSelector,
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
+    mostrarBuzon, buzonAbierto, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
   };
 })();

@@ -55,6 +55,7 @@ const API = (() => {
 
   return {
     setToken: (t) => { token = t || null; },
+    tieneToken: () => !!token,
     // El servidor entrega el token de cada equipo UNA sola vez por partida -> {equipo, token}; 409 si ya está tomado.
     reclamarEquipo: (equipo) => req("POST", "/api/equipo/reclamar", { equipo }),
     estado: () => req("GET", "/api/estado"),
@@ -75,6 +76,10 @@ const API = (() => {
       (host ? "&host=" + encodeURIComponent(host) : "") + (rol ? "&rol=" + encodeURIComponent(rol) : "")),
     // modelo/host: lo que el equipo que acepta tiene en SU panel en este instante.
     responderReto: (aceptado, rol, modelo, host) => req("POST", "/api/batalla/responder", { aceptado, rol, modelo, host }),
+    // Buzón de entrenamiento: Rojo envía desde una plantilla fija (para_usuario vacío = usuario del equipo azul).
+    plantillasCorreo: () => req("GET", "/api/correo/plantillas"),
+    enviarCorreo: (plantilla, para_usuario) => req("POST", "/api/correo", { plantilla, para_usuario: para_usuario || undefined }),
+    buzon: () => req("GET", "/api/buzon"),
     conectar,
   };
 })();
