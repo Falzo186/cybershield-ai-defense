@@ -197,7 +197,8 @@
 
   function abrirCorreo(c) {
     estado.correoAbierto = c.id;
-    R.mostrarCorreo(c, { reportar: () => accionCorreo("reportar", c.id), contener: () => accionCorreo("contener", c.id) });
+    R.mostrarCorreo(c, { reportar: () => accionCorreo("reportar", c.id), contener: () => accionCorreo("contener", c.id),
+      abrirPdf: () => accionPdf("pdf_abierto", c.id), reportarPdf: () => accionPdf("pdf_reportado", c.id) });
   }
 
   // Reportar / contener: el servidor aplica la regla fija y avisa qué cambió (riesgo y misiones completadas).
@@ -209,6 +210,28 @@
       R.toast((tipo === "reportar" ? "✓ Correo reportado" : "✓ Enlace contenido") +
         (typeof g.riesgo === "number" ? " · riesgo " + (g.riesgo > 0 ? "+" : "") + g.riesgo : "") +
         (misiones.length ? " · misión completada: " + misiones.join(", ") : ""));
+    } catch (e) { R.toast(e.message); }
+    cargarBuzon();
+    cargarMisiones();
+  }
+
+  // Abrir/reportar el PDF adjunto: primero el evento (auditoría + regla) y, si es abrir, la descarga del PDF fijo.
+  async function accionPdf(tipo, id) {
+    try {
+      const r = await API.eventoPdf(tipo, id);
+      const g = r.regla || {};
+      const misiones = (g.misiones_completadas || []).map((m) => "«" + m.titulo + "» +" + m.puntos + " pts");
+      R.toast((tipo === "pdf_abierto" ? "📎 PDF abierto (evento registrado)" : "✓ PDF reportado") +
+        (g.riesgo ? " · riesgo " + (g.riesgo > 0 ? "+" : "") + g.riesgo : "") +
+        (misiones.length ? " · misión completada: " + misiones.join(", ") : ""));
+      if (r.descarga && /^\/pdf\/[a-z_]{1,40}$/.test(r.descarga)) {
+        const a = document.createElement("a");
+        a.href = r.descarga;
+        a.download = "";
+        document.body.append(a);
+        a.click();
+        a.remove();
+      }
     } catch (e) { R.toast(e.message); }
     cargarBuzon();
     cargarMisiones();

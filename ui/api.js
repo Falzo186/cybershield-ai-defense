@@ -84,6 +84,8 @@ const API = (() => {
     reportarCorreo: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/reportar", {}),
     contenerCorreo: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/contener", {}),
     misiones: () => req("GET", "/api/misiones"),
+    // tipo "pdf_abierto" | "pdf_reportado" sobre el PDF adjunto del correo id -> {documento, regla, descarga|null}
+    eventoPdf: (tipo, correoId) => req("POST", "/api/evento", { tipo, recurso: "correo:" + correoId }),
     completarMision: (id) => req("POST", "/api/misiones/" + encodeURIComponent(id) + "/completar", {}),
     conectar,
   };

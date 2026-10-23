@@ -572,7 +572,7 @@ const R = (() => {
       const b = el("button", "buzon-item");
       b.type = "button";
       b.append(el("b", null, c.asunto), el("span", "fecha", fechaCorta(c.ts)), el("span", "de", c.de));
-      const marcas = [[c.clicado && !c.contenido, "marca-clic", "ENLACE CLICADO"],
+      const marcas = [[c.adjunto, "marca-pdf", "📎 PDF"], [c.clicado && !c.contenido, "marca-clic", "ENLACE CLICADO"],
         [c.contenido, "marca-contenido", "CONTENIDO"], [c.reportado, "marca-reportado", "REPORTADO"]]
         .filter(([si]) => si);
       if (marcas.length) {
@@ -617,6 +617,15 @@ const R = (() => {
       a.rel = "noopener noreferrer";
       d.append(a);
     }
+    if (c.adjunto) { // PDF benigno del catálogo fijo: abrir/reportar son eventos (no se ejecuta nada)
+      const adj = el("div", "buzon-adjunto");
+      adj.append(el("span", null, "📎 " + c.adjunto.titulo + " · " + c.adjunto.archivo));
+      if (acciones) {
+        adj.append(botonAccion("Abrir PDF", "", false, "", acciones.abrirPdf),
+          botonAccion("⚑ Reportar PDF", "", c.pdf_reportado, "✓ PDF reportado", acciones.reportarPdf));
+      }
+      d.append(adj);
+    }
     if (!acciones) return;
     const f = el("div", "buzon-acciones");
     f.append(botonAccion("⚑ Reportar", "", c.reportado, "✓ Reportado", acciones.reportar));
@@ -632,7 +641,7 @@ const R = (() => {
   }
 
   const CONDICION = { correo_reportado: "Se completa al reportar un correo", manual: "La marca el propio equipo",
-    enlace_contenido: "Se completa al contener un enlace clicado" };
+    enlace_contenido: "Se completa al contener un enlace clicado", pdf_abierto: "Se completa al abrir un PDF adjunto" };
 
   function setMisiones(d, onCompletar) {
     $("misiones-resumen").textContent = (d.usuario ? d.usuario + " · " : "") + d.puntos + " pts · riesgo de la partida " +

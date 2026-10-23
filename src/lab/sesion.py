@@ -10,11 +10,13 @@ CONTENIDOS = ("DEFENSA_EXITOSA", "DEFENSA_EN_PROFUNDIDAD")
 
 # Evento del laboratorio -> consecuencia FIJA (determinista, sin aprendizaje). Lista editable:
 #   riesgo: puntos que suma/resta al riesgo de la sesión · mision: si el evento completa las misiones cuya
-#   condicion_evento es ese mismo evento. (pdf_reportado se añadirá cuando exista el evento de PDFs.)
+#   condicion_evento es ese mismo evento.
 REGLAS_EVENTO = {
     "CLIC_ENLACE": {"riesgo": +15, "mision": False},       # alguien de Azul abrió un enlace de entrenamiento
     "correo_reportado": {"riesgo": -10, "mision": True},   # Azul reportó un correo sospechoso
     "enlace_contenido": {"riesgo": -15, "mision": True},   # Azul contuvo un enlace ya clicado (anula su +15)
+    "pdf_abierto": {"riesgo": 0, "mision": True},          # Azul revisó un PDF adjunto (benigno: no suma riesgo)
+    "pdf_reportado": {"riesgo": -10, "mision": False},     # Azul reportó un PDF adjunto sospechoso
 }
 
 

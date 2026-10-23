@@ -22,11 +22,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import uvicorn  # noqa: E402
 from fastapi import Request  # noqa: E402
-from fastapi.responses import HTMLResponse, JSONResponse  # noqa: E402
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 import mock_server as ms  # noqa: E402
-from src.lab import atacante, cliente_ollama, correos, motor, repositorio, sesion  # noqa: E402
+from src.lab import atacante, cliente_ollama, correos, documentos, motor, repositorio, sesion  # noqa: E402
 
 app = ms.app
 HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -59,7 +59,8 @@ RUTAS_PUBLICAS = ("/api/eventos", "/api/estado")
 RUTA_RECLAMAR = "/api/equipo/reclamar"
 # Rutas reservadas a UN equipo (además de exigir token). Detener la partida es cosa del árbitro; Rojo envía
 # correos de entrenamiento y Azul los lee en su buzón.
-SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul"}
+SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul",
+               "/api/evento": "azul"}
 # Partida = proceso del servidor: los correos se guardan con este id y el buzón solo muestra los de esta partida.
 PARTIDA_ID = datetime.now().strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(2)
 USUARIO_AZUL_DEFECTO = "ana.perez"
@@ -342,6 +343,45 @@ async def contener_enlace(correo_id: int, request: Request):
         return _prohibido(*_CONTENER_ERROR[r])
     ms.emitir("auditoria", ms.aud("DEFENDER", "ENLACE_CONTENIDO", f"correo {correo_id} · {usuario}", "OK", "BAJO"))
     return {"contenido": True, "regla": _aplicar_regla("enlace_contenido", usuario)}
+
+
+# ---------- PDFs benignos adjuntos: abrir / reportar son EVENTOS (no se ejecuta nada) ----------
+class EventoIn(BaseModel):
+    tipo: str = Field(..., pattern="^(pdf_abierto|pdf_reportado)$")
+    recurso: str = Field(..., pattern=r"^correo:[0-9]{1,9}$")  # el correo de SU buzón que trae el PDF
+
+
+_EVENTO_ERROR = {"sin_adjunto": ("Ese correo no trae ningún PDF adjunto.", 409),
+                 "ya_reportado": ("Ese PDF ya fue reportado.", 409),
+                 None: ("Ese correo no está en su buzón de esta partida.", 404)}
+
+
+@app.post("/api/evento")
+async def registrar_evento(body: EventoIn):
+    """Solo Azul (SOLO_EQUIPO). Escribe el evento en auditoría y aplica su regla fija; si es pdf_abierto devuelve
+    la ruta de descarga del PDF (catálogo fijo)."""
+    usuario = USUARIO_EQUIPO.get("azul")
+    correo_id = int(body.recurso.split(":")[1])
+    r = repositorio.por_defecto().evento_pdf(PARTIDA_ID, usuario, correo_id, body.tipo)
+    if not isinstance(r, dict):
+        return _prohibido(*_EVENTO_ERROR[r])
+    doc = r["doc"]
+    ms.emitir("auditoria", ms.aud("DEFENDER", body.tipo.upper(), f"{doc['archivo']} · correo {correo_id} · {usuario}",
+                                  "OK", "BAJO"))
+    return {"ok": True, "documento": doc, "regla": _aplicar_regla(body.tipo, usuario),
+            "descarga": "/pdf/" + doc["id"] if body.tipo == "pdf_abierto" else None}
+
+
+@app.get("/pdf/{doc_id}")
+async def descargar_pdf(doc_id: str):
+    """PDF benigno del catálogo FIJO, solo como descarga. El id nunca forma una ruta: se busca en el catálogo."""
+    d = documentos.info(doc_id)
+    if d is None or not documentos.ruta(doc_id).is_file():
+        return JSONResponse({"error": "Documento no encontrado."}, status_code=404)
+    return FileResponse(documentos.ruta(doc_id), media_type="application/pdf", filename=d["archivo"],
+                        content_disposition_type="attachment",
+                        headers={"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox",
+                                 "Cache-Control": "no-store"})
 
 
 # ---------- misiones individuales del Equipo Azul ----------

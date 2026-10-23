@@ -8,7 +8,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from . import correos, permisos, schema, seed
+from . import correos, documentos, permisos, schema, seed
 from .permisos import Identidad
 
 RUTA_DB = Path(__file__).resolve().parents[2] / "data" / "lab.db"
@@ -116,11 +116,12 @@ class Repositorio:
         ruta = "/l/" + enlace_id
         ahora = datetime.now()
         de, asunto, cuerpo = correos.componer(plantilla_id, para_usuario, ruta, ahora.strftime("%d/%m/%Y"))
+        adjunto = correos.adjunto(plantilla_id)
         ts = ahora.isoformat(timespec="seconds")
         with self.conn:  # correo y enlace en una sola transacción
             cur = self.conn.execute(
-                "INSERT INTO correos(partida,de,para_usuario,asunto,cuerpo,plantilla_id,ts) VALUES(?,?,?,?,?,?,?)",
-                (partida, de, para_usuario, asunto, cuerpo, plantilla_id, ts))
+                "INSERT INTO correos(partida,de,para_usuario,asunto,cuerpo,plantilla_id,ts,adjunto) "
+                "VALUES(?,?,?,?,?,?,?,?)", (partida, de, para_usuario, asunto, cuerpo, plantilla_id, ts, adjunto))
             self.conn.execute("INSERT INTO enlaces(id,correo_id,ruta_local) VALUES(?,?,?)",
                               (enlace_id, cur.lastrowid, ruta))
         return {"id": cur.lastrowid, "para_usuario": para_usuario, "asunto": asunto, "plantilla_id": plantilla_id,
@@ -131,12 +132,17 @@ class Repositorio:
             "SELECT c.id, c.de, c.asunto, c.cuerpo, c.plantilla_id, c.ts, e.ruta_local AS enlace, "
             "r.correo_id IS NOT NULL AS reportado, k.correo_id IS NOT NULL AS contenido, "
             "EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'CLIC_ENLACE' AND a.recurso = 'correo:' || c.id) "
-            "AS clicado "
+            "AS clicado, c.adjunto, "
+            "EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'PDF_ABIERTO' AND a.recurso = 'correo:' || c.id) "
+            "AS pdf_abierto, "
+            "EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'PDF_REPORTADO' AND a.recurso = 'correo:' || c.id) "
+            "AS pdf_reportado "
             "FROM correos c JOIN enlaces e ON e.correo_id = c.id LEFT JOIN reportes r ON r.correo_id = c.id "
             "LEFT JOIN contenciones k ON k.correo_id = c.id "
             "WHERE c.partida = ? AND c.para_usuario = ? ORDER BY c.id DESC LIMIT ?",
             (partida, usuario, limite)).fetchall()
-        return [dict(f) for f in filas]
+        # adjunto -> {id, archivo, titulo} del catálogo fijo (None si el correo no trae PDF)
+        return [{**dict(f), "adjunto": documentos.info(f["adjunto"])} for f in filas]
 
     def registrar_clic(self, enlace_id):
         """Registra en auditoría el clic en un enlace de entrenamiento. Si Azul ya lo contuvo, el clic queda
@@ -186,6 +192,21 @@ class Repositorio:
             return False
         self.registrar(self.identidad(usuario), "CORREO_REPORTADO", f"correo:{correo_id}", "REPORTADO", "BAJO")
         return True
+
+    def evento_pdf(self, partida, usuario, correo_id, tipo):
+        """Azul abre o reporta el PDF adjunto de un correo SUYO de esta partida. No se ejecuta nada: es solo un
+        evento en auditoría. tipo = "pdf_abierto" | "pdf_reportado" (un PDF se reporta una sola vez).
+        -> {"doc": {...}} · "sin_adjunto" · "ya_reportado" · None (no es suyo)."""
+        fila = next((c for c in self.buzon(partida, usuario, limite=-1) if c["id"] == correo_id), None)
+        if fila is None:
+            return None
+        if not fila["adjunto"]:
+            return "sin_adjunto"
+        if tipo == "pdf_reportado" and fila["pdf_reportado"]:
+            return "ya_reportado"
+        accion, resultado = ("PDF_ABIERTO", "ABIERTO") if tipo == "pdf_abierto" else ("PDF_REPORTADO", "REPORTADO")
+        self.registrar(self.identidad(usuario), accion, f"correo:{correo_id}", resultado, "BAJO")
+        return {"doc": fila["adjunto"]}
 
     # ---------- misiones del Equipo Azul ----------
     def misiones(self, partida, usuario):

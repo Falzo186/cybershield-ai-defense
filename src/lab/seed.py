@@ -8,6 +8,7 @@ MISIONES = [
     (1, "Reportar un correo sospechoso", "correo_reportado", 10),
     (2, "Contener un enlace clicado", "enlace_contenido", 15),  # acción de Azul DESPUÉS de un CLIC_ENLACE
     (3, "Revisar el buzón diariamente", "manual", 5),
+    (4, "Revisar un documento recibido", "pdf_abierto", 10),
 ]
 
 

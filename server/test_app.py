@@ -118,7 +118,7 @@ def main():
     m = c.get("/api/misiones", headers=H(ta)).json()
     estados = {x["id"]: x["estado"] for x in m["misiones"]}
     chk("azul ve su progreso (1 completada, CLIC_ENLACE no completa misiones, manual pendiente)",
-        m["usuario"] == "luis.gomez" and estados == {1: "completada", 2: "pendiente", 3: "pendiente"}
+        m["usuario"] == "luis.gomez" and estados == {1: "completada", 2: "pendiente", 3: "pendiente", 4: "pendiente"}
         and m["puntos"] == 10 and m["riesgo_partida"] == 5)
     chk("rojo no completa misiones", c.post("/api/misiones/3/completar", headers=H(tr)).status_code == 403)
     chk("azul no completa a mano una misión por evento", c.post("/api/misiones/2/completar", headers=H(ta)).status_code == 409)
@@ -140,12 +140,45 @@ def main():
         and srv.ESTADO_PARTIDA.riesgo_acumulado == 0)
     chk("contener dos veces -> 409", c.post(f"/api/correo/{cid}/contener", headers=H(ta)).status_code == 409)
     m = c.get("/api/misiones", headers=H(ta)).json()
-    chk("las 3 misiones completadas (30 pts)",
-        {x["estado"] for x in m["misiones"]} == {"completada"} and m["puntos"] == 30)
+    chk("misiones 1-3 completadas (30 pts), la del PDF pendiente",
+        {x["id"]: x["estado"] for x in m["misiones"]} == {1: "completada", 2: "completada", 3: "completada",
+                                                          4: "pendiente"} and m["puntos"] == 30)
     r = c.get(enlace)
     chk("un clic sobre el enlace contenido se bloquea y no suma riesgo",
         "bloqueado" in r.text.lower() and srv.ESTADO_PARTIDA.riesgo_acumulado == 0
         and repositorio.por_defecto().auditoria(1)[0]["accion"] == "CLIC_BLOQUEADO")
+
+    # --- PDFs benignos adjuntos ---
+    pdf_id = c.post("/api/correo", json={"plantilla": "recursos_humanos"}, headers=H(tr)).json()["id"]
+    con_pdf = [x for x in c.get("/api/buzon", headers=H(ta)).json()["correos"] if x["id"] == pdf_id][0]
+    chk("el correo de RR. HH. trae su PDF fijo", con_pdf["adjunto"]["archivo"] == "recibo_nomina.pdf")
+    ev = lambda tipo, rec, t=ta: c.post("/api/evento", json={"tipo": tipo, "recurso": rec}, headers=H(t))  # noqa: E731
+    chk("rojo no registra eventos de PDF", ev("pdf_abierto", f"correo:{pdf_id}", tr).status_code == 403)
+    chk("espectador no registra eventos", c.post("/api/evento", json={"tipo": "pdf_abierto",
+                                                                      "recurso": f"correo:{pdf_id}"}).status_code == 403)
+    chk("tipo de evento libre rechazado", ev("ejecutar_macro", f"correo:{pdf_id}").status_code == 422)
+    chk("recurso libre rechazado", ev("pdf_abierto", "../../data/lab.db").status_code == 422)
+    chk("correo sin PDF -> 409", ev("pdf_abierto", f"correo:{cid}").status_code == 409)
+    r = ev("pdf_abierto", f"correo:{pdf_id}")
+    chk("abrir PDF -> descarga + misión «Revisar un documento recibido»",
+        r.status_code == 200 and r.json()["descarga"] == "/pdf/recibo_nomina"
+        and [m["id"] for m in r.json()["regla"]["misiones_completadas"]] == [4]
+        and repositorio.por_defecto().auditoria(5)[1]["accion"] == "PDF_ABIERTO")
+    d = c.get(r.json()["descarga"])
+    chk("el PDF se sirve solo como descarga con nosniff",
+        d.status_code == 200 and d.headers["content-type"] == "application/pdf"
+        and d.headers["content-disposition"].startswith("attachment") and d.headers["x-content-type-options"] == "nosniff"
+        and d.content.startswith(b"%PDF-"))
+    chk("PDF fuera del catálogo -> 404", c.get("/pdf/..%2F..%2Fdata%2Flab.db").status_code == 404
+        and c.get("/pdf/inventado").status_code == 404)
+    antes = srv.ESTADO_PARTIDA.riesgo_acumulado
+    srv.ESTADO_PARTIDA.aplicar_evento("CLIC_ENLACE")  # riesgo > 0 para ver el -10
+    r = ev("pdf_reportado", f"correo:{pdf_id}")
+    chk("reportar PDF -> riesgo -10", r.status_code == 200 and r.json()["regla"]["riesgo"] == -10
+        and srv.ESTADO_PARTIDA.riesgo_acumulado == antes + 15 - 10)
+    chk("reportar el PDF dos veces -> 409", ev("pdf_reportado", f"correo:{pdf_id}").status_code == 409)
+    m = c.get("/api/misiones", headers=H(ta)).json()
+    chk("las 4 misiones completadas (40 pts)", {x["estado"] for x in m["misiones"]} == {"completada"} and m["puntos"] == 40)
 
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)

@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS auditoria(
 CREATE TABLE IF NOT EXISTS correos(
     id INTEGER PRIMARY KEY AUTOINCREMENT, partida TEXT NOT NULL, de TEXT NOT NULL,
     para_usuario TEXT NOT NULL REFERENCES usuarios(usuario), asunto TEXT NOT NULL, cuerpo TEXT NOT NULL,
-    plantilla_id TEXT NOT NULL, ts TEXT NOT NULL);
+    plantilla_id TEXT NOT NULL, ts TEXT NOT NULL, adjunto TEXT);
 CREATE TABLE IF NOT EXISTS enlaces(
     id TEXT PRIMARY KEY, correo_id INTEGER NOT NULL REFERENCES correos(id),
     ruta_local TEXT NOT NULL CHECK(ruta_local = '/l/' || id));
@@ -80,8 +80,16 @@ def _migrar_progreso(conn):
         conn.execute("DROP TABLE progreso_mision")
 
 
+def _migrar_correos(conn):
+    """correos ganó la columna adjunto (id de un PDF fijo del catálogo, o NULL)."""
+    columnas = {f[1] for f in conn.execute("PRAGMA table_info(correos)")}
+    if "adjunto" not in columnas:
+        conn.execute("ALTER TABLE correos ADD COLUMN adjunto TEXT")
+
+
 def crear(conn):
     _migrar_roles(conn)
     _migrar_progreso(conn)
     conn.executescript(DDL)
+    _migrar_correos(conn)
     conn.commit()

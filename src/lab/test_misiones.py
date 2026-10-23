@@ -14,9 +14,10 @@ def chk(nombre, cond):
 def main():
     repo = repositorio.abrir(":memory:")
     ms = repo.misiones("p1", "ana.perez")
-    chk("3 misiones fijas sembradas, todas pendientes",
+    chk("4 misiones fijas sembradas, todas pendientes",
         [m["titulo"] for m in ms] == ["Reportar un correo sospechoso", "Contener un enlace clicado",
-                                      "Revisar el buzón diariamente"] and {m["estado"] for m in ms} == {"pendiente"})
+                                      "Revisar el buzón diariamente", "Revisar un documento recibido"]
+        and {m["estado"] for m in ms} == {"pendiente"})
     chk("cada condición es un evento con regla o 'manual'",
         all(m["condicion_evento"] in sesion.REGLAS_EVENTO or m["condicion_evento"] == "manual" for m in ms))
 
@@ -49,7 +50,7 @@ def main():
     repo.conn.execute("UPDATE misiones SET condicion_evento='CLIC_ENLACE' WHERE id=2")  # definición vieja
     seed.sembrar_misiones(repo.conn)
     chk("volver a sembrar no duplica y actualiza la definición",
-        len(repo.misiones("p1", "ana.perez")) == 3 and repo.misiones("p1", "ana.perez")[1]["condicion_evento"] == "enlace_contenido")
+        len(repo.misiones("p1", "ana.perez")) == 4 and repo.misiones("p1", "ana.perez")[1]["condicion_evento"] == "enlace_contenido")
     chk("re-sembrar conserva el progreso", repo.misiones("p1", "ana.perez")[1]["estado"] == "completada")
 
     print(f"Total {sum(resultados)}/{len(resultados)}")

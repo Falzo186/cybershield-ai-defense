@@ -37,7 +37,12 @@ def main():
     s.registrar("rol_falso", "DEFENSA_EXITOSA", "RECHAZAR")
     s.aplicar_evento("CLIC_ENLACE")
     chk("los eventos se suman al riesgo de las rondas", s.riesgo_acumulado == 8 + 15)
-    chk("pdf_reportado aún no tiene regla (no existe el evento)", "pdf_reportado" not in sesion.REGLAS_EVENTO)
+    s = sesion.EstadoSesion()
+    s.aplicar_evento("CLIC_ENLACE")
+    chk("pdf_abierto no suma riesgo y marca misión", s.aplicar_evento("pdf_abierto")["riesgo"] == 0
+        and s.riesgo_acumulado == 15 and sesion.REGLAS_EVENTO["pdf_abierto"]["mision"] is True)
+    r = s.aplicar_evento("pdf_reportado")
+    chk("pdf_reportado resta 10 sin misión", r["riesgo"] == -10 and r["mision"] is False and s.riesgo_acumulado == 5)
     s = sesion.EstadoSesion()
     s.aplicar_evento("CLIC_ENLACE")
     r = s.aplicar_evento("enlace_contenido")

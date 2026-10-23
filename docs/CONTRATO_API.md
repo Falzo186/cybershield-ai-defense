@@ -148,3 +148,10 @@ Tablas `misiones(id, titulo, condicion_evento, puntos)` y `progreso_mision(parti
 - Un clic posterior en `/l/{id}` muestra «Enlace bloqueado por el Equipo Azul», se registra como `CLIC_BLOQUEADO` y no aplica ninguna regla.
 - `GET /api/buzon`: cada correo trae también `clicado` y `contenido` (0/1).
 - Las definiciones de `seed.MISIONES` se actualizan en BD existentes al arrancar (el progreso se conserva).
+
+### PDFs benignos como eventos (añadido)
+PDFs fijos de solo texto en `data/pdf/` (catálogo `src/lab/documentos.py`; nunca se suben desde la UI). Plantillas con adjunto fijo: `recursos_humanos` (recibo_nomina), `paqueteria` (comprobante_envio) y la nueva `comunicado_interno` (politica_escritorio_limpio). Tabla `correos` + columna `adjunto`.
+- `GET /api/buzon`: cada correo trae `adjunto:{id, archivo, titulo}|null`, `pdf_abierto` y `pdf_reportado` (0/1).
+- `POST /api/evento` (solo token `azul`) `{tipo:"pdf_abierto"|"pdf_reportado", recurso:"correo:<id>"}` -> `{ok, documento, regla, descarga:"/pdf/<id>"|null}`. Escribe `PDF_ABIERTO`/`PDF_REPORTADO` en `auditoria`. 404 si el correo no es suyo, 409 si no trae PDF o el PDF ya se reportó.
+- `GET /pdf/{id}` (público, solo ids del catálogo): `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`.
+- Reglas: `pdf_abierto` -> riesgo 0 y completa «Revisar un documento recibido» (misión 4, 10 pts); `pdf_reportado` -> riesgo −10.
