@@ -165,7 +165,7 @@
   // ---------- buzón de correos de entrenamiento ----------
   async function abrirBuzon() {
     R.mostrarBuzon(true, estado.rol);
-    if (estado.rol === "azul") { cargarBuzon(); return; }
+    if (estado.rol === "azul") { cargarBuzon(); cargarMisiones(); return; }
     try {
       const [p, u] = await Promise.all([API.plantillasCorreo(), API.usuarios()]);
       R.setPlantillas(p.plantillas || []);
@@ -184,12 +184,43 @@
     $("btn-correo").disabled = false;
   }
 
+  // Tras refrescar, el correo abierto sigue abierto (con sus botones al día).
   async function cargarBuzon() {
     try {
       const b = await API.buzon();
-      R.setBuzon(b.usuario, b.correos || [], R.mostrarCorreo);
-      R.mostrarCorreo(null);
+      const correos = b.correos || [];
+      const abierto = correos.find((c) => c.id === estado.correoAbierto);
+      R.setBuzon(b.usuario, correos, abrirCorreo, abierto && abierto.id);
+      if (abierto) abrirCorreo(abierto); else { estado.correoAbierto = null; R.mostrarCorreo(null); }
     } catch (e) { if (R.buzonAbierto()) R.toast(e.message); }
+  }
+
+  function abrirCorreo(c) {
+    estado.correoAbierto = c.id;
+    R.mostrarCorreo(c, { reportar: () => accionCorreo("reportar", c.id), contener: () => accionCorreo("contener", c.id) });
+  }
+
+  // Reportar / contener: el servidor aplica la regla fija y avisa qué cambió (riesgo y misiones completadas).
+  async function accionCorreo(tipo, id) {
+    try {
+      const r = await (tipo === "reportar" ? API.reportarCorreo(id) : API.contenerCorreo(id));
+      const g = r.regla || {};
+      const misiones = (g.misiones_completadas || []).map((m) => "«" + m.titulo + "» +" + m.puntos + " pts");
+      R.toast((tipo === "reportar" ? "✓ Correo reportado" : "✓ Enlace contenido") +
+        (typeof g.riesgo === "number" ? " · riesgo " + (g.riesgo > 0 ? "+" : "") + g.riesgo : "") +
+        (misiones.length ? " · misión completada: " + misiones.join(", ") : ""));
+    } catch (e) { R.toast(e.message); }
+    cargarBuzon();
+    cargarMisiones();
+  }
+
+  async function cargarMisiones() {
+    try { R.setMisiones(await API.misiones(), completarMision); } catch (e) { if (R.buzonAbierto()) R.toast(e.message); }
+  }
+
+  async function completarMision(id) {
+    try { await API.completarMision(id); R.toast("✓ Misión completada"); } catch (e) { R.toast(e.message); }
+    cargarMisiones();
   }
 
   function aplicarMetricas(m) {
@@ -309,8 +340,10 @@
     },
     auditoria(d) {
       R.addAuditoria(d);
-      // Correo nuevo en la partida: el equipo azul refresca su buzón (el contador del botón se actualiza solo).
-      if (d.accion === "CORREO_ENVIADO" && estado.rol === "azul" && API.tieneToken()) cargarBuzon();
+      // Correo nuevo o clic en un enlace: el equipo azul refresca su buzón (contador y botón «Contener» al día).
+      if ((d.accion === "CORREO_ENVIADO" || d.accion === "CLIC_ENLACE") && estado.rol === "azul" && API.tieneToken()) {
+        cargarBuzon();
+      }
     },
     metricas(d) { aplicarMetricas(d); },
     fin(d) {
@@ -631,6 +664,11 @@
     $("buzon-cerrar").addEventListener("click", () => R.mostrarBuzon(false));
     $("buzon-modal").addEventListener("click", (ev) => { if (ev.target === $("buzon-modal")) R.mostrarBuzon(false); });
     $("btn-buzon-refrescar").addEventListener("click", cargarBuzon);
+    $("btn-misiones-refrescar").addEventListener("click", cargarMisiones);
+    document.querySelectorAll("[data-azul]").forEach((t) => t.addEventListener("click", () => {
+      R.setVistaAzul(t.dataset.azul);
+      if (t.dataset.azul === "misiones") cargarMisiones();
+    }));
     $("correo-form").addEventListener("submit", (ev) => { ev.preventDefault(); enviarCorreo(); });
     document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && R.buzonAbierto()) R.mostrarBuzon(false); });
 

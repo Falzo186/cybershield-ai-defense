@@ -562,7 +562,8 @@ const R = (() => {
     $("btn-buzon").textContent = typeof n === "number" ? "✉ BUZÓN (" + n + ")" : "✉ CORREOS";
   }
 
-  function setBuzon(usuario, correos, onAbrir) {
+  // seleccionado = id del correo abierto (se conserva el resaltado al refrescar la lista).
+  function setBuzon(usuario, correos, onAbrir, seleccionado) {
     $("buzon-usuario").textContent = usuario ? "Buzón de " + usuario : "Sin usuario asignado";
     const ul = $("buzon-lista");
     ul.replaceChildren();
@@ -571,6 +572,15 @@ const R = (() => {
       const b = el("button", "buzon-item");
       b.type = "button";
       b.append(el("b", null, c.asunto), el("span", "fecha", fechaCorta(c.ts)), el("span", "de", c.de));
+      const marcas = [[c.clicado && !c.contenido, "marca-clic", "ENLACE CLICADO"],
+        [c.contenido, "marca-contenido", "CONTENIDO"], [c.reportado, "marca-reportado", "REPORTADO"]]
+        .filter(([si]) => si);
+      if (marcas.length) {
+        const m = el("span", "buzon-marcas");
+        marcas.forEach(([, cls, txt]) => m.append(el("span", "marca " + cls, txt)));
+        b.append(m);
+      }
+      if (c.id === seleccionado) b.setAttribute("aria-current", "true");
       b.addEventListener("click", () => {
         ul.querySelectorAll(".buzon-item").forEach((x) => x.removeAttribute("aria-current"));
         b.setAttribute("aria-current", "true");
@@ -583,7 +593,17 @@ const R = (() => {
     setBotonBuzon(correos.length);
   }
 
-  function mostrarCorreo(c) {
+  function botonAccion(texto, cls, hecho, textoHecho, onClick) {
+    const b = el("button", "btn btn-mini " + cls, hecho ? textoHecho : texto);
+    b.type = "button";
+    b.disabled = !!hecho;
+    if (!hecho) b.addEventListener("click", () => { b.disabled = true; onClick(); });
+    return b;
+  }
+
+  // acciones = {reportar(), contener()}: Reportar siempre (deshabilitado si ya se reportó); Contener solo si el
+  // enlace ya tuvo un clic (deshabilitado si ya se contuvo).
+  function mostrarCorreo(c, acciones) {
     const d = $("buzon-detalle");
     d.replaceChildren();
     d.hidden = !c;
@@ -597,6 +617,42 @@ const R = (() => {
       a.rel = "noopener noreferrer";
       d.append(a);
     }
+    if (!acciones) return;
+    const f = el("div", "buzon-acciones");
+    f.append(botonAccion("⚑ Reportar", "", c.reportado, "✓ Reportado", acciones.reportar));
+    if (c.clicado) f.append(botonAccion("⛔ Contener", "btn-danger", c.contenido, "✓ Contenido", acciones.contener));
+    d.append(f);
+  }
+
+  // ---------- misiones del Equipo Azul ----------
+  function setVistaAzul(vista) {
+    document.querySelectorAll("[data-azul]").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.azul === vista)));
+    $("azul-correos").hidden = vista !== "correos";
+    $("azul-misiones").hidden = vista !== "misiones";
+  }
+
+  const CONDICION = { correo_reportado: "Se completa al reportar un correo", manual: "La marca el propio equipo",
+    enlace_contenido: "Se completa al contener un enlace clicado" };
+
+  function setMisiones(d, onCompletar) {
+    $("misiones-resumen").textContent = (d.usuario ? d.usuario + " · " : "") + d.puntos + " pts · riesgo de la partida " +
+      Math.round(d.riesgo_partida || 0) + "/100";
+    const ul = $("misiones-lista");
+    ul.replaceChildren();
+    if (!d.misiones.length) ul.append(el("li", "buzon-vacio", "Sin misiones."));
+    d.misiones.forEach((m) => {
+      const hecha = m.estado === "completada";
+      const li = el("li", "mision" + (hecha ? " completada" : ""));
+      const det = el("span", "det");
+      det.append(el("span", "estado-" + m.estado, hecha ? "✓ COMPLETADA" : "○ PENDIENTE"),
+        el("span", null, CONDICION[m.condicion_evento] || m.condicion_evento));
+      if (hecha && m.ts) det.append(el("span", null, fechaCorta(m.ts)));
+      li.append(el("b", null, m.titulo), el("span", "pts", m.puntos + " pts"), det);
+      if (!hecha && m.condicion_evento === "manual") {
+        li.append(botonAccion("Marcar completada", "", false, "", () => onCompletar(m.id)));
+      }
+      ul.append(li);
+    });
   }
 
   // ---------- modal de resultados ----------
@@ -643,5 +699,6 @@ const R = (() => {
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
     mostrarBuzon, buzonAbierto, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
+    setVistaAzul, setMisiones,
   };
 })();

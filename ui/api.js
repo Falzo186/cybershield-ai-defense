@@ -80,6 +80,11 @@ const API = (() => {
     plantillasCorreo: () => req("GET", "/api/correo/plantillas"),
     enviarCorreo: (plantilla, para_usuario) => req("POST", "/api/correo", { plantilla, para_usuario: para_usuario || undefined }),
     buzon: () => req("GET", "/api/buzon"),
+    // Solo Azul: acciones sobre un correo de su buzón y misiones -> {..., regla:{riesgo, misiones_completadas}}
+    reportarCorreo: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/reportar", {}),
+    contenerCorreo: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/contener", {}),
+    misiones: () => req("GET", "/api/misiones"),
+    completarMision: (id) => req("POST", "/api/misiones/" + encodeURIComponent(id) + "/completar", {}),
     conectar,
   };
 })();

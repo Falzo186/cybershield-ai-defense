@@ -49,11 +49,11 @@ h3 { font-size: 12px; letter-spacing: .08em; color: var(--texto-sec); margin: 14
 .conn-warn { color: var(--warn); border-color: var(--warn); }
 
 .tabs { display: flex; gap: 4px; }
-.tab {
+.tab, .subtab {
   background: transparent; color: var(--texto-sec); border: 1px solid var(--borde);
   padding: 7px 12px; border-radius: 6px; font: 600 12px var(--sans); letter-spacing: .06em; cursor: pointer;
 }
-.tab[aria-selected="true"] { background: var(--panel2); color: var(--texto); border-color: var(--def); }
+.tab[aria-selected="true"], .subtab[aria-selected="true"] { background: var(--panel2); color: var(--texto); border-color: var(--def); }
 .tab:disabled { opacity: .5; cursor: not-allowed; }
 .actions { display: flex; gap: 8px; align-items: center; }
 .rondas { font-size: 12px; color: var(--texto-sec); display: flex; gap: 6px; align-items: center; }
@@ -379,3 +379,15 @@ body[data-rol="rojo"] #ro-def[hidden], body[data-rol="azul"] #ro-atq[hidden] { d
 .buzon-detalle pre { white-space: pre-wrap; word-break: break-word; font: 13px var(--sans); margin: 0 0 10px; }
 .buzon-detalle a { color: var(--def); font: 600 13px var(--mono); word-break: break-all; }
 @media (max-width: 600px) { .buzon-item { grid-template-columns: 1fr; } .buzon-item .fecha { grid-row: auto; grid-column: auto; } }
+.buzon-tabs { margin-bottom: 10px; }
+.buzon-marcas { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.marca { font: 600 10px var(--sans); letter-spacing: .06em; padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; }
+.marca-clic { color: var(--bad); } .marca-contenido { color: var(--def); } .marca-reportado { color: var(--ok); }
+.buzon-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.misiones-lista { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mision { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; background: var(--panel2); border: 1px solid var(--borde); border-left: 3px solid var(--texto-sec); border-radius: 6px; padding: 8px 10px; }
+.mision.completada { border-left-color: var(--ok); }
+.mision b { font-weight: 600; overflow-wrap: anywhere; }
+.mision .pts { font: 700 13px var(--mono); white-space: nowrap; }
+.mision .det { color: var(--texto-sec); font-size: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.mision .estado-pendiente { color: var(--warn); } .mision .estado-completada { color: var(--ok); }

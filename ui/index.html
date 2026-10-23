@@ -245,12 +245,25 @@
       <button type="submit" id="btn-correo" class="btn btn-primary">Enviar correo de entrenamiento</button>
     </form>
     <div id="buzon-azul" hidden>
-      <div class="buzon-head">
-        <span id="buzon-usuario" class="muted"></span>
-        <button type="button" id="btn-buzon-refrescar" class="btn btn-mini">↻ Actualizar</button>
+      <div class="tabs buzon-tabs" role="tablist" aria-label="Vista del Equipo Azul">
+        <button type="button" role="tab" class="subtab" data-azul="correos" aria-selected="true" aria-controls="azul-correos">CORREOS</button>
+        <button type="button" role="tab" class="subtab" data-azul="misiones" aria-selected="false" aria-controls="azul-misiones">MISIONES</button>
       </div>
-      <ul id="buzon-lista" class="buzon-lista" aria-label="Correos recibidos"></ul>
-      <article id="buzon-detalle" class="buzon-detalle" hidden aria-live="polite"></article>
+      <div id="azul-correos" role="tabpanel">
+        <div class="buzon-head">
+          <span id="buzon-usuario" class="muted"></span>
+          <button type="button" id="btn-buzon-refrescar" class="btn btn-mini">↻ Actualizar</button>
+        </div>
+        <ul id="buzon-lista" class="buzon-lista" aria-label="Correos recibidos"></ul>
+        <article id="buzon-detalle" class="buzon-detalle" hidden aria-live="polite"></article>
+      </div>
+      <div id="azul-misiones" role="tabpanel" hidden>
+        <div class="buzon-head">
+          <span id="misiones-resumen" class="muted"></span>
+          <button type="button" id="btn-misiones-refrescar" class="btn btn-mini">↻ Actualizar</button>
+        </div>
+        <ul id="misiones-lista" class="misiones-lista" aria-label="Misiones del Equipo Azul"></ul>
+      </div>
     </div>
     <button type="button" id="buzon-cerrar" class="btn">CERRAR (Esc)</button>
   </div>
