@@ -244,6 +244,22 @@ class Repositorio:
         self.registrar(self.identidad(usuario), accion, f"correo:{correo_id}", resultado, "BAJO")
         return {"doc": fila["adjunto"]}
 
+    def logros_rojo(self, partida):
+        """Lo que cuenta para el puntaje de Rojo en la partida: correos con enlace clicado y NO contenido, y correos
+        con PDF abierto y NO reportado. -> {enlaces_sin_contener, pdfs_sin_reportar}"""
+        fila = self.conn.execute(
+            "SELECT COALESCE(SUM(clicado AND NOT contenido), 0) AS enlaces, "
+            "COALESCE(SUM(pdf_abierto AND NOT pdf_reportado), 0) AS pdfs FROM ("
+            "  SELECT EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'CLIC_ENLACE' AND a.recurso = 'correo:' || c.id)"
+            "         AS clicado,"
+            "         EXISTS(SELECT 1 FROM contenciones k WHERE k.correo_id = c.id) AS contenido,"
+            "         EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'PDF_ABIERTO' AND a.recurso = 'correo:' || c.id)"
+            "         AS pdf_abierto,"
+            "         EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'PDF_REPORTADO' AND a.recurso = 'correo:' || c.id)"
+            "         AS pdf_reportado"
+            "  FROM correos c WHERE c.partida = ?)", (partida,)).fetchone()
+        return {"enlaces_sin_contener": fila["enlaces"], "pdfs_sin_reportar": fila["pdfs"]}
+
     # ---------- misiones del Equipo Azul ----------
     def misiones(self, partida, usuario):
         """Todas las misiones con el progreso de ese usuario EN ESA PARTIDA ('pendiente' si aún no hay fila):

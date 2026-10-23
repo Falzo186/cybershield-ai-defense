@@ -402,3 +402,4 @@ body[data-rol="rojo"] #ro-def[hidden], body[data-rol="azul"] #ro-atq[hidden] { d
 .mp-azul { border-color: var(--def); } .mp-azul b { color: var(--def); }
 .mp-verde b { color: var(--ok); } .mp-ambar b { color: var(--warn); } .mp-rojo b { color: var(--bad); }
 @media (max-width: 600px) { .mp-item { white-space: normal; } }
+.mp-rojo-eq { border-color: var(--atq); } .mp-rojo-eq b { color: var(--atq); }

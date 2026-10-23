@@ -326,7 +326,10 @@ def _marcador():
     lista = repositorio.por_defecto().misiones(PARTIDA_ID, usuario)  # sin usuario azul: todas pendientes
     hechas = [m for m in lista if m["estado"] == "completada"]
     vistos = ESTADO_PARTIDA.eventos_vistos
+    rojo = repositorio.por_defecto().logros_rojo(PARTIDA_ID)
     return {"usuario_azul": usuario, "puntos_azul": sum(m["puntos"] for m in hechas),
+            "puntos_rojo": sesion.puntaje_rojo(rojo["enlaces_sin_contener"], rojo["pdfs_sin_reportar"]),
+            "rojo_enlaces_sin_contener": rojo["enlaces_sin_contener"], "rojo_pdfs_sin_reportar": rojo["pdfs_sin_reportar"],
             "misiones_completadas": len(hechas), "misiones_total": len(lista),
             "riesgo": ESTADO_PARTIDA.riesgo_acumulado,
             **{clave: vistos.get(evento, 0) for clave, evento in CONTEOS_MARCADOR.items()}}

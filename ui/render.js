@@ -646,6 +646,8 @@ const R = (() => {
       return s;
     };
     m.append(
+      item("mp-rojo-eq", "🔴 Rojo", d.puntos_rojo + " pts · " + d.rojo_enlaces_sin_contener + " enlaces / " +
+        d.rojo_pdfs_sin_reportar + " PDF"),
       item("mp-azul", "🔵 Azul" + (d.usuario_azul ? " (" + d.usuario_azul + ")" : ""),
         d.puntos_azul + " pts · " + d.misiones_completadas + "/" + d.misiones_total + " misiones"),
       item("mp-riesgo mp-" + zona, "Riesgo", r + "/100"),

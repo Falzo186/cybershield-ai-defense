@@ -19,6 +19,16 @@ REGLAS_EVENTO = {
     "pdf_reportado": {"riesgo": -10, "mision": False},     # Azul reportó un PDF adjunto sospechoso
 }
 
+# Puntaje de Rojo (determinista). Se CALCULA del estado de la partida en cada momento, no se otorga y se quita:
+# un enlace clicado vale +10 mientras Azul no lo contenga; un PDF abierto vale +5 mientras Azul no lo reporte. Al
+# finalizar la partida se congela lo que valga en ese instante.
+PUNTOS_ROJO = {"enlace_sin_contener": 10, "pdf_abierto_sin_reportar": 5}
+
+
+def puntaje_rojo(enlaces_sin_contener, pdfs_sin_reportar):
+    return (enlaces_sin_contener * PUNTOS_ROJO["enlace_sin_contener"]
+            + pdfs_sin_reportar * PUNTOS_ROJO["pdf_abierto_sin_reportar"])
+
 
 class EstadoSesion:
     def __init__(self):
