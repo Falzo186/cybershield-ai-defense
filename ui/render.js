@@ -653,7 +653,8 @@ const R = (() => {
       item("mp-riesgo mp-" + zona, "Riesgo", r + "/100"),
       item(null, "Clics", d.clics), item(null, "Contenciones", d.contenciones),
       item(null, "Reportes", d.correos_reportados + d.pdf_reportados),
-      item(null, "PDF abiertos", d.pdf_abiertos));
+      item(null, "PDF abiertos", d.pdf_abiertos),
+      item(null, "Accesos de Rojo denegados", d.denegaciones_rojo));
   }
 
   // ---------- misiones del Equipo Azul ----------

@@ -187,6 +187,7 @@ def main():
     chk("marcador: riesgo actual de la partida", mk["riesgo"] == srv.ESTADO_PARTIDA.riesgo_acumulado)
     chk("marcador: Rojo en 0 (el enlace clicado se contuvo y el PDF abierto se reportó)",
         (mk["puntos_rojo"], mk["rojo_enlaces_sin_contener"], mk["rojo_pdfs_sin_reportar"]) == (0, 0, 0))
+    chk("marcador: sin batallas IA vs IA no hay denegaciones de Rojo", mk["denegaciones_rojo"] == 0)
     chk("marcador: conteo de eventos clave (el clic bloqueado no cuenta)",
         (mk["clics"], mk["contenciones"], mk["correos_reportados"], mk["pdf_abiertos"], mk["pdf_reportados"])
         == (2, 1, 1, 1, 1))  # 2 clics = el real + el CLIC_ENLACE aplicado a mano antes de reportar el PDF

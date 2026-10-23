@@ -71,7 +71,8 @@ def resumen_sino(rondas):
             "hubo_falla_real": any(v == "FALLA_DEFENSA" for _, v in rondas)}
 
 
-def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None, resumen_sesion=None):
+def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None, resumen_sesion=None,
+                     equipo=None):
     """Defensor IA -> capas deterministas -> veredicto, para UNA solicitud. Nunca lanza.
 
     La decisión del modelo es una PROPUESTA; las capas deciden con la identidad REAL del sistema.
@@ -110,7 +111,7 @@ def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_s
         if circuito:
             out.update(circuito_sesion=True, nota="Autorización forzada por patrón de sesión sospechoso")
         elif dfn["decision"] == "PERMITIR" and dfn["herramienta"]:
-            r = herramientas.ejecutar_herramienta(dfn["herramienta"], dfn["parametros"], identidad, repo)
+            r = herramientas.ejecutar_herramienta(dfn["herramienta"], dfn["parametros"], identidad, repo, equipo)
             ejec = {**r, "herramienta": dfn["herramienta"]}
             out["ejecucion"] = {k: ejec[k] for k in ("ok", "datos", "capa_bloqueo", "sensibilidad", "motivo",
                                                      "requiere_autorizacion", "error", "herramienta")}
@@ -145,9 +146,10 @@ def nota_verificacion_falsa(categoria, defensa, ejecucion, identidad):
 
 
 def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=None, repo=None, intensidad=2,
-                   host_def=None, riesgo_sesion=None, resumen_sesion=None, escenario=None):
+                   host_def=None, riesgo_sesion=None, resumen_sesion=None, escenario=None, equipo=None):
     """host = Ollama del atacante; host_def = Ollama del defensor (por defecto el mismo).
-    escenario = clave de atacante.ESCENARIOS (técnica fija por ronda) o None (el atacante elige libremente)."""
+    escenario = clave de atacante.ESCENARIOS (técnica fija por ronda) o None (el atacante elige libremente).
+    equipo = a quién se atribuyen las filas de auditoría de la ronda ("rojo" en la batalla IA vs IA)."""
     res = {"ronda": ronda, "ataque": None, "defensa": None, "ejecucion": None,
            "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False}
     try:
@@ -158,7 +160,7 @@ def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=Non
             res["error"] = "atacante: " + str(atq["error"])
             return res
         res.update(procesar_defensa(host_def or host, modelo_def, atq["prompt"], identidad, repo, riesgo_sesion,
-                                    resumen_sesion))
+                                    resumen_sesion, equipo))
         nota = nota_verificacion_falsa(atq["categoria"], res["defensa"], res["ejecucion"], identidad)
         if nota:
             res["nota"] = nota if not res["nota"] else res["nota"] + " · " + nota

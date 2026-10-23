@@ -169,3 +169,7 @@ PDFs fijos de solo texto en `data/pdf/` (catálogo `src/lab/documentos.py`; nunc
 
 ### Puntaje de Rojo (añadido)
 `sesion.PUNTOS_ROJO`: +10 por cada correo de la partida con enlace clicado y NO contenido; +5 por cada correo con PDF abierto y NO reportado (una vez por correo, aunque haya varios clics/aperturas). Se calcula del estado actual (`Repositorio.logros_rojo`), así que contener/reportar le quita esos puntos; al finalizar se congela. `marcador_partida` añade `puntos_rojo`, `rojo_enlaces_sin_contener` y `rojo_pdfs_sin_reportar`.
+
+### Equipo en la auditoría (ajuste)
+- `auditoria` gana `equipo` y `partida`. Las acciones del buzón quedan como `azul`; en la batalla IA vs IA, `motor.ejecutar_ronda(..., equipo="rojo")` propaga el equipo por `procesar_defensa` -> `ejecutar_herramienta` -> `consultar`, así que sus denegaciones quedan como `rojo` (JSONL incluido). La prueba manual queda con `equipo` NULL.
+- `marcador_partida` añade `denegaciones_rojo` (filas DENEGADO de Rojo en la partida) y se difunde tras cada ronda de batalla.

@@ -332,6 +332,7 @@ def _marcador():
             "rojo_enlaces_sin_contener": rojo["enlaces_sin_contener"], "rojo_pdfs_sin_reportar": rojo["pdfs_sin_reportar"],
             "misiones_completadas": len(hechas), "misiones_total": len(lista),
             "riesgo": ESTADO_PARTIDA.riesgo_acumulado,
+            "denegaciones_rojo": repositorio.por_defecto().denegaciones(PARTIDA_ID, "rojo"),
             **{clave: vistos.get(evento, 0) for clave, evento in CONTEOS_MARCADOR.items()}}
 
 
@@ -859,7 +860,7 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
                     loop.run_in_executor(None, lambda n=n, h=list(historial): motor.ejecutar_ronda(
                         host_atq, modelo_atq, modelo_def, ident, n, historial=h, intensidad=intensidad,
                         host_def=host_def, riesgo_sesion=estado_sesion.riesgo_acumulado,
-                        resumen_sesion=estado_sesion.resumen(), escenario=escenario)),
+                        resumen_sesion=estado_sesion.resumen(), escenario=escenario, equipo="rojo")),
                     TIMEOUT_RONDA)
             except asyncio.TimeoutError:
                 r = {"ronda": n, "ataque": None, "defensa": None, "ejecucion": None, "veredicto": "ERROR",
@@ -877,6 +878,7 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
                 decisiones.append((d["decision_ia"], d["resultado"]))
                 jugadas += 1
                 historial.append({"categoria": r["ataque"]["categoria"], "resultado": r["veredicto"]})
+                _emitir_marcador()  # cuenta en vivo los intentos de Rojo frenados (denegaciones)
             await asyncio.sleep(0.6)
         ms.emitir("fin", {"modo": "batalla", "origen": "ollama", "metricas": ms.snapshot(), "errores": errores,
                           "demo": demo})

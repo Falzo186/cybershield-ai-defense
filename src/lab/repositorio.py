@@ -19,7 +19,7 @@ RUTA_EVENTOS = RUTA_DB.parent / "eventos.jsonl"
 PARTIDA = None  # id de la partida actual; lo fija server/app.py al arrancar
 
 # Acciones de auditoría que van al JSONL -> (tipo de evento, equipo que actúa). Además, todo DENEGADO de una
-# consulta o herramienta sale como "autorizacion_denegada" (equipo null: el actor lo decide la capa superior).
+# consulta o herramienta sale como "autorizacion_denegada" (equipo "rojo" en batallas IA vs IA; null si no se sabe).
 EVENTOS_SIEM = {
     "CLIC_ENLACE": ("clic_enlace", "azul"), "CLIC_BLOQUEADO": ("clic_bloqueado", "azul"),
     "ENLACE_CONTENIDO": ("enlace_contenido", "azul"), "CORREO_REPORTADO": ("correo_reportado", "azul"),
@@ -90,23 +90,31 @@ class Repositorio:
             raise KeyError(f"usuario desconocido: {usuario}")
         return Identidad(fila["usuario"], fila["rol"])
 
-    def registrar(self, identidad, accion, recurso, resultado, nivel):
+    def registrar(self, identidad, accion, recurso, resultado, nivel, equipo=None):
+        """equipo = quién actúa ("rojo" en las batallas IA vs IA). Si no se indica, sale de EVENTOS_SIEM (acciones
+        del buzón = azul) o queda NULL."""
         # ISO 8601 completo con zona horaria (p. ej. 2026-10-22T13:47:05-06:00): ordenable y listo para un SIEM.
         ts = datetime.now().astimezone().isoformat(timespec="seconds")
         usuario, rol = getattr(identidad, "usuario", None), getattr(identidad, "rol", None)
+        equipo = equipo or EVENTOS_SIEM.get(accion, (None, None))[1]
         self.conn.execute(
-            "INSERT INTO auditoria(ts,usuario,rol,accion,recurso,resultado,nivel_riesgo) VALUES(?,?,?,?,?,?,?)",
-            (ts, usuario, rol, accion, recurso, resultado, nivel))
+            "INSERT INTO auditoria(ts,usuario,rol,accion,recurso,resultado,nivel_riesgo,equipo,partida) "
+            "VALUES(?,?,?,?,?,?,?,?,?)", (ts, usuario, rol, accion, recurso, resultado, nivel, equipo, PARTIDA))
         self.conn.commit()
-        self._evento_siem(ts, usuario, rol, accion, recurso, resultado, nivel)
+        self._evento_siem(ts, usuario, rol, accion, recurso, resultado, nivel, equipo)
 
-    def _evento_siem(self, ts, usuario, rol, accion, recurso, resultado, nivel):
+    def denegaciones(self, partida, equipo):
+        """Filas DENEGADO de la partida atribuidas a ese equipo (p. ej. intentos de Rojo frenados por las capas)."""
+        return self.conn.execute(
+            "SELECT COUNT(*) FROM auditoria WHERE partida=? AND equipo=? AND resultado='DENEGADO'",
+            (partida, equipo)).fetchone()[0]
+
+    def _evento_siem(self, ts, usuario, rol, accion, recurso, resultado, nivel, equipo):
         """Mismo registro que auditoría, como una línea JSON en eventos.jsonl (solo eventos relevantes). Un fallo
         al escribir el archivo nunca tumba la auditoría (la tabla SQLite sigue siendo la fuente de verdad)."""
         if not self.ruta_eventos:
             return
-        tipo, equipo = EVENTOS_SIEM.get(accion, ("autorizacion_denegada", None) if resultado == "DENEGADO"
-                                        else (None, None))
+        tipo = EVENTOS_SIEM.get(accion, ("autorizacion_denegada",) if resultado == "DENEGADO" else (None,))[0]
         if tipo is None:
             return
         linea = json.dumps({"timestamp": ts, "partida": PARTIDA, "equipo": equipo, "usuario": usuario, "rol": rol,
@@ -118,7 +126,7 @@ class Repositorio:
         except OSError:
             pass
 
-    def consultar(self, identidad, tabla, filtros=None):
+    def consultar(self, identidad, tabla, filtros=None, equipo=None):
         esp = ESPECIFICACION.get(tabla)
         if esp is None:
             raise ValueError(f"tabla no permitida: {tabla}")
@@ -132,7 +140,7 @@ class Repositorio:
         sens = permisos.TABLAS[tabla]
         acceso = permisos.evaluar_acceso(identidad, sens, self.autorizador.vigente(identidad, tabla))
         if not acceso.permitido:
-            self.registrar(identidad, "CONSULTA", tabla, "DENEGADO", NIVEL_RIESGO[sens])
+            self.registrar(identidad, "CONSULTA", tabla, "DENEGADO", NIVEL_RIESGO[sens], equipo)
             raise PermisoDenegado("repositorio", acceso.motivo, acceso.requiere_autorizacion)
 
         sql = f"SELECT {', '.join(esp['columnas'])} FROM {tabla}"  # solo constantes del código
@@ -140,7 +148,7 @@ class Repositorio:
             sql += " WHERE " + " AND ".join(f"{k} = ?" for k in filtros)
         sql += f" LIMIT {LIMITE_FILAS}"
         filas = self.conn.execute(sql, tuple(filtros.values())).fetchall()
-        self.registrar(identidad, "CONSULTA", tabla, "PERMITIDO", NIVEL_RIESGO[sens])
+        self.registrar(identidad, "CONSULTA", tabla, "PERMITIDO", NIVEL_RIESGO[sens], equipo)
         return [dict(f) for f in filas]
 
     # ---------- buzón de entrenamiento (fuera de TABLAS: ninguna herramienta de la IA puede leerlo) ----------

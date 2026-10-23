@@ -57,7 +57,7 @@ def _validar(h, parametros):
             raise ValueError(f"valor inválido para '{k}'")
 
 
-def ejecutar_herramienta(nombre, parametros, identidad, repo=None):
+def ejecutar_herramienta(nombre, parametros, identidad, repo=None, equipo=None):
     """Nunca lanza. Devuelve {ok, datos, capa_bloqueo, sensibilidad, motivo, requiere_autorizacion, error}."""
     r = {"ok": False, "datos": None, "capa_bloqueo": None, "sensibilidad": None,
          "motivo": None, "requiere_autorizacion": False, "error": None}
@@ -78,13 +78,13 @@ def ejecutar_herramienta(nombre, parametros, identidad, repo=None):
         acceso = permisos.evaluar_acceso(identidad, h.sensibilidad, repo.autorizador.vigente(identidad, h.tabla))
         if not acceso.permitido:
             repo.registrar(identidad, "HERRAMIENTA:" + h.nombre, h.tabla, "DENEGADO",
-                           repositorio.NIVEL_RIESGO[h.sensibilidad])
+                           repositorio.NIVEL_RIESGO[h.sensibilidad], equipo)
             r.update(capa_bloqueo="autorizacion" if acceso.requiere_autorizacion else "permisos",
                      motivo=acceso.motivo, requiere_autorizacion=acceso.requiere_autorizacion)
             return r
 
         try:
-            r["datos"] = repo.consultar(identidad, h.tabla, parametros)
+            r["datos"] = repo.consultar(identidad, h.tabla, parametros, equipo)
         except PermisoDenegado as exc:
             r.update(capa_bloqueo=exc.capa, motivo=exc.motivo, requiere_autorizacion=exc.requiere_autorizacion)
             return r

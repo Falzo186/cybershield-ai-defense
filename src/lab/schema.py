@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS autorizaciones(
     vigente INTEGER NOT NULL DEFAULT 1, otorgada_por TEXT NOT NULL, fecha TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS auditoria(
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, usuario TEXT, rol TEXT,
-    accion TEXT NOT NULL, recurso TEXT, resultado TEXT NOT NULL, nivel_riesgo TEXT NOT NULL);
+    accion TEXT NOT NULL, recurso TEXT, resultado TEXT NOT NULL, nivel_riesgo TEXT NOT NULL,
+    equipo TEXT, partida TEXT);
 CREATE TABLE IF NOT EXISTS correos(
     id INTEGER PRIMARY KEY AUTOINCREMENT, partida TEXT NOT NULL, de TEXT NOT NULL,
     para_usuario TEXT NOT NULL REFERENCES usuarios(usuario), asunto TEXT NOT NULL, cuerpo TEXT NOT NULL,
@@ -80,6 +81,15 @@ def _migrar_progreso(conn):
         conn.execute("DROP TABLE progreso_mision")
 
 
+def _migrar_auditoria(conn):
+    """auditoria ganó equipo (rojo/azul o NULL) y partida. ADD COLUMN no choca con los triggers append-only
+    (solo bloquean UPDATE/DELETE); las filas viejas quedan con NULL."""
+    columnas = {f[1] for f in conn.execute("PRAGMA table_info(auditoria)")}
+    for col in ("equipo", "partida"):
+        if col not in columnas:
+            conn.execute(f"ALTER TABLE auditoria ADD COLUMN {col} TEXT")
+
+
 def _migrar_correos(conn):
     """correos ganó la columna adjunto (id de un PDF fijo del catálogo, o NULL)."""
     columnas = {f[1] for f in conn.execute("PRAGMA table_info(correos)")}
@@ -92,4 +102,5 @@ def crear(conn):
     _migrar_progreso(conn)
     conn.executescript(DDL)
     _migrar_correos(conn)
+    _migrar_auditoria(conn)
     conn.commit()
