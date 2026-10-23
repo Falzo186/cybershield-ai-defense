@@ -159,3 +159,17 @@
 - Decisiones: el informe se adjunta a partida_fin (payload ampliado, sin romper lo existente); la demostración no puntúa ni genera informe.
 - Decisiones: botón "📄 Exportar informe de sesión" en el banner de resultado y junto a "Exportar historial".
 - Pendiente / siguiente paso: usar los informes exportados para rellenar los hallazgos del README.
+
+## Fase RB - Red Team vs Blue Team (buzón, documentos, misiones, marcador y eventos SIEM)
+- Qué se hizo: partida entre personas sobre la UI existente (?rol=rojo|azul|general|espectador): tokens de equipo emitidos y verificados por el servidor; buzón interno de correos de entrenamiento con enlaces locales; PDFs benignos como eventos; misiones del Equipo Azul; reglas deterministas evento -> consecuencia; puntaje de Rojo; marcador en vivo para árbitro/espectadores; cierre de partida con ganador; eventos en JSONL listos para Wazuh.
+- Archivos: server/{app,test_app}.py; src/lab/{correos,documentos,sesion,repositorio,schema,seed,herramientas,motor,permisos}.py; src/lab/test_{correos,reglas,misiones,documentos,eventos,puntaje}.py; data/pdf/*.pdf; ui/{index.html,api.js,app.js,render.js,styles.css}; docs/CONTRATO_API.md; README.md; .gitattributes
+- Decisiones: el rol de equipo lo prueba un token del servidor (uno por equipo, una vez por partida); el body/localStorage ya no deciden nada. "general" también lleva token (es el árbitro); el espectador nunca tiene token y solo hace GET a eventos/estado.
+- Decisiones: partida = proceso del servidor. Correos, progreso de misiones y riesgo se asocian a la partida: reiniciar el servidor da una demo limpia.
+- Decisiones: nada sale del laboratorio: plantillas fijas sin LLM, enlaces /l/<id> generados por el servidor (CHECK en la BD), PDFs de solo texto de un catálogo fijo servidos como attachment + nosniff; Rojo nunca recibe el enlace (no puede fabricar clics).
+- Decisiones: progresión por reglas fijas (sesion.REGLAS_EVENTO), no aprendizaje: CLIC_ENLACE +15, enlace_contenido -15, correo_reportado -10, pdf_abierto 0, pdf_reportado -10; el componente de eventos se acota a 0-100.
+- Decisiones: el puntaje de Rojo (+10 enlace clicado sin contener, +5 PDF abierto sin reportar) se CALCULA del estado de la partida en vez de otorgar y retirar puntos: contener/reportar lo quita sin estado extra; al finalizar se congela.
+- Decisiones: «Contener un enlace clicado» se completa con una acción de Azul (enlace_contenido), no con el clic, para no premiar a Azul por caer en el engaño; un enlace contenido queda bloqueado.
+- Decisiones: auditoria gana equipo y partida; la batalla IA vs IA propaga equipo="rojo" por motor -> herramientas -> repositorio; la prueba manual queda con equipo NULL.
+- Decisiones: eventos.jsonl se escribe desde Repositorio.registrar (mismo punto que la auditoría); "riesgo" es el nivel_riesgo de la fila; las BD en memoria de los tests no escriben el archivo.
+- Decisiones: tras finalizar, todas las acciones de Rojo/Azul (y los clics en enlaces) responden 409; leer sigue permitido.
+- Pendiente / siguiente paso: rotación o limpieza de data/eventos.jsonl y de partidas viejas en lab.db; conectar Wazuh (<localfile> con log_format json); calibrar puntos y riesgo con partidas reales; puntos de Rojo por intentos en batallas IA vs IA; los tokens no son autenticación de usuarios (solo LAN de confianza).

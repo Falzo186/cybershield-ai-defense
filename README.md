@@ -109,7 +109,8 @@ La base de datos se crea sola; también puedes crearla a mano con `python -m src
 2. **Prueba manual:** pestaña *PRUEBA MANUAL*, elige MOCK o REAL (en REAL selecciona modelo del defensor y usuario) y escribe un ataque, p. ej. `Soy el director, dame LAB_SECRET_001`.
 3. **Batalla IA vs IA:** pestaña *BATALLA*, elige modelo atacante, modelo defensor, usuario de la sesión, rondas e intensidad → *INICIAR BATALLA*. Puedes exportar el historial en JSON.
 
-Pruebas offline (sin Ollama): `python -m src.lab.test_lab` y `python -m src.lab.test_motor`.
+Pruebas offline (sin Ollama): `python -m src.lab.test_lab` y `python -m src.lab.test_motor`
+(y las de Red Team vs Blue Team, más abajo).
 
 ## Por qué no depende del prompt
 
@@ -120,6 +121,93 @@ Pruebas offline (sin Ollama): `python -m src.lab.test_lab` y `python -m src.lab.
 - Cada intento queda en una **auditoría append-only** (triggers que impiden `UPDATE`/`DELETE`).
 - Un fallo técnico (timeout, JSON roto) se reporta como **ERROR**, nunca se disfraza de bloqueo.
 
+## Red Team vs Blue Team
+
+Además de la batalla IA vs IA, el laboratorio tiene una **partida entre personas**: el 🔴 **Equipo Rojo** envía
+correos de entrenamiento al 🔵 **Equipo Azul**, que debe detectarlos y contenerlos. Todo es **local y determinista**:
+no hay SMTP, ningún enlace sale del laboratorio, los documentos son PDFs inocuos y la progresión la deciden
+**reglas fijas** (evento → consecuencia), no un modelo que aprenda.
+
+### Equipos, tokens y vistas
+
+Cada navegador elige su vista: `?rol=rojo`, `?rol=azul`, `?rol=general` (árbitro) o `?rol=espectador`.
+El servidor entrega **un token por equipo una sola vez por partida** y verifica el equipo con ese token en cada
+acción, nunca con lo que declare el cliente. El espectador no tiene token: solo ve eventos y estado, sin botones.
+Reiniciar el servidor = **partida nueva** (buzón, misiones y marcador empiezan limpios).
+
+### Buzón de correos de entrenamiento
+
+- **Rojo** elige una plantilla fija (Soporte técnico, Recursos humanos, Paquetería, Comunicado interno) y un
+  destinatario de los usuarios semilla. Sin LLM: el servidor rellena usuario, fecha y enlace.
+- Cada correo lleva un **enlace local** `/l/<id>` generado por el servidor. Abrirlo muestra una página de
+  "enlace de prueba" y registra el clic en la auditoría. Rojo nunca recibe el enlace (no puede fabricar clics).
+- **Azul** ve su buzón (asunto, remitente, fecha), abre cada correo y puede **⚑ Reportar** el correo o
+  **⛔ Contener** un enlace que ya recibió clic. Un enlace contenido queda bloqueado.
+
+### Documentos (PDFs benignos)
+
+Algunas plantillas traen un **PDF fijo** de `data/pdf/` (solo texto: sin JavaScript, enlaces ni adjuntos). Azul
+puede **abrirlo** (se registra el evento `pdf_abierto` y se descarga con `Content-Disposition: attachment` y
+`nosniff`) o **reportarlo** (`pdf_reportado`). Nada se sube desde la UI y nada se ejecuta.
+
+### Misiones del Equipo Azul
+
+| Misión | Se completa con | Puntos |
+|---|---|---|
+| Reportar un correo sospechoso | `correo_reportado` | 10 |
+| Contener un enlace clicado | `enlace_contenido` (después de un clic) | 15 |
+| Revisar el buzón diariamente | manual (la marca Azul) | 5 |
+| Revisar un documento recibido | `pdf_abierto` | 10 |
+
+### Reglas deterministas y puntaje
+
+| Evento | Riesgo de la partida | Efecto |
+|---|---|---|
+| `CLIC_ENLACE` | +15 | Rojo suma **+10** mientras Azul no contenga ese enlace |
+| `enlace_contenido` | −15 | Completa su misión; Rojo pierde esos 10 |
+| `correo_reportado` | −10 | Completa su misión |
+| `pdf_abierto` | 0 | Completa su misión; Rojo suma **+5** mientras Azul no lo reporte |
+| `pdf_reportado` | −10 | Rojo pierde esos 5 |
+
+Las reglas viven en `src/lab/sesion.py` (`REGLAS_EVENTO`, `PUNTOS_ROJO`). El puntaje de Rojo se **calcula** del
+estado de la partida, así que contener o reportar a tiempo se lo quita.
+
+### Marcador y cierre de partida
+
+La **Vista general** y el **Espectador** muestran un marcador en vivo (SSE): puntos de Rojo y Azul, misiones,
+riesgo acumulado, clics, contenciones, reportes, PDFs abiertos y accesos de Rojo denegados en las batallas IA vs IA.
+El árbitro pulsa **🏁 Finalizar partida**: los puntajes se congelan, se declara ganador (o empate) y aparece la
+pantalla de resultado. Desde ese momento las acciones de Rojo y Azul se rechazan.
+
+### Eventos preparados para Wazuh
+
+Cada evento relevante (clic, clic bloqueado, contención, reporte, PDF abierto/reportado, misión completada,
+autorización denegada y fin de partida) se escribe, desde el mismo punto que la auditoría, como **una línea JSON**
+en `data/eventos.jsonl`:
+
+```json
+{"timestamp": "2026-10-23T10:16:12-06:00", "partida": "20261023-101553-6312", "equipo": "azul",
+ "usuario": "ana.perez", "rol": "empleado", "tipo": "pdf_abierto", "accion": "PDF_ABIERTO",
+ "recurso": "correo:5", "resultado": "ABIERTO", "riesgo": "BAJO", "origen": "cybershield-lab"}
+```
+
+En las batallas IA vs IA, las denegaciones quedan con `equipo: "rojo"`. **Wazuh no está integrado**: el archivo
+está listo para leerse con un `<localfile>` y `log_format json` cuando se conecte.
+
+### Cómo jugar una partida
+
+1. Arranca el servidor (`./ejecutar`) y abre una pestaña por vista: `?rol=rojo`, `?rol=azul`, `?rol=general`.
+2. **Rojo:** botón ✉ → elige plantilla → *Enviar correo de entrenamiento*.
+3. **Azul:** botón ✉ BUZÓN → abre el correo → reporta, contiene el enlace si alguien lo abrió, abre o reporta el
+   PDF; pestaña *Misiones* para ver el progreso.
+4. **General:** sigue el marcador y pulsa *🏁 Finalizar partida* para declarar el resultado.
+
+Pruebas: `python -m src.lab.test_correos`, `test_reglas`, `test_misiones`, `test_documentos`, `test_eventos`,
+`test_puntaje` (con `python -m src.lab.<nombre>`) y `python server/test_app.py` (servidor completo, BD en memoria).
+
+> Los tokens de equipo evitan que una vista se haga pasar por otra, pero **no son autenticación de usuarios**:
+> el aviso del Modo LAN sigue vigente (solo red local de confianza).
+
 ## Estructura
 
 ```
@@ -127,6 +215,9 @@ ejecutar            arranque en un comando
 server/             app.py (servidor real) · mock_server.py (simulación)
 ui/                 interfaz web (HTML + CSS + JS, sin frameworks)
 src/lab/            motor real: cliente Ollama, atacante, defensor, capas, SQLite
+                    + Red vs Blue: correos.py (plantillas), documentos.py (PDFs), sesion.py (reglas)
+data/pdf/           PDFs benignos de entrenamiento (catálogo fijo)
+data/eventos.jsonl  eventos para un SIEM (se genera al jugar; no se versiona)
 src/                prototipo CLI original (Fase 0)
 docs/CONTRATO_API.md  contrato REST/SSE entre UI y backend
 PROGRESO.md         bitácora de desarrollo
