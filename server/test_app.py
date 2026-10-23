@@ -205,6 +205,43 @@ def main():
     chk("cada regla aplicada difunde el marcador en vivo",
         [d["correos_reportados"] for t, d in eventos if t == "marcador_partida"] == [2])
 
+    # --- puntaje de Rojo en vivo: un enlace clicado sin contener (+10) y un PDF abierto sin reportar (+5) ---
+    nuevo = c.post("/api/correo", json={"plantilla": "paqueteria"}, headers=H(tr)).json()["id"]
+    x = [y for y in c.get("/api/buzon", headers=H(ta)).json()["correos"] if y["id"] == nuevo][0]
+    c.get(x["enlace"])
+    ev("pdf_abierto", f"correo:{nuevo}")
+    chk("Rojo suma 15 (enlace sin contener + PDF sin reportar)", srv._marcador()["puntos_rojo"] == 15)
+
+    # --- finalizar la partida ---
+    chk("rojo no finaliza", c.post("/api/partida/finalizar", headers=H(tr)).status_code == 403)
+    chk("azul no finaliza", c.post("/api/partida/finalizar", headers=H(ta)).status_code == 403)
+    chk("espectador no finaliza", c.post("/api/partida/finalizar").status_code == 403)
+    eventos = []
+    srv.ms.emitir = lambda tipo, datos: eventos.append((tipo, datos))
+    try:
+        r = c.post("/api/partida/finalizar", headers=H(tg))
+    finally:
+        srv.ms.emitir = original
+    fin = r.json()
+    chk("general finaliza: puntajes congelados y ganador", r.status_code == 200
+        and (fin["puntos_rojo"], fin["puntos_azul"], fin["ganador"]) == (15, 40, "azul"))
+    chk("se difunde el resultado por SSE", [t for t, _ in eventos if t in ("marcador_partida", "partida_finalizada")]
+        == ["marcador_partida", "partida_finalizada"])
+    chk("finalizar dos veces -> 409", c.post("/api/partida/finalizar", headers=H(tg)).status_code == 409)
+    chk("tras finalizar, Rojo no envía correos (409)",
+        c.post("/api/correo", json={"plantilla": "paqueteria"}, headers=H(tr)).status_code == 409)
+    chk("tras finalizar, Azul no reporta (409)", c.post(f"/api/correo/{nuevo}/reportar", headers=H(ta)).status_code == 409)
+    chk("tras finalizar, Azul no contiene (409)", c.post(f"/api/correo/{nuevo}/contener", headers=H(ta)).status_code == 409)
+    chk("tras finalizar, Azul no registra eventos de PDF (409)", ev("pdf_reportado", f"correo:{nuevo}").status_code == 409)
+    chk("tras finalizar, Azul no completa misiones (409)", c.post("/api/misiones/3/completar", headers=H(ta)).status_code == 409)
+    antes = len(repositorio.por_defecto().auditoria(500))
+    chk("tras finalizar, un clic no cuenta (409 sin auditoría)", c.get(x["enlace"]).status_code == 409
+        and len(repositorio.por_defecto().auditoria(500)) == antes)
+    mk = srv._marcador()
+    chk("el marcador queda congelado con el resultado", mk["puntos_rojo"] == 15 and mk["final"]["ganador"] == "azul")
+    chk("la finalización queda en auditoría", repositorio.por_defecto().auditoria(500)[0]["accion"] == "PARTIDA_FINALIZADA")
+    chk("la vista de Azul sigue pudiendo leer su buzón", c.get("/api/buzon", headers=H(ta)).status_code == 200)
+
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)
 

@@ -60,7 +60,7 @@ RUTA_RECLAMAR = "/api/equipo/reclamar"
 # Rutas reservadas a UN equipo (además de exigir token). Detener la partida es cosa del árbitro; Rojo envía
 # correos de entrenamiento y Azul los lee en su buzón.
 SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul",
-               "/api/evento": "azul"}
+               "/api/evento": "azul", "/api/partida/finalizar": "general"}
 # Partida = proceso del servidor: los correos se guardan con este id y el buzón solo muestra los de esta partida.
 PARTIDA_ID = datetime.now().strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(2)
 USUARIO_AZUL_DEFECTO = "ana.perez"
@@ -68,6 +68,7 @@ USUARIO_EQUIPO = {}  # equipo -> usuario semilla con el que juega (hoy solo azul
 # Riesgo de la partida Rojo/Azul (buzón): cada evento aplica su consecuencia fija de sesion.REGLAS_EVENTO.
 # Es independiente del EstadoSesion de cada batalla IA vs IA (ese se crea y descarta por batalla).
 ESTADO_PARTIDA = sesion.EstadoSesion()
+RESULTADO_FINAL = None  # al finalizar: puntajes congelados, ganador y marcador final (las acciones pasan a 409)
 repositorio.PARTIDA = PARTIDA_ID  # cada evento de data/eventos.jsonl lleva la partida
 
 
@@ -278,6 +279,8 @@ async def plantillas_correo():
 @app.post("/api/correo")
 async def enviar_correo(body: CorreoIn):
     """Solo Rojo (SOLO_EQUIPO). La respuesta NO incluye el enlace: así Rojo no puede fabricar clics."""
+    if cerrada := _partida_cerrada():
+        return cerrada
     para = body.para_usuario or USUARIO_EQUIPO.get("azul")
     if not para:
         return _prohibido("Falta destinatario: el equipo AZUL aún no ha entrado en la partida.", 409)
@@ -322,6 +325,9 @@ CONTEOS_MARCADOR = {"clics": "CLIC_ENLACE", "contenciones": "enlace_contenido", 
 
 
 def _marcador():
+    """Marcador en vivo; tras finalizar, el congelado (con el resultado en "final")."""
+    if RESULTADO_FINAL:
+        return {**RESULTADO_FINAL["marcador"], "final": {k: v for k, v in RESULTADO_FINAL.items() if k != "marcador"}}
     usuario = USUARIO_EQUIPO.get("azul")
     lista = repositorio.por_defecto().misiones(PARTIDA_ID, usuario)  # sin usuario azul: todas pendientes
     hechas = [m for m in lista if m["estado"] == "completada"]
@@ -333,7 +339,35 @@ def _marcador():
             "misiones_completadas": len(hechas), "misiones_total": len(lista),
             "riesgo": ESTADO_PARTIDA.riesgo_acumulado,
             "denegaciones_rojo": repositorio.por_defecto().denegaciones(PARTIDA_ID, "rojo"),
-            **{clave: vistos.get(evento, 0) for clave, evento in CONTEOS_MARCADOR.items()}}
+            **{clave: vistos.get(evento, 0) for clave, evento in CONTEOS_MARCADOR.items()}, "final": None}
+
+
+def _partida_cerrada():
+    """Tras POST /api/partida/finalizar, las acciones de Rojo/Azul se rechazan con 409."""
+    if RESULTADO_FINAL:
+        return _prohibido("La partida ya finalizó: los puntajes están congelados.", 409)
+    return None
+
+
+@app.post("/api/partida/finalizar")
+async def finalizar_partida():
+    """Solo General (SOLO_EQUIPO): congela los puntajes de Rojo y Azul, declara ganador o empate y lo difunde."""
+    global RESULTADO_FINAL
+    if cerrada := _partida_cerrada():
+        return cerrada
+    m = _marcador()
+    rojo, azul = m["puntos_rojo"], m["puntos_azul"]
+    ganador = "rojo" if rojo > azul else "azul" if azul > rojo else "empate"
+    RESULTADO_FINAL = {"partida": PARTIDA_ID, "puntos_rojo": rojo, "puntos_azul": azul, "ganador": ganador,
+                       "ts": datetime.now().astimezone().isoformat(timespec="seconds"), "marcador": m}
+    repositorio.por_defecto().registrar(None, "PARTIDA_FINALIZADA", PARTIDA_ID,
+                                        f"ROJO {rojo} - AZUL {azul} · {ganador.upper()}", "BAJO")
+    ms.emitir("auditoria", ms.aud("SYSTEM", "PARTIDA_FINALIZADA", PARTIDA_ID,
+                                  f"ROJO {rojo} — AZUL {azul} · ganador {ganador}", "BAJO"))
+    final = _marcador()
+    ms.emitir("marcador_partida", final)
+    ms.emitir("partida_finalizada", final["final"] | {"marcador": final})
+    return final["final"]
 
 
 def _emitir_marcador():
@@ -345,7 +379,7 @@ async def _hook_marcador():
     return "event: marcador_partida\ndata: " + json.dumps(_marcador(), ensure_ascii=False) + "\n\n"
 
 
-ms.ON_CONEXION.append(_hook_marcador)
+ms.ON_CONEXION.insert(0, _hook_marcador)  # primero: el de Ollama puede tardar segundos si Ollama no responde
 
 
 @app.post("/api/correo/{correo_id}/reportar")
@@ -353,6 +387,8 @@ async def reportar_correo(correo_id: int, request: Request):
     """Solo Azul: reporta como sospechoso un correo de SU buzón (una vez por correo) -> regla correo_reportado."""
     if request.state.equipo != "azul":
         return _prohibido("Solo el equipo azul puede reportar correos de su buzón.")
+    if cerrada := _partida_cerrada():
+        return cerrada
     usuario = USUARIO_EQUIPO.get("azul")
     nuevo = repositorio.por_defecto().reportar_correo(PARTIDA_ID, usuario, correo_id)
     if nuevo is None:
@@ -374,6 +410,8 @@ async def contener_enlace(correo_id: int, request: Request):
     enlace_contenido, que completa la misión «Contener un enlace clicado»."""
     if request.state.equipo != "azul":
         return _prohibido("Solo el equipo azul puede contener enlaces de su buzón.")
+    if cerrada := _partida_cerrada():
+        return cerrada
     usuario = USUARIO_EQUIPO.get("azul")
     r = repositorio.por_defecto().contener_enlace(PARTIDA_ID, usuario, correo_id)
     if r != "contenido":
@@ -397,6 +435,8 @@ _EVENTO_ERROR = {"sin_adjunto": ("Ese correo no trae ningún PDF adjunto.", 409)
 async def registrar_evento(body: EventoIn):
     """Solo Azul (SOLO_EQUIPO). Escribe el evento en auditoría y aplica su regla fija; si es pdf_abierto devuelve
     la ruta de descarga del PDF (catálogo fijo)."""
+    if cerrada := _partida_cerrada():
+        return cerrada
     usuario = USUARIO_EQUIPO.get("azul")
     correo_id = int(body.recurso.split(":")[1])
     r = repositorio.por_defecto().evento_pdf(PARTIDA_ID, usuario, correo_id, body.tipo)
@@ -437,6 +477,8 @@ async def completar_mision(mision_id: int, request: Request):
     """Solo Azul y solo misiones 'manual' (p. ej. revisar el buzón); las demás las completa su evento."""
     if request.state.equipo != "azul":
         return _prohibido("Solo el equipo azul puede completar sus misiones.")
+    if cerrada := _partida_cerrada():
+        return cerrada
     usuario = USUARIO_EQUIPO.get("azul")
     r = repositorio.por_defecto().completar_mision_manual(PARTIDA_ID, usuario, mision_id)
     if r is None:
@@ -463,6 +505,10 @@ _CABECERAS_ENLACE = {"Content-Security-Policy": "default-src 'none'; style-src '
 async def abrir_enlace(enlace_id: str):
     """Enlace de un correo de entrenamiento: registra el clic en auditoría y muestra una página FIJA (no refleja
     nada de la petición). Solo existen los enlaces que generó el servidor."""
+    if RESULTADO_FINAL:  # partida cerrada: el clic ya no tiene consecuencia ni se registra
+        return HTMLResponse(_PAGINA_ENLACE.format(
+            titulo="La partida terminó", texto="Este enlace de entrenamiento pertenecía a una partida ya finalizada."),
+            status_code=409, headers=_CABECERAS_ENLACE)
     clic = None
     if 8 <= len(enlace_id) <= 32 and all(ch.isalnum() or ch in "-_" for ch in enlace_id):
         clic = repositorio.por_defecto().registrar_clic(enlace_id)

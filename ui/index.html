@@ -19,6 +19,7 @@
       <span id="equipo-tag" class="equipo-tag eq-ninguno" title="Equipo de esta sesión">SIN EQUIPO</span>
       <a id="lnk-equipo" class="lnk" href="?cambiar=1">⇄ Cambiar de equipo</a>
       <button type="button" id="btn-buzon" class="btn btn-mini" aria-haspopup="dialog">✉ CORREOS</button>
+      <button type="button" id="btn-finalizar" class="btn btn-mini btn-danger" title="Congela los puntajes de Rojo y Azul y declara el ganador">🏁 FINALIZAR PARTIDA</button>
       <span id="marcador" class="marcador" role="status" aria-live="polite" title="Marcador de la partida: atacante — defensor">🔴 0 — 0 🔵</span>
       <span id="marcador-partida" class="marcador-partida" role="status" aria-live="polite" hidden title="Partida Rojo/Azul del buzón: puntos de misiones de Azul, riesgo acumulado y eventos clave"></span>
       <span id="demo-tag" class="demo-tag" hidden>DEMOSTRACIÓN · NO SUMA AL MARCADOR (admin: acceso legítimo por diseño)</span>
@@ -267,6 +268,19 @@
       </div>
     </div>
     <button type="button" id="buzon-cerrar" class="btn">CERRAR (Esc)</button>
+  </div>
+</div>
+
+<div id="final-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="final-t">
+  <div class="modal-card reto-card final-card">
+    <h2 id="final-t" class="partida-titulo">🏁 PARTIDA FINALIZADA</h2>
+    <p id="final-ganador" class="final-ganador"></p>
+    <div class="final-marcador">
+      <div class="final-eq final-rojo"><span>🔴 EQUIPO ROJO</span><b id="final-rojo">0</b></div>
+      <div class="final-eq final-azul"><span>🔵 EQUIPO AZUL</span><b id="final-azul">0</b></div>
+    </div>
+    <ul id="final-detalle" class="final-detalle"></ul>
+    <div class="reto-botones"><button type="button" id="final-cerrar" class="btn">CERRAR (Esc)</button></div>
   </div>
 </div>
 

@@ -461,6 +461,7 @@ const R = (() => {
     ocultar(ACCIONES_EQUIPO, !conToken);
     ocultar("#btn-stop", !conToken || rol !== "general");
     ocultar("#btn-buzon", !conToken || (rol !== "rojo" && rol !== "azul")); // correos: Rojo envía, Azul recibe
+    ocultar("#btn-finalizar", !conToken || rol !== "general"); // cerrar la partida es cosa del árbitro
   }
   function setEquipo(rol) {
     const r = NOMBRE_EQUIPO[rol] ? rol : "";
@@ -655,7 +656,34 @@ const R = (() => {
       item(null, "Reportes", d.correos_reportados + d.pdf_reportados),
       item(null, "PDF abiertos", d.pdf_abiertos),
       item(null, "Accesos de Rojo denegados", d.denegaciones_rojo));
+    if (d.final) m.prepend(item("mp-final", "🏁 FINAL", d.final.ganador === "empate" ? "EMPATE" : "GANA " + d.final.ganador.toUpperCase()));
   }
+
+  // Pantalla de resultado (general / espectador). marcador = marcador congelado al finalizar.
+  function mostrarResultado(final, marcador) {
+    const g = final.ganador;
+    $("final-ganador").textContent = g === "empate" ? "EMPATE" : "GANA EL EQUIPO " + g.toUpperCase();
+    $("final-ganador").className = "final-ganador g-" + g;
+    $("final-rojo").textContent = final.puntos_rojo;
+    $("final-azul").textContent = final.puntos_azul;
+    const ul = $("final-detalle");
+    ul.replaceChildren();
+    const mk = marcador || {};
+    [["Rojo: enlaces clicados sin contener", mk.rojo_enlaces_sin_contener],
+      ["Rojo: PDFs abiertos sin reportar", mk.rojo_pdfs_sin_reportar],
+      ["Rojo: accesos denegados en batallas", mk.denegaciones_rojo],
+      ["Azul: misiones completadas", mk.misiones_completadas + "/" + mk.misiones_total],
+      ["Riesgo final de la partida", Math.round(mk.riesgo || 0) + "/100"],
+      ["Finalizada", fechaCorta(final.ts)]].forEach(([k, v]) => {
+      const li = el("li");
+      li.append(el("span", null, k), el("b", null, v === undefined ? "—" : v));
+      ul.append(li);
+    });
+    $("final-modal").hidden = false;
+    $("final-cerrar").focus();
+  }
+  const cerrarResultado = () => { $("final-modal").hidden = true; };
+  const resultadoAbierto = () => !$("final-modal").hidden;
 
   // ---------- misiones del Equipo Azul ----------
   function setVistaAzul(vista) {
@@ -732,6 +760,6 @@ const R = (() => {
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
     mostrarBuzon, buzonAbierto, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
-    setVistaAzul, setMisiones, setMarcadorPartida,
+    setVistaAzul, setMisiones, setMarcadorPartida, mostrarResultado, cerrarResultado, resultadoAbierto,
   };
 })();

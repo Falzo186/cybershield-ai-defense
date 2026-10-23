@@ -23,7 +23,7 @@ const API = (() => {
   }
 
   const TIPOS = ["ronda_inicio", "ataque", "etapa", "decision", "auditoria", "metricas", "fin", "error",
-    "ollama_estado", "ronda_error", "reto_enviado", "reto_respondido", "reto_cancelado", "partida_fin", "marcador_partida"];
+    "ollama_estado", "ronda_error", "reto_enviado", "reto_respondido", "reto_cancelado", "partida_fin", "marcador_partida", "partida_finalizada"];
 
   // handlers: {tipo: fn(data)}; onEstado("conectado"|"reconectando")
   function conectar(handlers, onEstado) {
@@ -84,6 +84,7 @@ const API = (() => {
     reportarCorreo: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/reportar", {}),
     contenerCorreo: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/contener", {}),
     misiones: () => req("GET", "/api/misiones"),
+    finalizarPartida: () => req("POST", "/api/partida/finalizar", {}), // solo token general
     // tipo "pdf_abierto" | "pdf_reportado" sobre el PDF adjunto del correo id -> {documento, regla, descarga|null}
     eventoPdf: (tipo, correoId) => req("POST", "/api/evento", { tipo, recurso: "correo:" + correoId }),
     completarMision: (id) => req("POST", "/api/misiones/" + encodeURIComponent(id) + "/completar", {}),

@@ -403,3 +403,19 @@ body[data-rol="rojo"] #ro-def[hidden], body[data-rol="azul"] #ro-atq[hidden] { d
 .mp-verde b { color: var(--ok); } .mp-ambar b { color: var(--warn); } .mp-rojo b { color: var(--bad); }
 @media (max-width: 600px) { .mp-item { white-space: normal; } }
 .mp-rojo-eq { border-color: var(--atq); } .mp-rojo-eq b { color: var(--atq); }
+
+/* ---------- resultado final de la partida Rojo/Azul ---------- */
+.mp-final { border-color: var(--warn); } .mp-final b { color: var(--warn); }
+.final-card { max-width: 600px; }
+.final-ganador { font: 700 22px var(--sans); letter-spacing: .06em; margin: 4px 0 14px; }
+.final-ganador.g-rojo { color: var(--atq); } .final-ganador.g-azul { color: var(--def); } .final-ganador.g-empate { color: var(--warn); }
+.final-marcador { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.final-eq { background: var(--panel2); border: 1px solid var(--borde); border-radius: 8px; padding: 12px; }
+.final-eq span { display: block; font-size: 12px; letter-spacing: .08em; color: var(--texto-sec); }
+.final-eq b { font: 700 40px var(--mono); }
+.final-rojo { border-top: 3px solid var(--atq); } .final-rojo b { color: var(--atq); }
+.final-azul { border-top: 3px solid var(--def); } .final-azul b { color: var(--def); }
+.final-detalle { list-style: none; margin: 0; padding: 0; text-align: left; font-size: 13px; }
+.final-detalle li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--borde); }
+.final-detalle b { font-family: var(--mono); }
+@media (max-width: 600px) { .final-marcador { grid-template-columns: 1fr; } }

@@ -24,7 +24,7 @@ EVENTOS_SIEM = {
     "CLIC_ENLACE": ("clic_enlace", "azul"), "CLIC_BLOQUEADO": ("clic_bloqueado", "azul"),
     "ENLACE_CONTENIDO": ("enlace_contenido", "azul"), "CORREO_REPORTADO": ("correo_reportado", "azul"),
     "PDF_ABIERTO": ("pdf_abierto", "azul"), "PDF_REPORTADO": ("pdf_reportado", "azul"),
-    "MISION_COMPLETADA": ("mision_completada", "azul"),
+    "MISION_COMPLETADA": ("mision_completada", "azul"), "PARTIDA_FINALIZADA": ("partida_finalizada", None),
 }
 _CANDADO_EVENTOS = threading.Lock()
 LIMITE_FILAS = 50

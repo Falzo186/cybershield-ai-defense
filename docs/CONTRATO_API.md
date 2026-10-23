@@ -173,3 +173,8 @@ PDFs fijos de solo texto en `data/pdf/` (catálogo `src/lab/documentos.py`; nunc
 ### Equipo en la auditoría (ajuste)
 - `auditoria` gana `equipo` y `partida`. Las acciones del buzón quedan como `azul`; en la batalla IA vs IA, `motor.ejecutar_ronda(..., equipo="rojo")` propaga el equipo por `procesar_defensa` -> `ejecutar_herramienta` -> `consultar`, así que sus denegaciones quedan como `rojo` (JSONL incluido). La prueba manual queda con `equipo` NULL.
 - `marcador_partida` añade `denegaciones_rojo` (filas DENEGADO de Rojo en la partida) y se difunde tras cada ronda de batalla.
+
+### Cierre de partida con resultado (añadido)
+- `POST /api/partida/finalizar` (solo token `general`) congela los puntajes del marcador y declara `ganador` (`rojo`|`azul`|`empate`) -> `{partida, puntos_rojo, puntos_azul, ganador, ts}`. 409 si ya estaba finalizada. Registra `PARTIDA_FINALIZADA` en auditoría (y en el JSONL, tipo `partida_finalizada`).
+- SSE `partida_finalizada` `{..., marcador}`; a partir de ahí `marcador_partida` es el congelado, con `final:{...}` (antes `final:null`). La UI de General y Espectador muestra la pantalla de resultado (también al conectar tarde).
+- Tras finalizar, `POST /api/correo`, `/api/correo/{id}/reportar`, `/api/correo/{id}/contener`, `/api/evento` y `/api/misiones/{id}/completar` -> 409, y `/l/{id}` -> 409 sin registrar el clic. Leer (buzón, misiones, marcador) sigue permitido. Una partida nueva = reiniciar el servidor.

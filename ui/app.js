@@ -362,7 +362,18 @@
       R.mostrarPartida(d, !!estado.ultimaFin);
     },
     // Marcador de la partida Rojo/Azul: solo lo muestran el árbitro (general) y los espectadores.
-    marcador_partida(d) { if (estado.rol === "general" || estado.rol === "espectador") R.setMarcadorPartida(d); },
+    marcador_partida(d) {
+      if (estado.rol !== "general" && estado.rol !== "espectador") return;
+      R.setMarcadorPartida(d);
+      $("btn-finalizar").disabled = !!d.final; // ya no hay nada que cerrar
+      if (d.final && !estado.finalMostrado) { estado.finalMostrado = true; R.mostrarResultado(d.final, d); }
+    },
+    partida_finalizada(d) {
+      if ((estado.rol === "general" || estado.rol === "espectador") && !estado.finalMostrado) {
+        estado.finalMostrado = true;
+        R.mostrarResultado(d, d.marcador);
+      }
+    },
     auditoria(d) {
       R.addAuditoria(d);
       // Correo nuevo o clic en un enlace: el equipo azul refresca su buzón (contador y botón «Contener» al día).
@@ -686,6 +697,12 @@
     });
     document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && R.partidaAbierta()) R.cerrarPartida(); });
     $("btn-buzon").addEventListener("click", abrirBuzon);
+    $("btn-finalizar").addEventListener("click", async () => {
+      if (!window.confirm("¿Finalizar la partida? Se congelan los puntajes y Rojo/Azul ya no podrán actuar.")) return;
+      try { await API.finalizarPartida(); } catch (e) { R.toast(e.message); } // el resultado llega por SSE
+    });
+    $("final-cerrar").addEventListener("click", R.cerrarResultado);
+    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && R.resultadoAbierto()) R.cerrarResultado(); });
     $("buzon-cerrar").addEventListener("click", () => R.mostrarBuzon(false));
     $("buzon-modal").addEventListener("click", (ev) => { if (ev.target === $("buzon-modal")) R.mostrarBuzon(false); });
     $("btn-buzon-refrescar").addEventListener("click", cargarBuzon);
