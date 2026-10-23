@@ -361,6 +361,8 @@
       $("partida-informe").hidden = !estado.informe;
       R.mostrarPartida(d, !!estado.ultimaFin);
     },
+    // Marcador de la partida Rojo/Azul: solo lo muestran el árbitro (general) y los espectadores.
+    marcador_partida(d) { if (estado.rol === "general" || estado.rol === "espectador") R.setMarcadorPartida(d); },
     auditoria(d) {
       R.addAuditoria(d);
       // Correo nuevo o clic en un enlace: el equipo azul refresca su buzón (contador y botón «Contener» al día).

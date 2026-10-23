@@ -180,6 +180,28 @@ def main():
     m = c.get("/api/misiones", headers=H(ta)).json()
     chk("las 4 misiones completadas (40 pts)", {x["estado"] for x in m["misiones"]} == {"completada"} and m["puntos"] == 40)
 
+    # --- marcador de la partida (general / espectadores) ---
+    mk = srv._marcador()
+    chk("marcador: puntos de Azul y misiones", mk["usuario_azul"] == "luis.gomez" and mk["puntos_azul"] == 40
+        and (mk["misiones_completadas"], mk["misiones_total"]) == (4, 4))
+    chk("marcador: riesgo actual de la partida", mk["riesgo"] == srv.ESTADO_PARTIDA.riesgo_acumulado)
+    chk("marcador: conteo de eventos clave (el clic bloqueado no cuenta)",
+        (mk["clics"], mk["contenciones"], mk["correos_reportados"], mk["pdf_abiertos"], mk["pdf_reportados"])
+        == (2, 1, 1, 1, 1))  # 2 clics = el real + el CLIC_ENLACE aplicado a mano antes de reportar el PDF
+    import asyncio, json  # noqa: E401
+    sse = asyncio.run(srv._hook_marcador())
+    chk("el SSE entrega el marcador al conectar (también a espectadores)",
+        sse.startswith("event: marcador_partida\n") and json.loads(sse.split("data: ", 1)[1])["puntos_azul"] == 40)
+    eventos = []
+    original = srv.ms.emitir
+    srv.ms.emitir = lambda tipo, datos: eventos.append((tipo, datos))
+    try:
+        c.post(f"/api/correo/{pdf_id}/reportar", headers=H(ta))
+    finally:
+        srv.ms.emitir = original
+    chk("cada regla aplicada difunde el marcador en vivo",
+        [d["correos_reportados"] for t, d in eventos if t == "marcador_partida"] == [2])
+
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)
 

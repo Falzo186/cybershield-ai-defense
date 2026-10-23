@@ -23,7 +23,7 @@ const API = (() => {
   }
 
   const TIPOS = ["ronda_inicio", "ataque", "etapa", "decision", "auditoria", "metricas", "fin", "error",
-    "ollama_estado", "ronda_error", "reto_enviado", "reto_respondido", "reto_cancelado", "partida_fin"];
+    "ollama_estado", "ronda_error", "reto_enviado", "reto_respondido", "reto_cancelado", "partida_fin", "marcador_partida"];
 
   // handlers: {tipo: fn(data)}; onEstado("conectado"|"reconectando")
   function conectar(handlers, onEstado) {

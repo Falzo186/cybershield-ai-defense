@@ -155,3 +155,7 @@ PDFs fijos de solo texto en `data/pdf/` (catálogo `src/lab/documentos.py`; nunc
 - `POST /api/evento` (solo token `azul`) `{tipo:"pdf_abierto"|"pdf_reportado", recurso:"correo:<id>"}` -> `{ok, documento, regla, descarga:"/pdf/<id>"|null}`. Escribe `PDF_ABIERTO`/`PDF_REPORTADO` en `auditoria`. 404 si el correo no es suyo, 409 si no trae PDF o el PDF ya se reportó.
 - `GET /pdf/{id}` (público, solo ids del catálogo): `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`.
 - Reglas: `pdf_abierto` -> riesgo 0 y completa «Revisar un documento recibido» (misión 4, 10 pts); `pdf_reportado` -> riesgo −10.
+
+### Marcador de la partida para el árbitro y espectadores (añadido)
+- SSE `marcador_partida` `{usuario_azul, puntos_azul, misiones_completadas, misiones_total, riesgo, clics, contenciones, correos_reportados, pdf_abiertos, pdf_reportados}`: al conectar el SSE (también sin token), tras cada regla aplicada, al completar una misión manual y cuando Azul entra. Los conteos son las veces que se aplicó la regla del evento en esta partida (un clic sobre un enlace contenido no cuenta).
+- La UI lo muestra en la cabecera solo en `?rol=general` y `?rol=espectador`. Rojo aún no puntúa.

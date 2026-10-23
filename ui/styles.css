@@ -393,3 +393,12 @@ body[data-rol="rojo"] #ro-def[hidden], body[data-rol="azul"] #ro-atq[hidden] { d
 .mision .estado-pendiente { color: var(--warn); } .mision .estado-completada { color: var(--ok); }
 .marca-pdf { color: var(--warn); }
 .buzon-adjunto { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding: 8px; border: 1px dashed var(--borde); border-radius: 6px; font: 12px var(--mono); color: var(--texto-sec); }
+
+/* ---------- marcador de la partida Rojo/Azul (general / espectador) ---------- */
+.marcador-partida { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mp-item { display: inline-flex; gap: 6px; align-items: baseline; padding: 3px 8px; border: 1px solid var(--borde); border-radius: 6px; background: var(--panel2); font-size: 12px; white-space: nowrap; }
+.mp-lbl { color: var(--texto-sec); }
+.mp-item b { font: 700 13px var(--mono); }
+.mp-azul { border-color: var(--def); } .mp-azul b { color: var(--def); }
+.mp-verde b { color: var(--ok); } .mp-ambar b { color: var(--warn); } .mp-rojo b { color: var(--bad); }
+@media (max-width: 600px) { .mp-item { white-space: normal; } }

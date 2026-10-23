@@ -633,6 +633,27 @@ const R = (() => {
     d.append(f);
   }
 
+  // ---------- marcador de la partida Rojo/Azul (vista general y espectador, solo lectura) ----------
+  function setMarcadorPartida(d) {
+    const m = $("marcador-partida");
+    m.hidden = false;
+    m.replaceChildren();
+    const r = Math.round(d.riesgo || 0);
+    const zona = r > 70 ? "rojo" : r >= 30 ? "ambar" : "verde";
+    const item = (cls, etiqueta, valor) => {
+      const s = el("span", "mp-item " + (cls || ""));
+      s.append(el("span", "mp-lbl", etiqueta), el("b", null, valor));
+      return s;
+    };
+    m.append(
+      item("mp-azul", "🔵 Azul" + (d.usuario_azul ? " (" + d.usuario_azul + ")" : ""),
+        d.puntos_azul + " pts · " + d.misiones_completadas + "/" + d.misiones_total + " misiones"),
+      item("mp-riesgo mp-" + zona, "Riesgo", r + "/100"),
+      item(null, "Clics", d.clics), item(null, "Contenciones", d.contenciones),
+      item(null, "Reportes", d.correos_reportados + d.pdf_reportados),
+      item(null, "PDF abiertos", d.pdf_abiertos));
+  }
+
   // ---------- misiones del Equipo Azul ----------
   function setVistaAzul(vista) {
     document.querySelectorAll("[data-azul]").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.azul === vista)));
@@ -708,6 +729,6 @@ const R = (() => {
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
     mostrarBuzon, buzonAbierto, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
-    setVistaAzul, setMisiones,
+    setVistaAzul, setMisiones, setMarcadorPartida,
   };
 })();

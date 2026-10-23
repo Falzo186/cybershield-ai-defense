@@ -177,6 +177,8 @@ async def reclamar_equipo(body: ReclamarEquipoIn):
         USUARIO_EQUIPO["azul"] = usuario
     TOKENS[body.equipo] = secrets.token_urlsafe(24)  # sin await entre comprobar y asignar: no hay carrera
     ms.emitir("auditoria", ms.aud("SYSTEM", "EQUIPO_RECLAMADO", body.equipo, "OK", "BAJO"))
+    if body.equipo == "azul":
+        _emitir_marcador()  # el marcador ya sabe con qué usuario juega Azul
     return {"equipo": body.equipo, "token": TOKENS[body.equipo], "usuario": usuario}
 
 
@@ -308,7 +310,37 @@ def _aplicar_regla(evento, usuario):
     ms.emitir("regla_evento", {**r, "usuario": usuario})
     ms.emitir("auditoria", ms.aud("SYSTEM", "REGLA", f"{evento} → riesgo {r['riesgo']:+d}",
                                   f"riesgo partida {int(r['riesgo_acumulado'])}/100", "BAJO"))
+    _emitir_marcador()
     return r
+
+
+# ---------- marcador de la partida (vista general y espectadores; solo lectura, por SSE) ----------
+# Conteos de eventos clave = veces que se aplicó su regla en esta partida (sesion.EstadoSesion.eventos_vistos).
+CONTEOS_MARCADOR = {"clics": "CLIC_ENLACE", "contenciones": "enlace_contenido", "correos_reportados": "correo_reportado",
+                    "pdf_abiertos": "pdf_abierto", "pdf_reportados": "pdf_reportado"}
+
+
+def _marcador():
+    usuario = USUARIO_EQUIPO.get("azul")
+    lista = repositorio.por_defecto().misiones(PARTIDA_ID, usuario)  # sin usuario azul: todas pendientes
+    hechas = [m for m in lista if m["estado"] == "completada"]
+    vistos = ESTADO_PARTIDA.eventos_vistos
+    return {"usuario_azul": usuario, "puntos_azul": sum(m["puntos"] for m in hechas),
+            "misiones_completadas": len(hechas), "misiones_total": len(lista),
+            "riesgo": ESTADO_PARTIDA.riesgo_acumulado,
+            **{clave: vistos.get(evento, 0) for clave, evento in CONTEOS_MARCADOR.items()}}
+
+
+def _emitir_marcador():
+    ms.emitir("marcador_partida", _marcador())
+
+
+async def _hook_marcador():
+    """Al conectar el SSE (también un espectador sin token) llega el marcador actual."""
+    return "event: marcador_partida\ndata: " + json.dumps(_marcador(), ensure_ascii=False) + "\n\n"
+
+
+ms.ON_CONEXION.append(_hook_marcador)
 
 
 @app.post("/api/correo/{correo_id}/reportar")
@@ -408,6 +440,7 @@ async def completar_mision(mision_id: int, request: Request):
         return _prohibido("Esa misión ya estaba completada.", 409)
     ms.emitir("auditoria", ms.aud("DEFENDER", "MISION_COMPLETADA", f"misión {mision_id} (manual) · {usuario}",
                                   "OK", "BAJO"))
+    _emitir_marcador()
     return {"completada": True, "mision_id": mision_id}
 
 
