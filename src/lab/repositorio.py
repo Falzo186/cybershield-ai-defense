@@ -3,8 +3,10 @@
 Es la última capa de defensa: aunque la IA o la capa de herramientas fallen, aquí se vuelve a
 comprobar el acceso. No existe ningún camino para ejecutar SQL arbitrario.
 """
+import json
 import secrets
 import sqlite3
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -12,6 +14,19 @@ from . import correos, documentos, permisos, schema, seed
 from .permisos import Identidad
 
 RUTA_DB = Path(__file__).resolve().parents[2] / "data" / "lab.db"
+# Salida para un SIEM (p. ej. Wazuh, aún sin integrar): una línea JSON por evento relevante.
+RUTA_EVENTOS = RUTA_DB.parent / "eventos.jsonl"
+PARTIDA = None  # id de la partida actual; lo fija server/app.py al arrancar
+
+# Acciones de auditoría que van al JSONL -> (tipo de evento, equipo que actúa). Además, todo DENEGADO de una
+# consulta o herramienta sale como "autorizacion_denegada" (equipo null: el actor lo decide la capa superior).
+EVENTOS_SIEM = {
+    "CLIC_ENLACE": ("clic_enlace", "azul"), "CLIC_BLOQUEADO": ("clic_bloqueado", "azul"),
+    "ENLACE_CONTENIDO": ("enlace_contenido", "azul"), "CORREO_REPORTADO": ("correo_reportado", "azul"),
+    "PDF_ABIERTO": ("pdf_abierto", "azul"), "PDF_REPORTADO": ("pdf_reportado", "azul"),
+    "MISION_COMPLETADA": ("mision_completada", "azul"),
+}
+_CANDADO_EVENTOS = threading.Lock()
 LIMITE_FILAS = 50
 NIVEL_RIESGO = {"PUBLICA": "BAJO", "INTERNA": "MEDIO", "CONFIDENCIAL": "ALTO", "CRITICA": "CRITICO"}
 
@@ -62,10 +77,11 @@ class Autorizador:
 
 
 class Repositorio:
-    def __init__(self, conn):
+    def __init__(self, conn, ruta_eventos=None):
         conn.row_factory = sqlite3.Row
         self.conn = conn
         self.autorizador = Autorizador(conn)
+        self.ruta_eventos = ruta_eventos  # None = no se escribe JSONL (p. ej. BD en memoria de los tests)
 
     def identidad(self, usuario):
         """La identidad sale de la tabla de usuarios (el sistema), nunca de un prompt."""
@@ -75,12 +91,32 @@ class Repositorio:
         return Identidad(fila["usuario"], fila["rol"])
 
     def registrar(self, identidad, accion, recurso, resultado, nivel):
+        # ISO 8601 completo con zona horaria (p. ej. 2026-10-22T13:47:05-06:00): ordenable y listo para un SIEM.
+        ts = datetime.now().astimezone().isoformat(timespec="seconds")
+        usuario, rol = getattr(identidad, "usuario", None), getattr(identidad, "rol", None)
         self.conn.execute(
             "INSERT INTO auditoria(ts,usuario,rol,accion,recurso,resultado,nivel_riesgo) VALUES(?,?,?,?,?,?,?)",
-            # ISO 8601 completo con zona horaria (p. ej. 2026-10-22T13:47:05-06:00): ordenable y listo para un SIEM.
-            (datetime.now().astimezone().isoformat(timespec="seconds"), getattr(identidad, "usuario", None),
-             getattr(identidad, "rol", None), accion, recurso, resultado, nivel))
+            (ts, usuario, rol, accion, recurso, resultado, nivel))
         self.conn.commit()
+        self._evento_siem(ts, usuario, rol, accion, recurso, resultado, nivel)
+
+    def _evento_siem(self, ts, usuario, rol, accion, recurso, resultado, nivel):
+        """Mismo registro que auditoría, como una línea JSON en eventos.jsonl (solo eventos relevantes). Un fallo
+        al escribir el archivo nunca tumba la auditoría (la tabla SQLite sigue siendo la fuente de verdad)."""
+        if not self.ruta_eventos:
+            return
+        tipo, equipo = EVENTOS_SIEM.get(accion, ("autorizacion_denegada", None) if resultado == "DENEGADO"
+                                        else (None, None))
+        if tipo is None:
+            return
+        linea = json.dumps({"timestamp": ts, "partida": PARTIDA, "equipo": equipo, "usuario": usuario, "rol": rol,
+                            "tipo": tipo, "accion": accion, "recurso": recurso, "resultado": resultado,
+                            "riesgo": nivel, "origen": "cybershield-lab"}, ensure_ascii=False)
+        try:
+            with _CANDADO_EVENTOS, open(self.ruta_eventos, "a", encoding="utf-8") as f:
+                f.write(linea + "\n")
+        except OSError:
+            pass
 
     def consultar(self, identidad, tabla, filtros=None):
         esp = ESPECIFICACION.get(tabla)
@@ -252,15 +288,19 @@ class Repositorio:
         return [dict(f) for f in filas]
 
 
-def abrir(ruta=None):
+def abrir(ruta=None, ruta_eventos=None):
+    """ruta_eventos: archivo JSONL de eventos. Por defecto data/eventos.jsonl junto a la BD del laboratorio; una BD
+    en memoria no escribe eventos salvo que se indique un archivo."""
     ruta = str(ruta or RUTA_DB)
+    if ruta_eventos is None and ruta != ":memory:":
+        ruta_eventos = Path(ruta).parent / RUTA_EVENTOS.name
     if ruta != ":memory:":
         Path(ruta).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(ruta, check_same_thread=False)
     conn.execute("PRAGMA foreign_keys = ON")  # correos/enlaces referencian usuarios/correos
     schema.crear(conn)
     seed.sembrar(conn)
-    return Repositorio(conn)
+    return Repositorio(conn, ruta_eventos)
 
 
 _DEFECTO = None

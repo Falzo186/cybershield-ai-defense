@@ -68,6 +68,7 @@ USUARIO_EQUIPO = {}  # equipo -> usuario semilla con el que juega (hoy solo azul
 # Riesgo de la partida Rojo/Azul (buzón): cada evento aplica su consecuencia fija de sesion.REGLAS_EVENTO.
 # Es independiente del EstadoSesion de cada batalla IA vs IA (ese se crea y descarta por batalla).
 ESTADO_PARTIDA = sesion.EstadoSesion()
+repositorio.PARTIDA = PARTIDA_ID  # cada evento de data/eventos.jsonl lleva la partida
 
 
 async def _hilo(fn, *args):

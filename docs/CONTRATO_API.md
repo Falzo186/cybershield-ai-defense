@@ -159,3 +159,10 @@ PDFs fijos de solo texto en `data/pdf/` (catálogo `src/lab/documentos.py`; nunc
 ### Marcador de la partida para el árbitro y espectadores (añadido)
 - SSE `marcador_partida` `{usuario_azul, puntos_azul, misiones_completadas, misiones_total, riesgo, clics, contenciones, correos_reportados, pdf_abiertos, pdf_reportados}`: al conectar el SSE (también sin token), tras cada regla aplicada, al completar una misión manual y cuando Azul entra. Los conteos son las veces que se aplicó la regla del evento en esta partida (un clic sobre un enlace contenido no cuenta).
 - La UI lo muestra en la cabecera solo en `?rol=general` y `?rol=espectador`. Rojo aún no puntúa.
+
+### Eventos preparados para un SIEM (Wazuh, aún sin integrar)
+`Repositorio.registrar()` (el mismo punto que escribe la tabla `auditoria`) añade una línea JSON a `data/eventos.jsonl` (ignorado por git) para cada evento relevante:
+`{"timestamp":"2026-10-23T10:02:05-06:00","partida":"20261023-100100-ab12","equipo":"azul","usuario":"ana.perez","rol":"empleado","tipo":"clic_enlace","accion":"CLIC_ENLACE","recurso":"correo:3","resultado":"CLIC","riesgo":"ALTO","origen":"cybershield-lab"}`
+- `tipo`: `clic_enlace`, `clic_bloqueado`, `enlace_contenido`, `correo_reportado`, `pdf_abierto`, `pdf_reportado`, `mision_completada` (equipo `azul`) y `autorizacion_denegada` (todo `DENEGADO` de consultas/herramientas; equipo `null`).
+- `riesgo` es el `nivel_riesgo` de la fila de auditoría (BAJO/MEDIO/ALTO/CRITICO). Una BD en memoria (tests) no escribe el archivo. Un fallo al escribirlo no afecta a la auditoría.
+- Para Wazuh bastará un `<localfile>` con `log_format json` apuntando a este archivo; no hay nada conectado.
