@@ -138,7 +138,7 @@ Deterministas, en `sesion.REGLAS_EVENTO`, sobre un `EstadoSesion` de la partida 
 - SSE `regla_evento` `{evento, riesgo, mision, riesgo_acumulado, usuario}` y `auditoria` SYSTEM `REGLA`.
 
 ### Misiones individuales del Equipo Azul (añadido)
-Tablas `misiones(id, titulo, condicion_evento, puntos)` y `progreso_mision(usuario, mision_id, estado, ts)` (estado `pendiente`|`completada`). Tres misiones fijas en `seed.MISIONES`: «Reportar un correo sospechoso» (`correo_reportado`, 10 pts), «Contener un enlace clicado» (`enlace_contenido`, 15 pts) y «Revisar el buzón diariamente» (`manual`, 5 pts). El progreso es por usuario semilla (no por partida).
+Tablas `misiones(id, titulo, condicion_evento, puntos)` y `progreso_mision(partida, usuario, mision_id, estado, ts)` (estado `pendiente`|`completada`). Tres misiones fijas en `seed.MISIONES`: «Reportar un correo sospechoso» (`correo_reportado`, 10 pts), «Contener un enlace clicado» (`enlace_contenido`, 15 pts) y «Revisar el buzón diariamente» (`manual`, 5 pts). El progreso es por partida y usuario: cada arranque del servidor (partida nueva) empieza con todas las misiones pendientes.
 - Una misión se completa cuando ocurre su evento y la regla de ese evento tiene `mision:true` (hoy `correo_reportado` y `enlace_contenido`). `regla_evento` y la respuesta de reportar traen `misiones_completadas:[{id, titulo, puntos}]`.
 - `GET /api/misiones` (solo token `azul`) -> `{usuario, misiones:[{id, titulo, condicion_evento, puntos, estado, ts}], puntos, riesgo_partida}`.
 - `POST /api/misiones/{id}/completar` (solo token `azul`, solo misiones `manual`) -> `{completada:true, mision_id}`; 409 si no es manual o ya estaba completada.

@@ -1,7 +1,7 @@
 """Pruebas offline del buzón de entrenamiento (BD en memoria). Ejecutar: python -m src.lab.test_correos"""
 import sqlite3
 
-from . import correos, repositorio
+from . import correos, repositorio, schema
 
 resultados = []
 
@@ -58,6 +58,20 @@ def main():
     chk("la BD rechaza enlaces a correos inexistentes", lanza(lambda: repo.conn.execute(
         "INSERT INTO enlaces(id,correo_id,ruta_local) VALUES('x2',999,'/l/x2')"), sqlite3.IntegrityError))
     chk("las herramientas de la IA no pueden leer correos", "correos" not in repositorio.ESPECIFICACION)
+
+    # BD vieja (CHECK de roles sin 'espectador') que ya tiene correos: la migración no rompe sus FK
+    vieja = sqlite3.connect(":memory:")
+    vieja.execute("PRAGMA foreign_keys = ON")
+    vieja.executescript(
+        "CREATE TABLE usuarios(usuario TEXT PRIMARY KEY, rol TEXT NOT NULL "
+        "CHECK(rol IN ('invitado','empleado','analista','admin'))); INSERT INTO usuarios VALUES('ana.perez','empleado');"
+        "CREATE TABLE correos(id INTEGER PRIMARY KEY AUTOINCREMENT, partida TEXT NOT NULL, de TEXT NOT NULL, "
+        "para_usuario TEXT NOT NULL REFERENCES usuarios(usuario), asunto TEXT NOT NULL, cuerpo TEXT NOT NULL, "
+        "plantilla_id TEXT NOT NULL, ts TEXT NOT NULL);")
+    schema.crear(vieja)
+    sql = vieja.execute("SELECT sql FROM sqlite_master WHERE name='correos'").fetchone()[0]
+    chk("migrar roles conserva las FK hacia usuarios", "usuarios_v1" not in sql
+        and vieja.execute("PRAGMA foreign_keys").fetchone()[0] == 1)
 
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)
