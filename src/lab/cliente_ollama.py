@@ -146,8 +146,11 @@ def generar(host, modelo, system, user, formato=None, timeout=120, temperature=0
         return {"ok": ok, "contenido": contenido, "tiempo_ms": int((time.perf_counter() - t0) * 1000),
                 "tokens": tokens, "error": error}
 
+    # think: False -> los modelos 'thinking' (qwen3, deepseek-r1…) responden sin razonar. Ollama ya no pone el
+    # razonamiento en <think> dentro de content sino en message.thinking, y ese razonamiento agotaba num_predict:
+    # la respuesta salía cortada (done_reason=length) con content vacío. Los demás modelos lo ignoran.
     cuerpo = {
-        "model": modelo, "stream": False,
+        "model": modelo, "stream": False, "think": False,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         "options": {"temperature": temperature, "num_predict": num_predict},
     }
