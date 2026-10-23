@@ -173,3 +173,13 @@
 - Decisiones: eventos.jsonl se escribe desde Repositorio.registrar (mismo punto que la auditoría); "riesgo" es el nivel_riesgo de la fila; las BD en memoria de los tests no escriben el archivo.
 - Decisiones: tras finalizar, todas las acciones de Rojo/Azul (y los clics en enlaces) responden 409; leer sigue permitido.
 - Pendiente / siguiente paso: rotación o limpieza de data/eventos.jsonl y de partidas viejas en lab.db; conectar Wazuh (<localfile> con log_format json); calibrar puntos y riesgo con partidas reales; puntos de Rojo por intentos en batallas IA vs IA; los tokens no son autenticación de usuarios (solo LAN de confianza).
+
+## Fase OS - Escritorio con ventanas y arreglo de qwen3
+- Qué se hizo: interfaz tipo escritorio (iconos, ventanas arrastrables/redimensionables, barra de tareas, mosaico) que envuelve los paneles existentes; qwen3:4b vuelve a funcionar enviando think:false a Ollama.
+- Archivos: ui/escritorio.js (nuevo), ui/styles.css, ui/index.html, src/lab/cliente_ollama.py, src/lab/test_cliente.py (nuevo), README.md
+- Decisiones: las ventanas MUEVEN las <section> existentes a un marco (render.js las busca por id): cero lógica duplicada; una ventana por panel.
+- Decisiones: correo, misiones y finalizar son accesos directos que pulsan los botones/modales que ya existían (mismos permisos y tokens).
+- Decisiones: redimensionar con el control nativo (CSS resize); posiciones por vista en localStorage; z-index de ventanas por debajo de los modales.
+- Decisiones: vista clásica intacta como respaldo (enlace en la cabecera o ?vista=clasica) y obligatoria por debajo de 760 px; si la página carga estrecha, el escritorio se activa al ensancharse.
+- Decisiones: qwen3 fallaba porque Ollama 0.40 devuelve el razonamiento en message.thinking y agotaba num_predict (content vacío); think:false lo evita y los modelos sin razonamiento lo ignoran.
+- Pendiente / siguiente paso: minimizar/maximizar, varias ventanas del mismo panel, y llevar el buzón a ventana propia en vez de modal.

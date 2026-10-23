@@ -121,6 +121,20 @@ Pruebas offline (sin Ollama): `python -m src.lab.test_lab` y `python -m src.lab.
 - Cada intento queda en una **auditoría append-only** (triggers que impiden `UPDATE`/`DELETE`).
 - Un fallo técnico (timeout, JSON roto) se reporta como **ERROR**, nunca se disfraza de bloqueo.
 
+## Vista escritorio (CyberShield OS)
+
+La interfaz arranca como un **escritorio**: iconos a la izquierda, los paneles (IA Atacante, Centro de control,
+IA Defensora, Auditoría) en **ventanas arrastrables y redimensionables** y una barra de tareas abajo con las
+ventanas abiertas, el botón *▦ Organizar* (vuelve a colocarlas en mosaico) y un reloj. Cada vista abre por
+defecto sus ventanas: Rojo el atacante, Azul el defensor, General y Espectador todas. Hay accesos directos al
+correo/buzón y a las misiones (Rojo/Azul) y a *Finalizar partida* (General).
+
+- Las ventanas **envuelven los mismos paneles** de siempre (`ui/escritorio.js`): no se duplicó lógica.
+- Posición, tamaño y ventanas abiertas se recuerdan en el navegador, por vista.
+- Con la barra de una ventana enfocada, las **flechas** la mueven (Shift = pasos largos).
+- *☰ Vista clásica* en la cabecera vuelve al diseño anterior (también `?vista=clasica`); en pantallas de menos
+  de 760 px se usa siempre la vista clásica apilada.
+
 ## Red Team vs Blue Team
 
 Además de la batalla IA vs IA, el laboratorio tiene una **partida entre personas**: el 🔴 **Equipo Rojo** envía

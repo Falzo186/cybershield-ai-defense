@@ -419,3 +419,65 @@ body[data-rol="rojo"] #ro-def[hidden], body[data-rol="azul"] #ro-atq[hidden] { d
 .final-detalle li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--borde); }
 .final-detalle b { font-family: var(--mono); }
 @media (max-width: 600px) { .final-marcador { grid-template-columns: 1fr; } }
+
+/* ---------- escritorio "CyberShield OS" (ui/escritorio.js): ventanas que envuelven los paneles ---------- */
+body.escritorio .app { height: 100vh; min-height: 0; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; }
+body.escritorio main.mid { display: none; }
+.escritorio-area {
+  position: relative; min-height: 0; display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 6px;
+  border: 1px solid var(--borde); border-radius: 8px; overflow: hidden;
+  background:
+    radial-gradient(circle at 78% 22%, rgba(76, 201, 232, .10), transparent 45%),
+    radial-gradient(circle at 18% 85%, rgba(255, 122, 107, .08), transparent 40%),
+    linear-gradient(160deg, #0b1320, #101b2b 60%, #0c1522);
+}
+.escritorio-area::after {
+  content: "CyberShield OS"; position: absolute; right: 18px; bottom: 10px; pointer-events: none;
+  font: 700 28px var(--sans); letter-spacing: .12em; color: rgba(227, 234, 243, .05);
+}
+.esc-iconos { display: flex; flex-direction: column; gap: 6px; padding: 10px 6px; overflow-y: auto; z-index: 1; }
+.esc-icono {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border-radius: 8px;
+  background: transparent; border: 1px solid transparent; color: var(--texto); cursor: pointer; font: 12px var(--sans);
+}
+.esc-icono:hover, .esc-icono:focus-visible { background: rgba(255, 255, 255, .06); border-color: var(--borde); }
+.esc-icono-img { font-size: 26px; line-height: 1; }
+.esc-icono-txt { text-align: center; line-height: 1.2; overflow-wrap: anywhere; }
+.esc-capa { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+
+.ventana {
+  position: absolute; display: flex; flex-direction: column; min-width: 280px; min-height: 160px;
+  background: var(--panel); border: 1px solid var(--borde); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .45); resize: both;
+}
+.ventana[hidden] { display: none; }
+.ventana.activa { border-color: var(--def); }
+.ventana.arrastrando { opacity: .92; }
+.ventana-barra {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 6px 5px 10px;
+  background: var(--panel2); border-bottom: 1px solid var(--borde); cursor: move; user-select: none; touch-action: none;
+}
+.ventana-barra:focus-visible { outline: 2px solid var(--def); outline-offset: -2px; }
+.ventana-titulo { font: 600 12px var(--sans); letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ventana-cerrar {
+  background: transparent; border: 1px solid transparent; color: var(--texto-sec); border-radius: 4px;
+  width: 26px; height: 22px; cursor: pointer; font-size: 12px;
+}
+.ventana-cerrar:hover, .ventana-cerrar:focus-visible { color: var(--texto); border-color: var(--bad); background: rgba(255, 100, 100, .12); }
+.ventana-cuerpo { flex: 1; min-height: 0; display: flex; }
+body.escritorio .ventana-cuerpo > .panel {
+  flex: 1; min-width: 0; min-height: 0; overflow: auto; border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0;
+}
+body.escritorio .ventana-cuerpo > .aud { overflow: hidden; }
+
+.esc-barra {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; min-width: 0;
+  background: var(--panel); border: 1px solid var(--borde); border-radius: 8px;
+}
+.esc-tareas { display: flex; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; }
+.esc-tarea, .esc-organizar {
+  font: 600 12px var(--sans); padding: 5px 10px; border-radius: 6px; border: 1px solid var(--borde);
+  background: var(--panel2); color: var(--texto-sec); cursor: pointer; white-space: nowrap;
+}
+.esc-tarea.activa { color: var(--texto); border-color: var(--def); }
+.esc-reloj { color: var(--texto-sec); font-size: 12px; min-width: 40px; text-align: right; }
