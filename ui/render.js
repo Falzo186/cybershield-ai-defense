@@ -523,6 +523,13 @@ const R = (() => {
     return m ? m[3] + "/" + m[2] + "/" + m[1] + " " + m[4] + ":" + m[5] : (ts || "—");
   }
 
+  // El escritorio (escritorio.js) puede alojar la tarjeta del buzón en una ventana: entonces abrir/cerrar se
+  // delegan en ella ({abrir(), cerrar(), abierta()}) y el modal no se usa. Sin escritorio, todo sigue igual.
+  let ventanaBuzon = null;
+  function alojarBuzon(v) { ventanaBuzon = v; }
+  const buzonEsModal = () => !ventanaBuzon;
+  const buzonAbierto = () => (ventanaBuzon ? ventanaBuzon.abierta() : !$("buzon-modal").hidden);
+
   function mostrarBuzon(visible, rol) {
     const m = $("buzon-modal");
     if (visible) {
@@ -530,14 +537,13 @@ const R = (() => {
       $("buzon-t").textContent = rol === "rojo" ? "✉ ENVIAR CORREO DE ENTRENAMIENTO" : "✉ BUZÓN DEL EQUIPO AZUL";
       $("correo-form").hidden = rol !== "rojo";
       $("buzon-azul").hidden = rol !== "azul";
-      m.hidden = false;
+      if (ventanaBuzon) ventanaBuzon.abrir(); else m.hidden = false;
       $(rol === "rojo" ? "sel-plantilla" : "btn-buzon-refrescar").focus();
-    } else if (!m.hidden) {
-      m.hidden = true;
+    } else if (buzonAbierto()) {
+      if (ventanaBuzon) ventanaBuzon.cerrar(); else m.hidden = true;
       if (focoBuzon && focoBuzon.focus) focoBuzon.focus();
     }
   }
-  const buzonAbierto = () => !$("buzon-modal").hidden;
 
   function setPlantillas(lista) {
     const s = $("sel-plantilla");
@@ -759,7 +765,7 @@ const R = (() => {
     setVeredictoError, setOrigen, setManualOrigen, setEquipo, setPermisos, mostrarSelector,
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
-    mostrarBuzon, buzonAbierto, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
+    mostrarBuzon, buzonAbierto, buzonEsModal, alojarBuzon, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
     setVistaAzul, setMisiones, setMarcadorPartida, mostrarResultado, cerrarResultado, resultadoAbierto,
   };
 })();

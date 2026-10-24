@@ -712,7 +712,10 @@
       if (t.dataset.azul === "misiones") cargarMisiones();
     }));
     $("correo-form").addEventListener("submit", (ev) => { ev.preventDefault(); enviarCorreo(); });
-    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && R.buzonAbierto()) R.mostrarBuzon(false); });
+    // Esc cierra el buzón solo cuando es un modal; como ventana del escritorio se cierra con su ✕.
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && R.buzonEsModal() && R.buzonAbierto()) R.mostrarBuzon(false);
+    });
 
     R.initPipeline();
     R.initAuditoria();

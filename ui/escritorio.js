@@ -57,7 +57,11 @@
       { id: "control", titulo: "Centro de control", icono: "🎛️", sel: "section.panel.ctr", abierta: ["rojo", "azul", "general", "espectador", ""] },
       { id: "defensor", titulo: "IA Defensora", icono: "🛡️", sel: "section.panel.def", abierta: ["azul", "general", "espectador", ""] },
       { id: "auditoria", titulo: "Auditoría", icono: "📜", sel: "section.panel.aud", abierta: ["rojo", "azul", "general", "espectador", ""] },
-    ];
+      // Buzón: la MISMA tarjeta del modal (render.js delega abrir/cerrar en esta ventana con R.alojarBuzon).
+      // Se abre desde el acceso «Correo/Buzón» (que carga los datos), nunca sola al recargar, y flota fuera del mosaico.
+      { id: "buzon", titulo: rol === "azul" ? "Buzón" : "Correo", icono: "📬", sel: "#buzon-modal .buzon-card",
+        abierta: [], roles: ["rojo", "azul"], sinIcono: true, efimera: true, flotante: true, tam: [680, 560] },
+    ].filter((d) => !d.roles || d.roles.includes(rol));
     // Accesos directos: reutilizan los botones y modales que ya existen (mismo código, mismos permisos).
     const ACCESOS = [
       { id: "correo", titulo: rol === "azul" ? "Buzón" : "Correo", icono: "📬", roles: ["rojo", "azul"],
@@ -147,7 +151,8 @@
       marco.append(cab, cuerpo);
       capa.append(marco);
 
-      const v = { def, marco, abierta: false, x: 0, y: 0, w: 420, h: 320 };
+      const [w0, h0] = def.tam || [420, 320];
+      const v = { def, marco, abierta: false, x: 0, y: 0, w: w0, h: h0, nueva: true };
       cerrar.addEventListener("click", () => cerrarVentana(v));
       marco.addEventListener("pointerdown", () => alFrente(v), true);
       arrastrable(v, cab);
@@ -192,7 +197,17 @@
     }
 
     function abrirVentana(v) {
-      if (!v.abierta) { v.abierta = true; encajar(v); aplicar(v); }
+      if (!v.abierta) {
+        v.abierta = true;
+        if (v.nueva) { // primera vez sin posición guardada: centrada
+          const L = limites();
+          v.x = Math.round((L.w - v.w) / 2);
+          v.y = Math.round((L.h - v.h) / 2);
+        }
+        v.nueva = false;
+        encajar(v);
+        aplicar(v);
+      }
       alFrente(v);
       guardar();
     }
@@ -249,7 +264,7 @@
     function mosaico() {
       const L = limites();
       ventanas.filter((v) => !v.abierta).forEach(aplicar); // las cerradas, ocultas (si no, quedan sin tamaño)
-      const abiertas = ventanas.filter((v) => v.abierta);
+      const abiertas = ventanas.filter((v) => v.abierta && !v.def.flotante); // el buzón no entra en el mosaico
       const abajo = abiertas.filter((v) => v.def.id === "auditoria");
       const arriba = abiertas.filter((v) => v.def.id !== "auditoria");
       const altoAbajo = abajo.length ? Math.round(L.h * 0.3) : 0;
@@ -314,14 +329,21 @@
     VENTANAS.forEach((def) => { const v = crearVentana(def); if (v) ventanas.push(v); });
     mid.hidden = true; // ya no contiene nada: sus secciones viven en ventanas
 
-    ventanas.forEach((v) => icono(v.def.titulo, v.def.icono, () => abrirVentana(v), v.def.id));
+    ventanas.filter((v) => !v.def.sinIcono).forEach((v) => icono(v.def.titulo, v.def.icono, () => abrirVentana(v), v.def.id));
     ACCESOS.filter((a) => a.roles.includes(rol)).forEach((a) => icono(a.titulo, a.icono, a.accion, a.id));
 
-    const hayGuardado = ventanas.some((v) => guardado[v.def.id]);
+    const buzon = ventanas.find((v) => v.def.id === "buzon");
+    if (buzon && typeof R !== "undefined" && R.alojarBuzon) {
+      R.alojarBuzon({ abrir: () => abrirVentana(buzon), cerrar: () => cerrarVentana(buzon), abierta: () => buzon.abierta });
+    }
+
+    const hayGuardado = ventanas.some((v) => guardado[v.def.id] && !v.def.efimera);
     ventanas.forEach((v) => {
       const g = guardado[v.def.id];
-      if (g) Object.assign(v, { abierta: !!g.abierta, x: +g.x || 0, y: +g.y || 0, w: +g.w || 420, h: +g.h || 320 });
-      else v.abierta = v.def.abierta.includes(rol);
+      if (g) {
+        Object.assign(v, { abierta: !!g.abierta, x: +g.x || 0, y: +g.y || 0, w: +g.w || v.w, h: +g.h || v.h, nueva: false });
+      } else v.abierta = v.def.abierta.includes(rol);
+      if (v.def.efimera) v.abierta = false; // el buzón solo se abre con su acceso (que carga los datos)
     });
     if (hayGuardado) ventanas.forEach((v) => { if (v.abierta) encajar(v); aplicar(v); });
     else mosaico();

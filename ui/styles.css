@@ -481,3 +481,9 @@ body.escritorio .ventana-cuerpo > .aud { overflow: hidden; }
 }
 .esc-tarea.activa { color: var(--texto); border-color: var(--def); }
 .esc-reloj { color: var(--texto-sec); font-size: 12px; min-width: 40px; text-align: right; }
+
+/* Buzón alojado en una ventana del escritorio: la misma tarjeta, sin aspecto de modal (se cierra con el ✕ de la ventana). */
+body.escritorio .ventana-cuerpo > .buzon-card {
+  flex: 1; width: auto; max-width: none; max-height: none; margin: 0; border: 0; border-radius: 0; overflow: auto;
+}
+body.escritorio .ventana #buzon-cerrar { display: none; }
