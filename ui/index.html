@@ -86,7 +86,7 @@
       <div id="sel-atq-box" class="sel-box" hidden>
         <label>Modelo del atacante <select id="sel-atq" class="sel" aria-label="Modelo del atacante"></select></label>
         <button type="button" class="btn btn-mini" data-refrescar>↻ Actualizar modelos</button>
-        <span class="ollama-ind ind-off" data-ollama-ind="atq">🔴 OLLAMA DESCONECTADO</span>
+        <span class="ollama-ind ind-wait" data-ollama-ind="atq" role="status">COMPROBANDO OLLAMA…</span>
         <label class="host">IP Ollama del equipo rojo
           <input id="host-atq" class="sel mono" type="text" spellcheck="false" autocomplete="off" value="http://localhost:11434" aria-label="IP de Ollama del equipo rojo">
         </label>
@@ -149,7 +149,7 @@
       <div id="sel-def-box" class="sel-box" hidden>
         <label>Modelo del defensor <select id="sel-def" class="sel" aria-label="Modelo del defensor"></select></label>
         <button type="button" class="btn btn-mini" data-refrescar>↻ Actualizar modelos</button>
-        <span class="ollama-ind ind-off" data-ollama-ind="def">🔴 OLLAMA DESCONECTADO</span>
+        <span class="ollama-ind ind-wait" data-ollama-ind="def" role="status">COMPROBANDO OLLAMA…</span>
         <label class="host">IP Ollama del equipo azul
           <input id="host-def" class="sel mono" type="text" spellcheck="false" autocomplete="off" value="http://localhost:11434" aria-label="IP de Ollama del equipo azul">
         </label>

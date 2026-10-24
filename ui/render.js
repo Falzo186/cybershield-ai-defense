@@ -498,7 +498,27 @@ const R = (() => {
     s.value = valores.includes(previo) ? previo : valores[0];
   }
   // rol: "atq" | "def" — cada equipo tiene su propia Ollama (indicador y lista de modelos propios).
+  // Estado intermedio mientras se comprueba la conexión (spinner CSS). Si en 12 s no llega ningún resultado (p. ej.
+  // el host del panel no es el que el servidor comprueba al conectar), se indica en vez de girar para siempre.
+  const esperaOllama = {};
+  function setOllamaComprobando(rol) {
+    const r = rol === "def" ? "def" : "atq";
+    document.querySelectorAll('[data-ollama-ind="' + r + '"]').forEach((n) => {
+      n.textContent = "COMPROBANDO OLLAMA…";
+      n.className = "ollama-ind ind-wait";
+    });
+    llenarSelect(r === "def" ? "sel-def" : "sel-atq", [], "(comprobando…)");
+    clearTimeout(esperaOllama[r]);
+    esperaOllama[r] = setTimeout(() => {
+      document.querySelectorAll('[data-ollama-ind="' + r + '"].ind-wait').forEach((n) => {
+        n.textContent = "⚪ SIN RESPUESTA · usa «Probar conexión»";
+        n.className = "ollama-ind ind-sin";
+      });
+    }, 12000);
+  }
+
   function setOllama(rol, est) {
+    clearTimeout(esperaOllama[rol === "def" ? "def" : "atq"]);
     const on = !!est.disponible;
     document.querySelectorAll('[data-ollama-ind="' + (rol === "def" ? "def" : "atq") + '"]').forEach((n) => {
       n.textContent = on ? "🟢 OLLAMA CONECTADO" : "🔴 OLLAMA DESCONECTADO";
@@ -771,6 +791,6 @@ const R = (() => {
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
     mostrarBuzon, buzonAbierto, buzonEsModal, alojarBuzon, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
-    setVistaAzul, setMisiones, setMarcadorPartida, mostrarResultado, cerrarResultado, resultadoAbierto,
+    setVistaAzul, setMisiones, setMarcadorPartida, setOllamaComprobando, mostrarResultado, cerrarResultado, resultadoAbierto,
   };
 })();

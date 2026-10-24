@@ -140,6 +140,7 @@
   async function consultarHost(rol, avisar) {
     const host = hostDe(rol);
     LS.set(rol === "def" ? "cs_host_def" : "cs_host_atq", host);
+    R.setOllamaComprobando(rol);
     try {
       const e = await API.ollamaEstado(host);
       const m = e.disponible ? await API.ollamaModelos(host) : { modelos: [] };
@@ -726,8 +727,9 @@
     R.setModo(estado.modo);
     R.setAtqEstado("EN ESPERA", false);
     R.setDefEstado("PROTEGIENDO BD", true);
-    R.setOllama("atq", estado.ollama.atq);
-    R.setOllama("def", estado.ollama.def);
+    // Hasta que llegue el primer estado real (SSE al conectar o «Probar conexión»): «Comprobando…», no «desconectado».
+    R.setOllamaComprobando("atq");
+    R.setOllamaComprobando("def");
     actualizarOrigen();
 
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => cambiarModo(t.dataset.modo)));

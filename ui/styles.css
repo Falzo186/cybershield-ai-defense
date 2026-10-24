@@ -541,3 +541,11 @@ body.escritorio .ventana #buzon-cerrar { display: none; }
   body.escritorio .cnt b { font-size: 18px; }
   body.escritorio .kv { margin-bottom: 5px; }
 }
+
+/* ---------- estado intermedio de Ollama: «Comprobando…» con un spinner CSS ---------- */
+.ind-wait, .ind-sin { color: var(--texto-sec); }
+.ind-wait::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; vertical-align: -1px;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: girar .8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
