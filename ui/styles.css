@@ -584,3 +584,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* ---------- iconos del escritorio agrupados por función ---------- */
 .esc-grupo { display: flex; flex-direction: column; gap: 6px; }
 .esc-sep { height: 1px; margin: 4px 10px; background: var(--borde); flex-shrink: 0; }
+@media (max-height: 860px) { /* Auditoría al mínimo (100 px): que quepa al menos una línea completa del registro */
+  body.escritorio .ventana-cuerpo > .aud { padding-top: 6px; padding-bottom: 6px; }
+  body.escritorio .aud-head { margin-bottom: 4px; gap: 8px; }
+  body.escritorio .aud-head h2 { font-size: 12px; }
+  body.escritorio .aud .log { padding: 3px 8px; }
+}
