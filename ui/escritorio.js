@@ -65,10 +65,13 @@
     // Accesos directos: reutilizan los botones y modales que ya existen (mismo código, mismos permisos).
     const ACCESOS = [
       { id: "correo", titulo: rol === "azul" ? "Buzón" : "Correo", icono: "📬", roles: ["rojo", "azul"],
+        ayuda: rol === "azul" ? "Abrir el buzón de correos de entrenamiento" : "Enviar un correo de entrenamiento al Equipo Azul",
         accion: () => pulsar("btn-buzon", "Tu vista aún no tiene token de equipo.") },
       { id: "misiones", titulo: "Misiones", icono: "🎯", roles: ["azul"],
+        ayuda: "Ver el progreso de las misiones del Equipo Azul",
         accion: () => { if (pulsar("btn-buzon", "Tu vista aún no tiene token de equipo.")) clicEn('[data-azul="misiones"]'); } },
       { id: "finalizar", titulo: "Finalizar partida", icono: "🏁", roles: ["general"],
+        ayuda: "Finalizar la partida: congela los puntajes y muestra el resultado",
         accion: () => pulsar("btn-finalizar", "Necesitas el token de la vista general.") },
     ];
 
@@ -417,7 +420,15 @@
     }
 
     // ---------- iconos y barra de tareas ----------
-    function icono(titulo, emoji, alAbrir, id) {
+    // Grupos de iconos por función, de arriba abajo, separados por una línea sutil.
+    const GRUPOS_ICONOS = [
+      ["Herramientas del equipo", ["atacante", "control", "defensor"]],
+      ["Comunicación", ["correo"]],
+      ["Registro y seguimiento", ["auditoria", "misiones", "finalizar"]],
+    ];
+    const botonesIcono = new Map();
+
+    function icono(titulo, emoji, alAbrir, id, ayuda) {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "esc-icono";
@@ -430,9 +441,28 @@
       t.className = "esc-icono-txt";
       t.textContent = titulo;
       b.append(e, t);
-      b.title = "Abrir " + titulo;
+      b.title = ayuda || "Abrir " + titulo; // tooltip con el nombre (y qué hace) al pasar el cursor
       b.addEventListener("click", alAbrir);
-      iconos.append(b);
+      botonesIcono.set(id, b);
+    }
+
+    function pintarIconos() {
+      const grupos = GRUPOS_ICONOS.map(([nombre, ids]) => [nombre, ids.map((id) => botonesIcono.get(id)).filter(Boolean)])
+        .filter(([, botones]) => botones.length);
+      grupos.forEach(([nombre, botones], i) => {
+        if (i) {
+          const sep = document.createElement("div");
+          sep.className = "esc-sep";
+          sep.setAttribute("role", "separator");
+          iconos.append(sep);
+        }
+        const g = document.createElement("div");
+        g.className = "esc-grupo";
+        g.setAttribute("role", "group");
+        g.setAttribute("aria-label", nombre);
+        g.append(...botones);
+        iconos.append(g);
+      });
     }
 
     function pintarTareas() {
@@ -460,8 +490,10 @@
     VENTANAS.forEach((def) => { const v = crearVentana(def); if (v) ventanas.push(v); });
     mid.hidden = true; // ya no contiene nada: sus secciones viven en ventanas
 
-    ventanas.filter((v) => !v.def.sinIcono).forEach((v) => icono(v.def.titulo, v.def.icono, () => abrirVentana(v), v.def.id));
-    ACCESOS.filter((a) => a.roles.includes(rol)).forEach((a) => icono(a.titulo, a.icono, a.accion, a.id));
+    ventanas.filter((v) => !v.def.sinIcono).forEach((v) => icono(v.def.titulo, v.def.icono, () => abrirVentana(v), v.def.id,
+      "Abrir la ventana " + v.def.titulo));
+    ACCESOS.filter((a) => a.roles.includes(rol)).forEach((a) => icono(a.titulo, a.icono, a.accion, a.id, a.ayuda));
+    pintarIconos();
 
     const buzon = ventanas.find((v) => v.def.id === "buzon");
     if (buzon && typeof R !== "undefined" && R.alojarBuzon) {

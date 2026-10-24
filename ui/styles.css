@@ -580,3 +580,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .term-form input:focus-visible { outline-offset: 1px; }
 .ventana-barra:focus-visible { outline: 2px solid var(--texto); outline-offset: -3px; box-shadow: none; }
 .log:focus-visible { outline-offset: -2px; box-shadow: none; }
+
+/* ---------- iconos del escritorio agrupados por función ---------- */
+.esc-grupo { display: flex; flex-direction: column; gap: 6px; }
+.esc-sep { height: 1px; margin: 4px 10px; background: var(--borde); flex-shrink: 0; }
