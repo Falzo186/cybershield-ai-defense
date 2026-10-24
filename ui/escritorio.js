@@ -56,7 +56,7 @@
       { id: "atacante", titulo: "IA Atacante", icono: "🗡️", sel: "section.panel.atq", abierta: ["rojo", "general", "espectador", ""] },
       { id: "control", titulo: "Centro de control", icono: "🎛️", sel: "section.panel.ctr", abierta: ["rojo", "azul", "general", "espectador", ""] },
       { id: "defensor", titulo: "IA Defensora", icono: "🛡️", sel: "section.panel.def", abierta: ["azul", "general", "espectador", ""] },
-      { id: "auditoria", titulo: "Auditoría", icono: "📜", sel: "section.panel.aud", abierta: ["rojo", "azul", "general", "espectador", ""] },
+      { id: "auditoria", titulo: "Auditoría", icono: "📜", sel: "section.panel.aud", abierta: ["rojo", "azul", "general", "espectador", ""], minH: 100 },
       // Buzón: la MISMA tarjeta del modal (render.js delega abrir/cerrar en esta ventana con R.alojarBuzon).
       // Se abre desde el acceso «Correo/Buzón» (que carga los datos), nunca sola al recargar, y flota fuera del mosaico.
       { id: "buzon", titulo: rol === "azul" ? "Buzón" : "Correo", icono: "📬", sel: "#buzon-modal .buzon-card",
@@ -126,6 +126,7 @@
     // ---------- ventanas ----------
     const ventanas = [];
     let orden = []; // ids de abajo a arriba (z-order)
+    let mosaicoAuto = false; // true mientras la disposición sea la del mosaico y el usuario no la haya tocado
 
     function crearVentana(def) {
       const seccion = document.querySelector(def.sel);
@@ -178,7 +179,10 @@
         new ResizeObserver(() => {
           if (!v.abierta || v.minimizada || v.maximizada) return; // maximizada: no pisar el tamaño normal
           clearTimeout(t);
-          t = setTimeout(() => { v.w = marco.offsetWidth; v.h = marco.offsetHeight; guardar(); }, 250);
+          t = setTimeout(() => {
+            if (marco.offsetWidth !== v.w || marco.offsetHeight !== v.h) mosaicoAuto = false; // lo cambió el usuario
+            v.w = marco.offsetWidth; v.h = marco.offsetHeight; guardar();
+          }, 250);
         }).observe(marco);
       }
       return v;
@@ -203,7 +207,7 @@
     function encajar(v) {
       const L = limites();
       v.w = Math.max(280, Math.min(v.w, L.w - 2 * MARGEN));
-      v.h = Math.max(160, Math.min(v.h, L.h - 2 * MARGEN));
+      v.h = Math.max(v.def.minH || 160, Math.min(v.h, L.h - 2 * MARGEN)); // mismo mínimo que el CSS
       v.x = Math.max(0, Math.min(v.x, L.w - 120));
       v.y = Math.max(0, Math.min(v.y, L.h - 40));
     }
@@ -331,6 +335,7 @@
         if (!ini) return;
         ini = null;
         v.marco.classList.remove("arrastrando");
+        mosaicoAuto = false;
         guardar();
       };
       asa.addEventListener("pointerup", soltar);
@@ -342,6 +347,7 @@
         const d = { ArrowLeft: [-paso, 0], ArrowRight: [paso, 0], ArrowUp: [0, -paso], ArrowDown: [0, paso] }[ev.key];
         if (!d || v.maximizada) return;
         ev.preventDefault();
+        mosaicoAuto = false;
         v.x += d[0];
         v.y += d[1];
         encajar(v);
@@ -368,6 +374,7 @@
     function mosaico() {
       const L = limites();
       ventanas.filter((v) => !v.abierta).forEach(aplicar); // las cerradas, ocultas (si no, quedan sin tamaño)
+      mosaicoAuto = true;
       const abiertas = ventanas.filter((v) => v.abierta && !v.def.flotante); // el buzón no entra en el mosaico
       abiertas.forEach((v) => { v.minimizada = false; v.maximizada = false; }); // organizar = todas a la vista
       const aud = abiertas.find((v) => v.def.id === "auditoria");
@@ -384,6 +391,7 @@
         x += v.w + MARGEN;
         aplicar(v);
       });
+      abiertas.forEach((v) => { v.nueva = false; }); // ya tienen sitio: al reabrirlas no se centran
       const nat = new Map(arriba.map((v) => [v, altoNatural(v)])); // con el ancho ya asignado
       const maxNat = Math.max(0, ...nat.values());
       if (!aud) { guardar(); return; }
@@ -474,6 +482,25 @@
     ventanas.filter((v) => v.abierta).forEach(alFrente);
 
     organizar.addEventListener("click", mosaico);
+    // El área del escritorio cambia de alto sin que cambie la ventana del navegador (p. ej. aparece la fila del
+    // marcador de la partida tras el primer SSE): si el mosaico no se ha tocado, se recalcula; si no, solo se
+    // ajusta lo que quedaría fuera por abajo.
+    if ("ResizeObserver" in window) {
+      let previo = limites().h;
+      new ResizeObserver(() => {
+        const L = limites();
+        if (Math.abs(L.h - previo) < 2) return;
+        previo = L.h;
+        if (mosaicoAuto) { mosaico(); return; }
+        ventanas.filter((v) => v.abierta).forEach((v) => {
+          if (v.y + v.h > L.h - MARGEN) v.h = Math.max(v.def.minH || 160, L.h - MARGEN - v.y);
+          if (v.y + v.h > L.h - MARGEN) v.y = Math.max(0, L.h - MARGEN - v.h);
+          encajar(v);
+          aplicar(v);
+        });
+        guardar();
+      }).observe(capa);
+    }
     window.addEventListener("resize", () => {
       if (window.innerWidth < ANCHO_MINIMO) return; // se respeta al recargar
       ventanas.forEach((v) => { if (v.abierta) { encajar(v); aplicar(v); } }); // las maximizadas se reajustan

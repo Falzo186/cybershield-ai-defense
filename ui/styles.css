@@ -567,3 +567,4 @@ body.escritorio .ventana #buzon-cerrar { display: none; }
 .ventana.sale { opacity: 0; transform: scale(.96); pointer-events: none; }
 .ventana.sale-min { opacity: 0; transform: translateY(40px) scale(.9); pointer-events: none; }
 .ventana.geom { transition: left .18s ease, top .18s ease, width .18s ease, height .18s ease, opacity .17s ease, transform .17s ease; }
+.ventana[data-ventana="auditoria"] { min-height: 100px; } /* = AUDITORIA_MIN del mosaico (escritorio.js) */
