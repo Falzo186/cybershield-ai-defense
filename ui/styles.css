@@ -142,7 +142,9 @@ caption { text-align: left; color: var(--texto-sec); font-size: 11px; letter-spa
 .nodo[data-estado="ok"] .nodo-ico, .nodo[data-estado="ok"] .nodo-estado { color: var(--ok); }
 .nodo[data-estado="bloqueado"] { border-color: var(--bad); background: rgba(255, 100, 100, .1); }
 .nodo[data-estado="bloqueado"] .nodo-ico, .nodo[data-estado="bloqueado"] .nodo-estado { color: var(--bad); }
-.nodo[data-estado="omitido"] { opacity: .45; }
+/* omitido: borde discontinuo y texto secundario en vez de opacidad .45 (que dejaba el texto en 2.5:1) */
+.nodo[data-estado="omitido"] { background: transparent; border-style: dashed; }
+.nodo[data-estado="omitido"] .nodo-nombre, .nodo[data-estado="omitido"] .nodo-ico { color: var(--texto-sec); }
 @keyframes pulso {
   0%, 100% { box-shadow: 0 0 0 0 rgba(76, 201, 232, .5); }
   50% { box-shadow: 0 0 0 6px rgba(76, 201, 232, 0); }
@@ -484,7 +486,7 @@ body.escritorio .ventana-cuerpo > .aud { overflow: hidden; }
   background: var(--panel2); color: var(--texto-sec); cursor: pointer; white-space: nowrap;
 }
 .esc-tarea.activa { color: var(--texto); border-color: var(--def); }
-.esc-tarea.minimizada { opacity: .65; border-style: dashed; }
+.esc-tarea.minimizada { opacity: .8; border-style: dashed; } /* .8: contraste 4.9:1 (con .65 era 3.7:1) */
 .esc-reloj { color: var(--texto-sec); font-size: 12px; min-width: 40px; text-align: right; }
 
 /* Buzón alojado en una ventana del escritorio: la misma tarjeta, sin aspecto de modal (se cierra con el ✕ de la ventana). */
@@ -568,3 +570,13 @@ body.escritorio .ventana #buzon-cerrar { display: none; }
 .ventana.sale-min { opacity: 0; transform: translateY(40px) scale(.9); pointer-events: none; }
 .ventana.geom { transition: left .18s ease, top .18s ease, width .18s ease, height .18s ease, opacity .17s ease, transform .17s ease; }
 .ventana[data-ventana="auditoria"] { min-height: 100px; } /* = AUDITORIA_MIN del mosaico (escritorio.js) */
+
+/* ---------- foco visible al navegar con teclado: anillo claro + halo, distinto de los bordes azules ---------- */
+:focus-visible,
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--texto); outline-offset: 1px; box-shadow: 0 0 0 4px rgba(76, 201, 232, .55);
+}
+.term-form input:focus-visible { outline-offset: 1px; }
+.ventana-barra:focus-visible { outline: 2px solid var(--texto); outline-offset: -3px; box-shadow: none; }
+.log:focus-visible { outline-offset: -2px; box-shadow: none; }
