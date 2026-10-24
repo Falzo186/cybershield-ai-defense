@@ -1,6 +1,6 @@
 # Prueba de extremo a extremo — partida Rojo vs Azul
 
-Generado por `e2e/demo_partida.py` el 2026-10-24T06:04:27-06:00 en 13 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
+Generado por `e2e/demo_partida.py` el 2026-10-24T06:40:29-06:00 en 12 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
 
 **Resultado: 38/38 comprobaciones correctas.**
 
