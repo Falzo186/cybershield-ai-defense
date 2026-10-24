@@ -1,0 +1,8 @@
+1366x768 general    scroll interno: control (+237 px), defensor (+98 px)
+1366x768 azul       scroll interno: control (+204 px), defensor (+172 px)
+1366x768 rojo       scroll interno: atacante (+41 px), control (+204 px)
+1366x768 espectador scroll interno: control (+237 px), defensor (+98 px)
+1920x1080 general    scroll interno: ninguno
+1920x1080 azul       scroll interno: ninguno
+1920x1080 rojo       scroll interno: ninguno
+1920x1080 espectador scroll interno: ninguno
