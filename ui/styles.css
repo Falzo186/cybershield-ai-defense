@@ -509,3 +509,15 @@ body.escritorio .ventana #buzon-cerrar { display: none; }
   content: attr(data-vacio); color: var(--texto-sec); opacity: .75; font: italic 12px var(--sans);
 }
 #historial:empty::before { display: block; padding: 6px 2px; }
+
+/* ---------- cabecera en grupos: identidad/estado · acciones · marcadores ---------- */
+.hdr-top { flex: 1 1 auto; column-gap: 0; row-gap: 8px; }
+.hdr-grupo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hdr-grupo + .hdr-grupo { margin-left: 18px; padding-left: 18px; border-left: 1px solid var(--borde); }
+.hdr-acciones .lnk { font-size: 12px; }
+.hdr-grupo + .hdr-marcadores { margin-left: auto; margin-right: 4px; } /* marcador, a la derecha */
+.hdr-top > .marcador-partida { flex-basis: 100%; padding-top: 6px; border-top: 1px dashed var(--borde); }
+@media (max-width: 600px) {
+  .hdr-grupo + .hdr-grupo { margin-left: 0; padding-left: 0; border-left: 0; }
+  .hdr-top { gap: 8px; }
+}

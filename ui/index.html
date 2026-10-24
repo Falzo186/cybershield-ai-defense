@@ -11,18 +11,27 @@
 
   <header class="hdr">
     <div class="hdr-top">
-      <h1>AI SECURITY LABORATORY</h1>
-      <span class="tag-lab">LABORATORIO LOCAL · DATOS FICTICIOS</span>
-      <span id="conn" class="conn conn-warn" role="status">
-        <span id="conn-ico" aria-hidden="true">◐</span><span id="conn-txt">Reconectando…</span>
-      </span>
-      <span id="equipo-tag" class="equipo-tag eq-ninguno" title="Equipo de esta sesión">SIN EQUIPO</span>
-      <a id="lnk-equipo" class="lnk" href="?cambiar=1">⇄ Cambiar de equipo</a>
-      <button type="button" id="btn-buzon" class="btn btn-mini" aria-haspopup="dialog">✉ CORREOS</button>
-      <button type="button" id="btn-finalizar" class="btn btn-mini btn-danger" title="Congela los puntajes de Rojo y Azul y declara el ganador">🏁 FINALIZAR PARTIDA</button>
-      <span id="marcador" class="marcador" role="status" aria-live="polite" title="Marcador de la batalla IA vs IA: atacante — defensor (no es la partida Rojo/Azul del buzón)">🔴 0 — 0 🔵</span>
+      <!-- 1. Identidad y estado -->
+      <div class="hdr-grupo hdr-identidad">
+        <h1>AI SECURITY LABORATORY</h1>
+        <span class="tag-lab">LABORATORIO LOCAL · DATOS FICTICIOS</span>
+        <span id="conn" class="conn conn-warn" role="status">
+          <span id="conn-ico" aria-hidden="true">◐</span><span id="conn-txt">Reconectando…</span>
+        </span>
+        <span id="equipo-tag" class="equipo-tag eq-ninguno" title="Equipo de esta sesión">SIN EQUIPO</span>
+      </div>
+      <!-- 2. Acciones de la sesión (escritorio.js añade «Vista clásica» tras «Cambiar de equipo») -->
+      <div class="hdr-grupo hdr-acciones">
+        <a id="lnk-equipo" class="lnk" href="?cambiar=1">⇄ Cambiar de equipo</a>
+        <button type="button" id="btn-buzon" class="btn btn-mini" aria-haspopup="dialog">✉ CORREOS</button>
+        <button type="button" id="btn-finalizar" class="btn btn-mini btn-danger" title="Congela los puntajes de Rojo y Azul y declara el ganador">🏁 FINALIZAR PARTIDA</button>
+      </div>
+      <!-- 3. Marcadores -->
+      <div class="hdr-grupo hdr-marcadores">
+        <span id="marcador" class="marcador" role="status" aria-live="polite" title="Marcador de la batalla IA vs IA: atacante — defensor (no es la partida Rojo/Azul del buzón)">🔴 0 — 0 🔵</span>
+        <span id="demo-tag" class="demo-tag" hidden>DEMOSTRACIÓN · NO SUMA AL MARCADOR (admin: acceso legítimo por diseño)</span>
+      </div>
       <span id="marcador-partida" class="marcador-partida" role="status" aria-live="polite" hidden title="Partida Rojo/Azul del buzón: puntos de misiones de Azul, riesgo acumulado y eventos clave"></span>
-      <span id="demo-tag" class="demo-tag" hidden>DEMOSTRACIÓN · NO SUMA AL MARCADOR (admin: acceso legítimo por diseño)</span>
     </div>
     <div class="hdr-bottom">
       <div class="tabs" role="tablist" aria-label="Modo de operación">
