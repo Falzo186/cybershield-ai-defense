@@ -4,6 +4,7 @@ Es la última capa de defensa: aunque la IA o la capa de herramientas fallen, aq
 comprobar el acceso. No existe ningún camino para ejecutar SQL arbitrario.
 """
 import json
+import os
 import secrets
 import sqlite3
 import threading
@@ -13,7 +14,8 @@ from pathlib import Path
 from . import correos, documentos, permisos, schema, seed
 from .permisos import Identidad
 
-RUTA_DB = Path(__file__).resolve().parents[2] / "data" / "lab.db"
+# CS_LAB_DB permite usar otra BD (p. ej. la prueba de extremo a extremo usa una temporal y no toca data/lab.db).
+RUTA_DB = Path(os.getenv("CS_LAB_DB") or Path(__file__).resolve().parents[2] / "data" / "lab.db")
 # Salida para un SIEM (p. ej. Wazuh, aún sin integrar): una línea JSON por evento relevante.
 RUTA_EVENTOS = RUTA_DB.parent / "eventos.jsonl"
 PARTIDA = None  # id de la partida actual; lo fija server/app.py al arrancar
