@@ -549,3 +549,14 @@ body.escritorio .ventana #buzon-cerrar { display: none; }
   border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: girar .8s linear infinite;
 }
 @keyframes girar { to { transform: rotate(360deg); } }
+
+/* ---------- jerarquía: la ventana activa se distingue sin mirar la barra de tareas ---------- */
+.ventana { box-shadow: 0 6px 18px rgba(0, 0, 0, .35); }
+.ventana .ventana-titulo { color: var(--texto-sec); }
+.ventana.activa {
+  border-color: var(--def);
+  box-shadow: 0 0 0 1px var(--def), 0 16px 40px rgba(0, 0, 0, .6), 0 0 22px rgba(76, 201, 232, .18);
+}
+.ventana.activa .ventana-barra { background: #22344d; box-shadow: inset 3px 0 0 var(--def); }
+.ventana.activa .ventana-titulo { color: var(--texto); }
+.ventana.maximizada.activa { box-shadow: inset 0 0 0 1px var(--def); }
