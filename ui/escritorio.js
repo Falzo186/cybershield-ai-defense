@@ -208,6 +208,37 @@
       v.y = Math.max(0, Math.min(v.y, L.h - 40));
     }
 
+    // ---------- microinteracciones (solo presentación) ----------
+    // El estado (abierta/minimizada, barra de tareas) cambia al instante; la animación es solo visual: al entrar,
+    // fundido + escala; al salir, se oculta al terminar la transición. Con «reducir movimiento», sin animación.
+    const DURACION = 170;
+    const sinMovimiento = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function animarEntrada(v) {
+      const m = v.marco;
+      clearTimeout(v.tSalida);
+      v.tSalida = null;
+      m.classList.remove("sale", "sale-min");
+      if (sinMovimiento()) return;
+      m.classList.add("entra");
+      void m.offsetWidth; // fija el estado inicial antes de quitar la clase y disparar la transición
+      m.classList.remove("entra");
+    }
+
+    function ocultarAnimado(v, clase) {
+      clearTimeout(v.tSalida);
+      if (sinMovimiento()) { aplicar(v); return; }
+      v.marco.classList.add(clase);
+      v.tSalida = setTimeout(() => { v.tSalida = null; v.marco.classList.remove(clase); aplicar(v); }, DURACION);
+    }
+
+    function animarGeometria(v) {
+      if (sinMovimiento()) return;
+      clearTimeout(v.tGeom);
+      v.marco.classList.add("geom");
+      v.tGeom = setTimeout(() => v.marco.classList.remove("geom"), DURACION + 60);
+    }
+
     // Ventana activa = la de más arriba que no esté minimizada.
     const activa = () => [...orden].reverse().map((id) => ventanas.find((x) => x.def.id === id))
       .find((w) => w && w.abierta && !w.minimizada);
@@ -228,13 +259,14 @@
 
     function minimizarVentana(v) {
       v.minimizada = true; // sigue abierta: baja a la barra de tareas con su posición, tamaño y contenido
-      aplicar(v);
+      ocultarAnimado(v, "sale-min");
       reordenar();
       guardar();
     }
 
     function alternarMaximizar(v) {
       v.maximizada = !v.maximizada; // restaurar = volver a x/y/w/h, que no se tocaron al maximizar
+      animarGeometria(v);
       aplicar(v);
       alFrente(v);
       guardar();
@@ -242,12 +274,13 @@
 
     // Botón de la barra de tareas: restaura si está minimizada; si ya es la activa, la minimiza; si no, al frente.
     function alternarDesdeBarra(v) {
-      if (v.minimizada) { v.minimizada = false; aplicar(v); alFrente(v); guardar(); }
+      if (v.minimizada) { v.minimizada = false; aplicar(v); animarEntrada(v); alFrente(v); guardar(); }
       else if (activa() === v) minimizarVentana(v);
       else alFrente(v);
     }
 
     function abrirVentana(v) {
+      const estabaOculta = !v.abierta || v.minimizada || v.marco.hidden;
       if (v.minimizada) { v.minimizada = false; aplicar(v); }
       if (!v.abierta) {
         v.abierta = true;
@@ -260,6 +293,9 @@
         encajar(v);
         aplicar(v);
       }
+      if (v.tSalida) aplicar(v); // se reabre mientras se cerraba: que no la oculte el temporizador pendiente
+      if (estabaOculta || v.tSalida) animarEntrada(v); // ya visible: la transición arranca desde aquí
+      v.tSalida = null;
       alFrente(v);
       guardar();
     }
@@ -268,7 +304,7 @@
       v.abierta = false;
       v.minimizada = false;
       v.maximizada = false;
-      aplicar(v);
+      ocultarAnimado(v, "sale");
       orden = orden.filter((id) => id !== v.def.id);
       pintarTareas();
       guardar();
