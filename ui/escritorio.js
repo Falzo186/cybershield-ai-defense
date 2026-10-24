@@ -120,7 +120,8 @@
     let guardado = {};
     try { guardado = JSON.parse(LS.get(CLAVE) || "{}") || {}; } catch (_) { guardado = {}; }
     const guardar = () => LS.set(CLAVE, JSON.stringify(Object.fromEntries(
-      ventanas.map((v) => [v.def.id, { abierta: v.abierta, x: v.x, y: v.y, w: v.w, h: v.h }]))));
+      ventanas.map((v) => [v.def.id, { abierta: v.abierta, minimizada: v.minimizada, maximizada: v.maximizada,
+        x: v.x, y: v.y, w: v.w, h: v.h }]))));
 
     // ---------- ventanas ----------
     const ventanas = [];
@@ -139,12 +140,22 @@
       const titulo = document.createElement("span");
       titulo.className = "ventana-titulo";
       titulo.textContent = def.icono + " " + def.titulo;
-      const cerrar = document.createElement("button");
-      cerrar.type = "button";
-      cerrar.className = "ventana-cerrar";
-      cerrar.textContent = "✕";
-      cerrar.setAttribute("aria-label", "Cerrar " + def.titulo);
-      cab.append(titulo, cerrar);
+      const boton = (cls, texto, etiqueta) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "ventana-btn " + cls;
+        b.textContent = texto;
+        b.setAttribute("aria-label", etiqueta + " " + def.titulo);
+        b.title = etiqueta;
+        return b;
+      };
+      const minimizar = boton("ventana-minimizar", "–", "Minimizar");
+      const maximizar = boton("ventana-maximizar", "□", "Maximizar");
+      const cerrar = boton("ventana-cerrar", "✕", "Cerrar");
+      const botones = document.createElement("span");
+      botones.className = "ventana-botones";
+      botones.append(minimizar, maximizar, cerrar);
+      cab.append(titulo, botones);
       const cuerpo = document.createElement("div");
       cuerpo.className = "ventana-cuerpo";
       cuerpo.append(seccion); // la MISMA sección: ids, listeners y estado intactos
@@ -152,15 +163,20 @@
       capa.append(marco);
 
       const [w0, h0] = def.tam || [420, 320];
-      const v = { def, marco, abierta: false, x: 0, y: 0, w: w0, h: h0, nueva: true };
+      // x/y/w/h = posición y tamaño "normales"; maximizada solo cambia cómo se pinta (al restaurar vuelve a ellos).
+      const v = { def, marco, btnMax: maximizar, abierta: false, minimizada: false, maximizada: false,
+        x: 0, y: 0, w: w0, h: h0, nueva: true };
       cerrar.addEventListener("click", () => cerrarVentana(v));
+      minimizar.addEventListener("click", () => minimizarVentana(v));
+      maximizar.addEventListener("click", () => alternarMaximizar(v));
+      cab.addEventListener("dblclick", (ev) => { if (!ev.target.closest("button")) alternarMaximizar(v); });
       marco.addEventListener("pointerdown", () => alFrente(v), true);
       arrastrable(v, cab);
       // Redimensionar con el control nativo (CSS resize): se guarda el tamaño al terminar.
       if ("ResizeObserver" in window) {
         let t = null;
         new ResizeObserver(() => {
-          if (!v.abierta) return;
+          if (!v.abierta || v.minimizada || v.maximizada) return; // maximizada: no pisar el tamaño normal
           clearTimeout(t);
           t = setTimeout(() => { v.w = marco.offsetWidth; v.h = marco.offsetHeight; guardar(); }, 250);
         }).observe(marco);
@@ -170,11 +186,16 @@
 
     function aplicar(v) {
       const m = v.marco;
-      m.style.left = v.x + "px";
-      m.style.top = v.y + "px";
-      m.style.width = v.w + "px";
-      m.style.height = v.h + "px";
-      m.hidden = !v.abierta;
+      const L = v.maximizada ? limites() : null;
+      m.style.left = (L ? 0 : v.x) + "px";
+      m.style.top = (L ? 0 : v.y) + "px";
+      m.style.width = (L ? L.w : v.w) + "px";
+      m.style.height = (L ? L.h : v.h) + "px";
+      m.classList.toggle("maximizada", v.maximizada);
+      v.btnMax.textContent = v.maximizada ? "❐" : "□";
+      v.btnMax.title = v.maximizada ? "Restaurar" : "Maximizar";
+      v.btnMax.setAttribute("aria-label", (v.maximizada ? "Restaurar " : "Maximizar ") + v.def.titulo);
+      m.hidden = !v.abierta || v.minimizada;
     }
 
     function limites() { return { w: capa.clientWidth, h: capa.clientHeight }; }
@@ -187,16 +208,47 @@
       v.y = Math.max(0, Math.min(v.y, L.h - 40));
     }
 
-    function alFrente(v) {
-      orden = orden.filter((id) => id !== v.def.id).concat(v.def.id);
+    // Ventana activa = la de más arriba que no esté minimizada.
+    const activa = () => [...orden].reverse().map((id) => ventanas.find((x) => x.def.id === id))
+      .find((w) => w && w.abierta && !w.minimizada);
+
+    function reordenar() {
+      const top = activa();
       orden.forEach((id, i) => {
         const w = ventanas.find((x) => x.def.id === id);
-        if (w) { w.marco.style.zIndex = String(Z_BASE + i); w.marco.classList.toggle("activa", i === orden.length - 1); }
+        if (w) { w.marco.style.zIndex = String(Z_BASE + i); w.marco.classList.toggle("activa", w === top); }
       });
       pintarTareas();
     }
 
+    function alFrente(v) {
+      orden = orden.filter((id) => id !== v.def.id).concat(v.def.id);
+      reordenar();
+    }
+
+    function minimizarVentana(v) {
+      v.minimizada = true; // sigue abierta: baja a la barra de tareas con su posición, tamaño y contenido
+      aplicar(v);
+      reordenar();
+      guardar();
+    }
+
+    function alternarMaximizar(v) {
+      v.maximizada = !v.maximizada; // restaurar = volver a x/y/w/h, que no se tocaron al maximizar
+      aplicar(v);
+      alFrente(v);
+      guardar();
+    }
+
+    // Botón de la barra de tareas: restaura si está minimizada; si ya es la activa, la minimiza; si no, al frente.
+    function alternarDesdeBarra(v) {
+      if (v.minimizada) { v.minimizada = false; aplicar(v); alFrente(v); guardar(); }
+      else if (activa() === v) minimizarVentana(v);
+      else alFrente(v);
+    }
+
     function abrirVentana(v) {
+      if (v.minimizada) { v.minimizada = false; aplicar(v); }
       if (!v.abierta) {
         v.abierta = true;
         if (v.nueva) { // primera vez sin posición guardada: centrada
@@ -214,6 +266,8 @@
 
     function cerrarVentana(v) {
       v.abierta = false;
+      v.minimizada = false;
+      v.maximizada = false;
       aplicar(v);
       orden = orden.filter((id) => id !== v.def.id);
       pintarTareas();
@@ -223,7 +277,7 @@
     function arrastrable(v, asa) {
       let ini = null;
       asa.addEventListener("pointerdown", (ev) => {
-        if (ev.button !== 0 || ev.target.closest("button")) return;
+        if (ev.button !== 0 || ev.target.closest("button") || v.maximizada) return; // maximizada: no se arrastra
         ini = { px: ev.clientX, py: ev.clientY, x: v.x, y: v.y };
         asa.setPointerCapture(ev.pointerId);
         v.marco.classList.add("arrastrando");
@@ -250,7 +304,7 @@
       asa.addEventListener("keydown", (ev) => {
         const paso = ev.shiftKey ? 40 : 10;
         const d = { ArrowLeft: [-paso, 0], ArrowRight: [paso, 0], ArrowUp: [0, -paso], ArrowDown: [0, paso] }[ev.key];
-        if (!d) return;
+        if (!d || v.maximizada) return;
         ev.preventDefault();
         v.x += d[0];
         v.y += d[1];
@@ -265,6 +319,7 @@
       const L = limites();
       ventanas.filter((v) => !v.abierta).forEach(aplicar); // las cerradas, ocultas (si no, quedan sin tamaño)
       const abiertas = ventanas.filter((v) => v.abierta && !v.def.flotante); // el buzón no entra en el mosaico
+      abiertas.forEach((v) => { v.minimizada = false; v.maximizada = false; }); // organizar = todas a la vista
       const abajo = abiertas.filter((v) => v.def.id === "auditoria");
       const arriba = abiertas.filter((v) => v.def.id !== "auditoria");
       const altoAbajo = abajo.length ? Math.round(L.h * 0.3) : 0;
@@ -310,12 +365,16 @@
 
     function pintarTareas() {
       tareas.replaceChildren();
+      const top = activa();
       ventanas.filter((v) => v.abierta).forEach((v) => {
         const b = document.createElement("button");
         b.type = "button";
-        b.className = "esc-tarea" + (orden[orden.length - 1] === v.def.id ? " activa" : "");
+        b.className = "esc-tarea" + (v === top ? " activa" : "") + (v.minimizada ? " minimizada" : "");
+        b.dataset.tarea = v.def.id;
         b.textContent = v.def.icono + " " + v.def.titulo;
-        b.addEventListener("click", () => abrirVentana(v));
+        b.title = v.minimizada ? "Restaurar" : v === top ? "Minimizar" : "Traer al frente";
+        b.setAttribute("aria-pressed", String(!v.minimizada));
+        b.addEventListener("click", () => alternarDesdeBarra(v));
         tareas.append(b);
       });
     }
@@ -341,9 +400,10 @@
     ventanas.forEach((v) => {
       const g = guardado[v.def.id];
       if (g) {
-        Object.assign(v, { abierta: !!g.abierta, x: +g.x || 0, y: +g.y || 0, w: +g.w || v.w, h: +g.h || v.h, nueva: false });
+        Object.assign(v, { abierta: !!g.abierta, minimizada: !!g.minimizada, maximizada: !!g.maximizada,
+          x: +g.x || 0, y: +g.y || 0, w: +g.w || v.w, h: +g.h || v.h, nueva: false });
       } else v.abierta = v.def.abierta.includes(rol);
-      if (v.def.efimera) v.abierta = false; // el buzón solo se abre con su acceso (que carga los datos)
+      if (v.def.efimera) Object.assign(v, { abierta: false, minimizada: false, maximizada: false }); // solo con su acceso
     });
     if (hayGuardado) ventanas.forEach((v) => { if (v.abierta) encajar(v); aplicar(v); });
     else mosaico();
@@ -352,7 +412,7 @@
     organizar.addEventListener("click", mosaico);
     window.addEventListener("resize", () => {
       if (window.innerWidth < ANCHO_MINIMO) return; // se respeta al recargar
-      ventanas.forEach((v) => { if (v.abierta) { encajar(v); aplicar(v); } });
+      ventanas.forEach((v) => { if (v.abierta) { encajar(v); aplicar(v); } }); // las maximizadas se reajustan
     });
     tic();
     setInterval(tic, 15000);

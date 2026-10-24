@@ -459,11 +459,15 @@ body.escritorio main.mid { display: none; }
 }
 .ventana-barra:focus-visible { outline: 2px solid var(--def); outline-offset: -2px; }
 .ventana-titulo { font: 600 12px var(--sans); letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ventana-cerrar {
+.ventana-botones { display: inline-flex; gap: 2px; flex-shrink: 0; }
+.ventana-btn {
   background: transparent; border: 1px solid transparent; color: var(--texto-sec); border-radius: 4px;
-  width: 26px; height: 22px; cursor: pointer; font-size: 12px;
+  width: 26px; height: 22px; cursor: pointer; font-size: 12px; line-height: 1;
 }
-.ventana-cerrar:hover, .ventana-cerrar:focus-visible { color: var(--texto); border-color: var(--bad); background: rgba(255, 100, 100, .12); }
+.ventana-btn:hover, .ventana-btn:focus-visible { color: var(--texto); border-color: var(--borde); background: rgba(255, 255, 255, .06); }
+.ventana-cerrar:hover, .ventana-cerrar:focus-visible { border-color: var(--bad); background: rgba(255, 100, 100, .12); }
+.ventana.maximizada { border-radius: 0; resize: none; box-shadow: none; }
+.ventana.maximizada .ventana-barra { cursor: default; }
 .ventana-cuerpo { flex: 1; min-height: 0; display: flex; }
 body.escritorio .ventana-cuerpo > .panel {
   flex: 1; min-width: 0; min-height: 0; overflow: auto; border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0;
@@ -480,6 +484,7 @@ body.escritorio .ventana-cuerpo > .aud { overflow: hidden; }
   background: var(--panel2); color: var(--texto-sec); cursor: pointer; white-space: nowrap;
 }
 .esc-tarea.activa { color: var(--texto); border-color: var(--def); }
+.esc-tarea.minimizada { opacity: .65; border-style: dashed; }
 .esc-reloj { color: var(--texto-sec); font-size: 12px; min-width: 40px; text-align: right; }
 
 /* Buzón alojado en una ventana del escritorio: la misma tarjeta, sin aspecto de modal (se cierra con el ✕ de la ventana). */
