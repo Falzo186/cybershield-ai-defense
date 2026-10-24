@@ -521,3 +521,23 @@ body.escritorio .ventana #buzon-cerrar { display: none; }
   .hdr-grupo + .hdr-grupo { margin-left: 0; padding-left: 0; border-left: 0; }
   .hdr-top { gap: 8px; }
 }
+
+/* ---------- ventanas en pantallas bajas (≤ 860 px, p. ej. 1366×768): contenido más compacto para evitar scroll ---------- */
+@media (max-height: 860px) {
+  body.escritorio .ventana-cuerpo > .panel { padding: 8px 10px; }
+  body.escritorio .ventana h2 { margin-bottom: 6px; }
+  body.escritorio .ronda-num { font-size: 32px; }
+  body.escritorio .pipeline { margin: 6px 0 8px; }
+  body.escritorio .nodo { padding: 2px 8px; margin-bottom: 5px; font-size: 13px; }
+  body.escritorio .nodo:not(:last-child)::after { height: 5px; }
+  body.escritorio .nodo-ico { font-size: 14px; }
+  body.escritorio .veredicto { padding: 6px; font-size: 15px; }
+  body.escritorio .hist-head h3 { margin: 8px 0 4px; }
+  body.escritorio .gauge-wrap { max-width: 190px; }
+  body.escritorio .det { gap: 3px 10px; font-size: 12px; margin-top: 6px; }
+  body.escritorio .box { min-height: 56px; padding: 8px; }
+  body.escritorio .counters { gap: 6px; margin-top: 8px; }
+  body.escritorio .cnt { padding: 4px; }
+  body.escritorio .cnt b { font-size: 18px; }
+  body.escritorio .kv { margin-bottom: 5px; }
+}

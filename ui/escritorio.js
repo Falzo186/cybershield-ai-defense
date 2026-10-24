@@ -314,33 +314,61 @@
       });
     }
 
-    // Mosaico por defecto según la vista: paneles principales arriba, auditoría abajo a lo ancho.
+    // Alto que necesita el contenido de una ventana con el ancho que tiene ahora (sin scroll interno).
+    function altoNatural(v) {
+      const m = v.marco;
+      const previo = m.style.height;
+      m.style.height = "auto";
+      const h = m.offsetHeight;
+      m.style.height = previo;
+      return h;
+    }
+
+    // Mosaico por defecto según la vista y el CONTENIDO real de cada panel (medido, no proporciones fijas):
+    // - paneles principales en fila y auditoría debajo, si caben enteros dejando a la auditoría su mínimo;
+    // - si no caben (pantallas bajas), la auditoría se apila bajo el panel que menos alto necesita y los demás
+    //   usan todo el alto; si ni así, fila con el alto disponible (el scroll interno es entonces inevitable).
+    const AUDITORIA_MIN = 100;
     function mosaico() {
       const L = limites();
       ventanas.filter((v) => !v.abierta).forEach(aplicar); // las cerradas, ocultas (si no, quedan sin tamaño)
       const abiertas = ventanas.filter((v) => v.abierta && !v.def.flotante); // el buzón no entra en el mosaico
       abiertas.forEach((v) => { v.minimizada = false; v.maximizada = false; }); // organizar = todas a la vista
-      const abajo = abiertas.filter((v) => v.def.id === "auditoria");
-      const arriba = abiertas.filter((v) => v.def.id !== "auditoria");
-      const altoAbajo = abajo.length ? Math.round(L.h * 0.3) : 0;
-      const altoArriba = L.h - altoAbajo - MARGEN * (abajo.length ? 3 : 2);
+      const aud = abiertas.find((v) => v.def.id === "auditoria");
+      const arriba = abiertas.filter((v) => v !== aud);
+      const util = L.h - 2 * MARGEN;
       // Peso de cada panel en el ancho: el panel "propio" del equipo, más ancho.
       const peso = (id) => (id === "atacante" && rol === "rojo") || (id === "defensor" && rol === "azul") ? 1.4
         : id === "control" ? 1.2 : 1;
       const total = arriba.reduce((s, v) => s + peso(v.def.id), 0) || 1;
+      const anchoUtil = (arriba.length ? L.w : 0) - MARGEN * (arriba.length + 1);
       let x = MARGEN;
-      const anchoUtil = L.w - MARGEN * (arriba.length + 1);
       arriba.forEach((v) => {
-        v.x = x; v.y = MARGEN;
-        v.w = Math.round(anchoUtil * peso(v.def.id) / total);
-        v.h = altoArriba;
+        v.x = x; v.y = MARGEN; v.w = Math.round(anchoUtil * peso(v.def.id) / total); v.h = util;
         x += v.w + MARGEN;
         aplicar(v);
       });
-      abajo.forEach((v) => {
-        v.x = MARGEN; v.y = L.h - altoAbajo - MARGEN; v.w = L.w - 2 * MARGEN; v.h = altoAbajo;
-        aplicar(v);
-      });
+      const nat = new Map(arriba.map((v) => [v, altoNatural(v)])); // con el ancho ya asignado
+      const maxNat = Math.max(0, ...nat.values());
+      if (!aud) { guardar(); return; }
+      if (!arriba.length || maxNat + MARGEN + AUDITORIA_MIN <= util) {
+        const alto = arriba.length ? maxNat : 0;
+        arriba.forEach((v) => { v.h = alto; aplicar(v); });
+        Object.assign(aud, { x: MARGEN, y: MARGEN + (alto ? alto + MARGEN : 0), w: L.w - 2 * MARGEN,
+          h: util - (alto ? alto + MARGEN : 0) });
+      } else {
+        const bajo = arriba.reduce((a, b) => (nat.get(b) < nat.get(a) ? b : a));
+        if (nat.get(bajo) + MARGEN + AUDITORIA_MIN <= util) {
+          bajo.h = nat.get(bajo);
+          aplicar(bajo);
+          Object.assign(aud, { x: bajo.x, y: MARGEN + bajo.h + MARGEN, w: bajo.w, h: util - bajo.h - MARGEN });
+        } else {
+          const alto = util - MARGEN - AUDITORIA_MIN;
+          arriba.forEach((v) => { v.h = alto; aplicar(v); });
+          Object.assign(aud, { x: MARGEN, y: MARGEN + alto + MARGEN, w: L.w - 2 * MARGEN, h: AUDITORIA_MIN });
+        }
+      }
+      aplicar(aud);
       guardar();
     }
 
