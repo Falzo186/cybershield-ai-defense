@@ -183,3 +183,14 @@
 - Decisiones: vista clásica intacta como respaldo (enlace en la cabecera o ?vista=clasica) y obligatoria por debajo de 760 px; si la página carga estrecha, el escritorio se activa al ensancharse.
 - Decisiones: qwen3 fallaba porque Ollama 0.40 devuelve el razonamiento en message.thinking y agotaba num_predict (content vacío); think:false lo evita y los modelos sin razonamiento lo ignoran.
 - Pendiente / siguiente paso: minimizar/maximizar, varias ventanas del mismo panel, y llevar el buzón a ventana propia en vez de modal.
+
+## Fase cierre-exposición - Buzón en ventana, minimizar/maximizar, prueba E2E y guion
+- Qué se hizo: el buzón pasa a ser una ventana del escritorio; minimizar y maximizar en todas las ventanas; prueba de extremo a extremo con Playwright que juega una partida completa con capturas; correcciones de lo que encontró; README con resultados reales y guion de la demo.
+- Archivos: ui/{escritorio.js,render.js,app.js,styles.css}; src/lab/repositorio.py (CS_LAB_DB); e2e/demo_partida.py (nuevo); docs/capturas_demo/ (16 capturas + RESUMEN.md); docs/GUION_DEMO.md (nuevo); README.md
+- Decisiones: el buzón reutiliza la MISMA tarjeta del modal; render.js delega abrir/cerrar en la ventana con R.alojarBuzon (sin escritorio, el modal sigue igual). Se abre con su acceso (que carga los datos) y no se reabre sola al recargar; Esc ya no la cierra (solo el ✕).
+- Decisiones: maximizar no toca x/y/w/h (solo cómo se pinta), así restaurar vuelve exactamente al tamaño anterior; una ventana maximizada no se arrastra ni se redimensiona; minimizar mantiene la ventana abierta en la barra de tareas.
+- Decisiones: la E2E arranca su propio servidor con una BD temporal (variable CS_LAB_DB) para no tocar data/; capturas en JPEG para no inflar el repo (~1,6 MB); el 409 de Rojo tras finalizar se clasifica como esperado.
+- Resultado real de la E2E (24/10/2026): 38/38 comprobaciones en 13 s; Rojo 0 — Azul 35; riesgo 0 → 15 → 5 → 0.
+- Corregido por la E2E: 403 innecesario del espectador (/api/metricas sin token); aviso que decía "riesgo −10" con el riesgo ya en 0 (ahora muestra el riesgo resultante); falta de la marca "PDF REPORTADO" en la lista del buzón.
+- Limitaciones conocidas (no se tocaron por falta de tiempo para volver a probarlas bien): los avisos de éxito usan el mismo estilo (borde rojo) que los de error; conviven dos marcadores en la cabecera (el de la batalla IA vs IA "0 — 0" y el de la partida Rojo/Azul); una pestaña que pierde su token no puede recuperarlo sin reiniciar la partida.
+- Pendiente / siguiente paso: medir la batalla IA vs IA con modelos reales para la tabla de hallazgos; integrar Wazuh con data/eventos.jsonl.

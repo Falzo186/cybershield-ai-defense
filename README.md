@@ -81,9 +81,35 @@ La interfaz muestra siempre el origen de los datos (🟡 MOCK / 🟢 OLLAMA) y n
 
 - **Prototipo inicial (solo system prompt + filtros, 26 batallas parciales):** sin defensas el atacante ganó 4/10 (40 %); con solo el prompt de guardia, 2/10 (20 %); con filtro de salida, 0/6. La técnica más efectiva fue la **urgencia emocional** (5 de 6 victorias).
 - **Modelos pequeños y JSON:** en una prueba corta (2 rondas) `llama3.2:3b` como defensor no produjo JSON parseable en ninguna ronda; esas rondas se registran como ERROR y no cuentan como defensa.
-- **TODO:** tasa de defensa por modelo → `<pegar tabla: modelo defensor | rondas | defensa exitosa | IA engañada | victoria del atacante>`
-- **TODO:** efecto de la intensidad del atacante (1-3) → `<pegar resultados>`
-- **TODO:** defensa en profundidad: de N rondas en las que la IA fue engañada, las capas contuvieron M → `<pegar números>`
+- **Modelos "thinking" (`qwen3:4b`, Ollama 0.40):** el defensor y el atacante devolvían respuesta vacía en **6/6**
+  llamadas reales: el razonamiento llega aparte (`message.thinking`) y agotaba el límite de tokens. Enviando
+  `think: false` pasaron a **6/6 respuestas válidas** (defensor 12-27 s, atacante 14-24 s por llamada, en CPU local).
+  En la misma prueba `llama3.2:3b` como defensor dio 3/3 JSON válidos (`python -m src.lab.test_cliente --real <modelo>`).
+- **Pendiente de medir (batalla IA vs IA):** tasa de defensa por modelo, efecto de la intensidad del atacante (1-3) y
+  cuántas rondas con la IA engañada contuvieron las capas. No hay datos reales todavía; no se rellenan con estimaciones.
+
+### Partida Red Team vs Blue Team de extremo a extremo (prueba automatizada)
+
+`python e2e/demo_partida.py` juega una partida completa con 4 navegadores (General, Rojo, Azul, Espectador) sobre
+un servidor y una BD temporales. Ejecución del 24/10/2026: **38/38 comprobaciones correctas en 13 s**; capturas y
+detalle en [`docs/capturas_demo/RESUMEN.md`](docs/capturas_demo/RESUMEN.md).
+
+| Paso | Riesgo de la partida | Rojo | Azul | Misión completada |
+|---|---|---|---|---|
+| Rojo envía 3 correos (2 con PDF) | 0 | 0 | 0 | — |
+| Un empleado abre el enlace de un correo | **15** | 10 | 0 | — |
+| Azul reporta otro correo | 5 | 10 | 10 | Reportar un correo sospechoso |
+| Azul contiene el enlace clicado | 0 | **0** | 25 | Contener un enlace clicado |
+| Azul abre el PDF de nómina | 0 | 5 | 35 | Revisar un documento recibido |
+| Azul reporta ese PDF | 0 | **0** | 35 | — |
+| General finaliza | — | **0** | **35** | Gana Azul |
+
+- El marcador de **General y Espectador coincidió** en cada paso (SSE), y `eventos.jsonl` registró `clic_enlace`,
+  `enlace_contenido`, `correo_reportado`, `pdf_abierto`, `pdf_reportado`, 3 × `mision_completada` y `partida_finalizada`.
+- **Hallazgo de diseño:** el riesgo no baja de 0, así que el orden importa: la contención (−15) después del reporte
+  (−10) dejó el riesgo en 0 sin "descontar" los 5 restantes. Es intencional (sin saldo a favor) pero conviene explicarlo.
+- La prueba encontró y se corrigieron: un **403** innecesario en la vista de espectador, un aviso que mostraba
+  "riesgo −10" cuando el riesgo ya estaba en 0, y que la lista del buzón no marcaba los PDFs reportados.
 
 ## Instalación rápida
 
@@ -126,11 +152,14 @@ Pruebas offline (sin Ollama): `python -m src.lab.test_lab` y `python -m src.lab.
 La interfaz arranca como un **escritorio**: iconos a la izquierda, los paneles (IA Atacante, Centro de control,
 IA Defensora, Auditoría) en **ventanas arrastrables y redimensionables** y una barra de tareas abajo con las
 ventanas abiertas, el botón *▦ Organizar* (vuelve a colocarlas en mosaico) y un reloj. Cada vista abre por
-defecto sus ventanas: Rojo el atacante, Azul el defensor, General y Espectador todas. Hay accesos directos al
-correo/buzón y a las misiones (Rojo/Azul) y a *Finalizar partida* (General).
+defecto sus ventanas: Rojo el atacante, Azul el defensor, General y Espectador todas. El **buzón** (Rojo/Azul) es
+una ventana más, que se abre con su icono 📬 (o 🎯 Misiones en Azul); General tiene el acceso *Finalizar partida*.
 
 - Las ventanas **envuelven los mismos paneles** de siempre (`ui/escritorio.js`): no se duplicó lógica.
-- Posición, tamaño y ventanas abiertas se recuerdan en el navegador, por vista.
+- Cada ventana se puede **minimizar** (–, queda en la barra de tareas sin cerrarse), **maximizar** (□ o doble clic
+  en su barra; otro clic la devuelve a su tamaño) y cerrar (✕). En la barra de tareas, un clic restaura una ventana
+  minimizada o minimiza la activa.
+- Posición, tamaño y ventanas abiertas/minimizadas/maximizadas se recuerdan en el navegador, por vista.
 - Con la barra de una ventana enfocada, las **flechas** la mueven (Shift = pasos largos).
 - *☰ Vista clásica* en la cabecera vuelve al diseño anterior (también `?vista=clasica`); en pantallas de menos
   de 760 px se usa siempre la vista clásica apilada.
@@ -217,7 +246,10 @@ está listo para leerse con un `<localfile>` y `log_format json` cuando se conec
 4. **General:** sigue el marcador y pulsa *🏁 Finalizar partida* para declarar el resultado.
 
 Pruebas: `python -m src.lab.test_correos`, `test_reglas`, `test_misiones`, `test_documentos`, `test_eventos`,
-`test_puntaje` (con `python -m src.lab.<nombre>`) y `python server/test_app.py` (servidor completo, BD en memoria).
+`test_puntaje`, `test_cliente` (con `python -m src.lab.<nombre>`) y `python server/test_app.py` (servidor completo,
+BD en memoria). La partida completa en navegadores reales: `python e2e/demo_partida.py` (requiere
+`pip install playwright` y `playwright install chromium`; escribe las capturas en `docs/capturas_demo/`).
+Guion para la exposición: [`docs/GUION_DEMO.md`](docs/GUION_DEMO.md).
 
 > Los tokens de equipo evitan que una vista se haga pasar por otra, pero **no son autenticación de usuarios**:
 > el aviso del Modo LAN sigue vigente (solo red local de confianza).
