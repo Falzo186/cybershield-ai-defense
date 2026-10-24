@@ -1,8 +1,8 @@
 # Prueba de extremo a extremo — partida Rojo vs Azul
 
-Generado por `e2e/demo_partida.py` el 2026-10-24T05:55:59-06:00 en 13 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
+Generado por `e2e/demo_partida.py` el 2026-10-24T05:58:02-06:00 en 13 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
 
-**Resultado: 35/35 comprobaciones correctas.**
+**Resultado: 38/38 comprobaciones correctas.**
 
 ## 1. Arranque: General abre la partida; Rojo y Azul reclaman sus tokens; entra un espectador
 
@@ -46,7 +46,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-24T05:55:59-06:00 en 13 s, con un 
 
 ## 3c. Azul reporta el correo de soporte técnico
 
-- Aviso: ✓ Correo reportado · riesgo -10 · misión completada: «Reportar un correo sospechoso» +10 pts
+- Aviso: ✓ Correo reportado · regla -10 → riesgo de la partida 5/100 · misión completada: «Reportar un correo sospechoso» +10 pts
 - ✅ misión «Reportar un correo sospechoso» completada: esperado `True`, observado `True`
 - ✅ riesgo baja −10: esperado `5`, observado `5`
 - ✅ Azul suma 10: esperado `10`, observado `10`
@@ -54,7 +54,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-24T05:55:59-06:00 en 13 s, con un 
 
 ## 3d. Azul contiene el enlace clicado
 
-- Aviso: ✓ Enlace contenido · riesgo -15 · misión completada: «Contener un enlace clicado» +15 pts
+- Aviso: ✓ Enlace contenido · regla -15 → riesgo de la partida 0/100 · misión completada: «Contener un enlace clicado» +15 pts
 - ✅ aparece el botón Contener (el enlace tuvo clic): esperado `True`, observado `True`
 - ✅ riesgo baja (5 − 15, acotado a 0): esperado `0`, observado `0`
 - ✅ Rojo pierde los 10 del enlace: esperado `0`, observado `0`
@@ -64,13 +64,15 @@ Generado por `e2e/demo_partida.py` el 2026-10-24T05:55:59-06:00 en 13 s, con un 
 
 ## 3e. Azul abre el PDF de nómina y luego lo reporta
 
-- Aviso: ✓ PDF reportado · riesgo -10
+- Aviso: ✓ PDF reportado · regla -10 → riesgo de la partida 0/100
 - ✅ se descarga el PDF fijo: esperado `recibo_nomina.pdf`, observado `recibo_nomina.pdf`
 - ✅ es un PDF de verdad: esperado `True`, observado `True`
 - ✅ Rojo gana +5 (PDF abierto sin reportar): esperado `5`, observado `5`
 - ✅ Azul suma 10 (misión del documento) = 35: esperado `35`, observado `35`
 - ✅ Rojo pierde los 5 del PDF: esperado `0`, observado `0`
 - ✅ riesgo sigue en 0 (no baja de 0): esperado `0`, observado `0`
+- ✅ el aviso dice el riesgo real de la partida, no solo el −10 de la regla: esperado `True`, observado `True`
+- ✅ la lista del buzón marca el PDF como reportado: esperado `1`, observado `1`
 
 ![09_general_pdf_abierto.jpg](09_general_pdf_abierto.jpg)
 ![10_azul_reporta_pdf.jpg](10_azul_reporta_pdf.jpg)
@@ -94,6 +96,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-24T05:55:59-06:00 en 13 s, con un 
 - ✅ puntajes finales (Rojo — Azul): esperado `('0', '35')`, observado `('0', '35')`
 - ✅ el Espectador también ve el resultado: esperado `True`, observado `True`
 - ✅ tras finalizar, Rojo ya no puede enviar (409): esperado `True`, observado `True`
+- ✅ sin errores de consola inesperados en ninguna vista: esperado `[]`, observado `[]`
 
 ![14_general_resultado.jpg](14_general_resultado.jpg)
 ![15_espectador_resultado.jpg](15_espectador_resultado.jpg)
@@ -111,5 +114,5 @@ Generado por `e2e/demo_partida.py` el 2026-10-24T05:55:59-06:00 en 13 s, con un 
 
 ## Comportamientos inesperados
 
-- Error de consola (espectador, paso 1): `Failed to load resource: the server responded with a status of 403 (Forbidden)`
 - (esperado) Error de consola (rojo, paso 9): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es el envío rechazado a propósito tras finalizar
+- Ninguno: todas las comprobaciones pasaron y no hubo errores de consola inesperados.

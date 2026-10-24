@@ -201,15 +201,20 @@
       abrirPdf: () => accionPdf("pdf_abierto", c.id), reportarPdf: () => accionPdf("pdf_reportado", c.id) });
   }
 
+  // Texto del aviso tras una regla: el cambio de la regla Y el riesgo resultante de la partida (que no baja de 0,
+  // así que "−10" con la partida ya en 0 no se lee como una bajada que no ocurrió) + misiones completadas.
+  function textoRegla(g) {
+    const riesgo = g.riesgo ? " · regla " + (g.riesgo > 0 ? "+" : "") + g.riesgo +
+      (typeof g.riesgo_acumulado === "number" ? " → riesgo de la partida " + Math.round(g.riesgo_acumulado) + "/100" : "") : "";
+    const misiones = (g.misiones_completadas || []).map((m) => "«" + m.titulo + "» +" + m.puntos + " pts");
+    return riesgo + (misiones.length ? " · misión completada: " + misiones.join(", ") : "");
+  }
+
   // Reportar / contener: el servidor aplica la regla fija y avisa qué cambió (riesgo y misiones completadas).
   async function accionCorreo(tipo, id) {
     try {
       const r = await (tipo === "reportar" ? API.reportarCorreo(id) : API.contenerCorreo(id));
-      const g = r.regla || {};
-      const misiones = (g.misiones_completadas || []).map((m) => "«" + m.titulo + "» +" + m.puntos + " pts");
-      R.toast((tipo === "reportar" ? "✓ Correo reportado" : "✓ Enlace contenido") +
-        (typeof g.riesgo === "number" ? " · riesgo " + (g.riesgo > 0 ? "+" : "") + g.riesgo : "") +
-        (misiones.length ? " · misión completada: " + misiones.join(", ") : ""));
+      R.toast((tipo === "reportar" ? "✓ Correo reportado" : "✓ Enlace contenido") + textoRegla(r.regla || {}));
     } catch (e) { R.toast(e.message); }
     cargarBuzon();
     cargarMisiones();
@@ -219,11 +224,7 @@
   async function accionPdf(tipo, id) {
     try {
       const r = await API.eventoPdf(tipo, id);
-      const g = r.regla || {};
-      const misiones = (g.misiones_completadas || []).map((m) => "«" + m.titulo + "» +" + m.puntos + " pts");
-      R.toast((tipo === "pdf_abierto" ? "📎 PDF abierto (evento registrado)" : "✓ PDF reportado") +
-        (g.riesgo ? " · riesgo " + (g.riesgo > 0 ? "+" : "") + g.riesgo : "") +
-        (misiones.length ? " · misión completada: " + misiones.join(", ") : ""));
+      R.toast((tipo === "pdf_abierto" ? "📎 PDF abierto (evento registrado)" : "✓ PDF reportado") + textoRegla(r.regla || {}));
       if (r.descarga && /^\/pdf\/[a-z_]{1,40}$/.test(r.descarga)) {
         const a = document.createElement("a");
         a.href = r.descarga;
@@ -399,7 +400,8 @@
       const e = await API.estado();
       R.setInfo(e);
       if (e.corriendo !== estado.corriendo && e.modo !== "manual") setCorriendo(!!e.corriendo);
-      aplicarMetricas(await API.metricas());
+      // /api/metricas exige token: el espectador no lo pide (antes producía un 403 en consola en cada conexión)
+      if (API.tieneToken()) aplicarMetricas(await API.metricas());
     } catch (_) { /* el indicador de conexión ya informa */ }
   }
 

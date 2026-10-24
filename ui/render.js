@@ -580,7 +580,8 @@ const R = (() => {
       b.type = "button";
       b.append(el("b", null, c.asunto), el("span", "fecha", fechaCorta(c.ts)), el("span", "de", c.de));
       const marcas = [[c.adjunto, "marca-pdf", "📎 PDF"], [c.clicado && !c.contenido, "marca-clic", "ENLACE CLICADO"],
-        [c.contenido, "marca-contenido", "CONTENIDO"], [c.reportado, "marca-reportado", "REPORTADO"]]
+        [c.contenido, "marca-contenido", "CONTENIDO"], [c.reportado, "marca-reportado", "REPORTADO"],
+        [c.pdf_reportado, "marca-reportado", "PDF REPORTADO"]]
         .filter(([si]) => si);
       if (marcas.length) {
         const m = el("span", "buzon-marcas");

@@ -242,6 +242,11 @@ def main(ver=False):
             v = esperar(lambda: valores(general)["rojo"] == 0 and valores(general)) or valores(general)
             chk("Rojo pierde los 5 del PDF", 0, v["rojo"])
             chk("riesgo sigue en 0 (no baja de 0)", 0, v["riesgo"])
+            chk("el aviso dice el riesgo real de la partida, no solo el −10 de la regla", True,
+                "riesgo de la partida 0/100" in t)
+            esperar(lambda: azul.locator(".buzon-item", has_text="nómina").locator(".marca", has_text="PDF REPORTADO").count())
+            chk("la lista del buzón marca el PDF como reportado", 1,
+                azul.locator(".buzon-item", has_text="nómina").locator(".marca", has_text="PDF REPORTADO").count())
             captura(azul, "azul_reporta_pdf")
 
             # ---------------------------------------------------------------------------------------------
@@ -283,6 +288,8 @@ def main(ver=False):
             t = esperar(lambda: "finalizó" in toast(rojo) and toast(rojo)) or toast(rojo)
             chk("tras finalizar, Rojo ya no puede enviar (409)", True, "finalizó" in t)
             captura(rojo, "rojo_tras_finalizar")
+            inesperados = [f"{r}: {e}" for n, r, e in errores_js if not (n == len(pasos) and r == "rojo" and "409" in e)]
+            chk("sin errores de consola inesperados en ninguna vista", [], inesperados)
 
             nav.close()
     finally:
@@ -325,7 +332,7 @@ def escribir_resumen(duracion, eventos):
     lineas += [f"- (esperado) Error de consola ({r}, paso {n}): `{e}` — es el envío rechazado a propósito tras finalizar"
                for n, r, e in errores_js if esperado(n, r, e)]
     if not fallos and not [x for x in errores_js if not esperado(*x)]:
-        lineas.append("- Ninguno: todas las comprobaciones pasaron y no hubo errores de consola.")
+        lineas.append("- Ninguno: todas las comprobaciones pasaron y no hubo errores de consola inesperados.")
     (SALIDA / "RESUMEN.md").write_text("\n".join(lineas) + "\n", encoding="utf-8")
     print(f"\nResumen: {SALIDA / 'RESUMEN.md'} · {buenos}/{total} comprobaciones")
 
