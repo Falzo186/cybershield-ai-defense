@@ -492,3 +492,14 @@ body.escritorio .ventana-cuerpo > .buzon-card {
   flex: 1; width: auto; max-width: none; max-height: none; margin: 0; border: 0; border-radius: 0; overflow: auto;
 }
 body.escritorio .ventana #buzon-cerrar { display: none; }
+
+/* Aviso de éxito: borde verde (el de error sigue rojo, ver .toast). */
+.toast.toast-ok { border-color: var(--ok); }
+
+/* Dos marcadores en la cabecera: una etiqueta corta sobre cada uno para no confundirlos. */
+.marcador { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.marcador::before, .marcador-partida::before {
+  font: 600 9px var(--sans); letter-spacing: .1em; color: var(--texto-sec); white-space: nowrap;
+}
+.marcador::before { content: "BATALLA IA vs IA"; }
+.marcador-partida::before { content: "PARTIDA ROJO / AZUL"; flex-basis: 100%; }

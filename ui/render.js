@@ -385,9 +385,11 @@ const R = (() => {
     $("def-modelo").textContent = e.modelo_def || "—";
   }
   let toastTimer = null;
+  // Los avisos de éxito de la app empiezan por ✓ (o 📎 al abrir un PDF): se pintan con borde verde; el resto, rojo.
   function toast(msg) {
     const t = $("toast");
     t.textContent = String(msg);
+    t.classList.toggle("toast-ok", /^(✓|📎)/.test(t.textContent));
     t.hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
