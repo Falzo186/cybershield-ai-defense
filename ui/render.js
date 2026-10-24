@@ -127,6 +127,7 @@ const R = (() => {
     const s = $("atq-sens");
     s.className = "sens-" + String(a.sensibilidad_objetivo || "").replace(/[^A-Z]/g, "");
     s.textContent = (SENS_ICONO[a.sensibilidad_objetivo] || "") + " " + (a.sensibilidad_objetivo || "—");
+    box.classList.remove("vacio"); // deja de mostrarse el estado vacío (también durante el tecleo)
     if (reduce()) { box.textContent = texto; return; }
     box.textContent = "";
     let i = 0;
@@ -138,7 +139,8 @@ const R = (() => {
   }
   function limpiarAtaque() {
     clearInterval(tipTimer);
-    $("atq-prompt").textContent = "—";
+    $("atq-prompt").textContent = "";
+    $("atq-prompt").classList.add("vacio"); // estado vacío: texto en data-vacio (index.html), pintado por CSS
     $("atq-meta").textContent = "";
     $("atq-cat").textContent = "Categoría: —";
     $("atq-obj").textContent = "Objetivo: —";

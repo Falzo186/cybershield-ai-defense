@@ -89,7 +89,7 @@
 
       <div id="atq-vista">
         <div class="lbl">PROMPT ACTUAL</div>
-        <pre id="atq-prompt" class="mono box">—</pre>
+        <pre id="atq-prompt" class="mono box vacio" data-vacio="Esperando el inicio de la ronda…"></pre>
         <div id="atq-meta" class="kv mono"></div>
         <div class="chips"><span id="atq-cat" class="chip">Categoría: —</span><span id="atq-obj" class="chip">Objetivo: —</span></div>
         <div class="kv">Sensibilidad del objetivo <b id="atq-sens">—</b></div>
@@ -101,7 +101,7 @@
           <button type="button" class="tog" data-origen="mock" aria-pressed="true">🟡 MOCK</button>
           <button type="button" class="tog" data-origen="real" aria-pressed="false">🟢 REAL (Ollama)</button>
         </div>
-        <div id="term-log" class="mono term-log" role="log" aria-live="polite"></div>
+        <div id="term-log" class="mono term-log" role="log" aria-live="polite" data-vacio="Escribe un prompt abajo y pulsa Enter para probar al defensor."></div>
         <form id="term-form" class="term-form" autocomplete="off">
           <label for="term-input" class="ps1">&gt;</label>
           <input id="term-input" class="mono" type="text" maxlength="2000" spellcheck="false" placeholder="Escribe un prompt y pulsa Enter">
@@ -131,7 +131,7 @@
         <button type="button" id="btn-export" class="btn btn-mini">Exportar historial (JSON)</button>
         <button type="button" id="btn-informe" class="btn btn-mini" disabled title="Disponible al terminar una partida">📄 Exportar informe de sesión</button>
       </div>
-      <ul id="historial" class="historial"></ul>
+      <ul id="historial" class="historial" data-vacio="Aún no hay rondas: inicia una simulación o una batalla."></ul>
     </section>
 
     <section class="panel def" aria-labelledby="t-def">
@@ -177,7 +177,7 @@
       <div id="filtros" class="filtros" role="group" aria-label="Filtrar por agente"></div>
       <span id="aud-pausa" class="muted" hidden>⏸ autoscroll en pausa</span>
     </div>
-    <div id="aud-log" class="mono log" role="log" aria-live="polite" tabindex="0"></div>
+    <div id="aud-log" class="mono log" role="log" aria-live="polite" tabindex="0" data-vacio="Aún no hay eventos registrados."></div>
   </section>
 </div>
 
