@@ -265,6 +265,14 @@
       <label>Destinatario <select id="sel-destinatario" class="sel" aria-label="Destinatario del correo"></select></label>
       <button type="submit" id="btn-correo" class="btn btn-primary">Enviar correo de entrenamiento</button>
     </form>
+    <section id="rojo-enviados" class="rojo-enviados" hidden aria-label="Correos enviados por el Equipo Rojo">
+      <div class="buzon-head">
+        <h3>ENVIADOS · SEGUIMIENTO DE LA CAMPAÑA</h3>
+        <button type="button" id="btn-enviados-refrescar" class="btn btn-mini">↻ Actualizar</button>
+      </div>
+      <p class="muted">Una campaña de phishing real puede medir clics y aperturas de adjuntos, no si se leyó o se reportó.</p>
+      <ul id="rojo-enviados-lista" class="buzon-lista" data-vacio="Aún no has enviado ningún correo en esta partida."></ul>
+    </section>
     <div id="buzon-azul" hidden>
       <div class="tabs buzon-tabs" role="tablist" aria-label="Vista del Equipo Azul">
         <button type="button" role="tab" class="subtab" data-azul="correos" aria-selected="true" aria-controls="azul-correos">CORREOS</button>
@@ -275,7 +283,13 @@
           <span id="buzon-usuario" class="muted"></span>
           <button type="button" id="btn-buzon-refrescar" class="btn btn-mini">↻ Actualizar</button>
         </div>
-        <ul id="buzon-lista" class="buzon-lista" aria-label="Correos recibidos"></ul>
+        <div class="carpetas" role="tablist" aria-label="Carpetas del correo">
+          <button type="button" role="tab" class="carpeta" data-carpeta="entrada" aria-selected="true">📥 Entrada <b data-cuenta="entrada"></b></button>
+          <button type="button" role="tab" class="carpeta" data-carpeta="sospechosos" aria-selected="false">⚠ Sospechosos <b data-cuenta="sospechosos"></b></button>
+          <button type="button" role="tab" class="carpeta" data-carpeta="archivados" aria-selected="false">🗄 Archivados <b data-cuenta="archivados"></b></button>
+          <button type="button" role="tab" class="carpeta" data-carpeta="enviados" aria-selected="false">📤 Enviados <b data-cuenta="enviados"></b></button>
+        </div>
+        <ul id="buzon-lista" class="buzon-lista" aria-label="Correos de la carpeta"></ul>
         <article id="buzon-detalle" class="buzon-detalle" hidden aria-live="polite"></article>
       </div>
       <div id="azul-misiones" role="tabpanel" hidden>
@@ -287,6 +301,18 @@
       </div>
     </div>
     <button type="button" id="buzon-cerrar" class="btn">CERRAR (Esc)</button>
+  </div>
+</div>
+
+<div id="visor-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="visor-t">
+  <div class="modal-card visor-card">
+    <h2 id="visor-t">👁 VISOR SEGURO</h2>
+    <p class="nota">El documento se muestra como texto dentro del laboratorio: no se descarga ni se ejecuta nada en tu equipo.</p>
+    <dl id="visor-meta" class="visor-meta"></dl>
+    <div id="visor-indicadores"></div>
+    <h3>CONTENIDO</h3>
+    <pre id="visor-texto" class="visor-texto mono"></pre>
+    <div class="reto-botones"><button type="button" id="visor-cerrar" class="btn">CERRAR (Esc)</button></div>
   </div>
 </div>
 

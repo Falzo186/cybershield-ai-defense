@@ -88,6 +88,14 @@ const API = (() => {
     reportarCorreo: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/reportar", {}),
     contenerCorreo: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/contener", {}),
     misiones: () => req("GET", "/api/misiones"),
+    // Fase D: aplicación de correo de Azul y seguimiento de Rojo (todo se valida en el servidor)
+    leerCorreo: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/leer", {}),
+    archivarCorreo: (id, archivar) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/archivar", { archivar }),
+    verificarRemitente: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/verificar", {}),
+    inspeccionarEnlace: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/inspeccionar", {}),
+    responderCorreo: (id, texto) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/responder", { texto }),
+    aislarAdjunto: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/aislar", {}),
+    enviadosRojo: () => req("GET", "/api/correo/enviados"),
     finalizarPartida: () => req("POST", "/api/partida/finalizar", {}), // solo token general
     // tipo "pdf_abierto" | "pdf_reportado" sobre el PDF adjunto del correo id -> {documento, regla, descarga|null}
     eventoPdf: (tipo, correoId) => req("POST", "/api/evento", { tipo, recurso: "correo:" + correoId }),

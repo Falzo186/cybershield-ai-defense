@@ -1,8 +1,8 @@
 # Prueba de extremo a extremo — partida Rojo vs Azul
 
-Generado por `e2e/demo_partida.py` el 2026-10-26T10:26:47-06:00 en 14 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
+Generado por `e2e/demo_partida.py` el 2026-10-26T12:16:06-06:00 en 14 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
 
-**Resultado: 42/42 comprobaciones correctas.**
+**Resultado: 52/52 comprobaciones correctas.**
 
 ## 1. Preparación: cada participante entra con su nombre, entra un espectador y el árbitro inicia la partida
 
@@ -25,7 +25,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-26T10:26:47-06:00 en 14 s, con un 
 
 ## 2. Rojo envía 3 correos (uno sin adjunto y dos con PDF)
 
-- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Actualización de tu recibo de nómina (26/10/2026)» | ✓ Correo enviado a ana.perez: «Tu paquete no pudo ser entregado»
+- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Actualización de tu recibo de nómina (26/10/2026)»
 - ✅ los 3 envíos se confirman: esperado `3`, observado `3`
 - ✅ el buzón de Azul se actualiza solo por SSE: esperado `3`, observado `3`
 
@@ -68,11 +68,18 @@ Generado por `e2e/demo_partida.py` el 2026-10-26T10:26:47-06:00 en 14 s, con un 
 
 ![09_azul_contiene_enlace.jpg](09_azul_contiene_enlace.jpg)
 
-## 3e. Azul abre el PDF de nómina y luego lo reporta
+## 3e. Azul verifica el remitente de nómina, inspecciona el enlace y previsualiza el PDF
 
+- Verificación: ⚠ El remitente IMITA al dominio oficial | Dominio que IMITA al oficial: «cybershieId.invalid» se parece a «cybershield.invalid» pero no es el mismo (caracteres cambiados o palabras añadidas). | Indicadores: El dominio usa una «I» mayúscula en lugar de «l» (cybershieId) · Adjunto de nómina no solicitado · Enlace para un «acuse» que no hace falta
 - Aviso: ✓ PDF reportado · regla -10 → riesgo de la partida 0/100
-- ✅ se descarga el PDF fijo: esperado `recibo_nomina.pdf`, observado `recibo_nomina.pdf`
-- ✅ es un PDF de verdad: esperado `True`, observado `True`
+- ✅ detecta que el remitente IMITA al dominio oficial: esperado `True`, observado `True`
+- ✅ inspeccionar muestra que el enlace no va a donde dice: esperado `True`, observado `True`
+- ✅ inspeccionar no cuenta como clic (sin «ENLACE CLICADO»): esperado `0`, observado `0`
+- ✅ se abre el visor seguro: esperado `True`, observado `True`
+- ✅ el visor muestra el texto del propio PDF: esperado `True`, observado `True`
+- ✅ el visor muestra el SHA-256 real del archivo: esperado `True`, observado `True`
+- ✅ Esc cierra el visor: esperado `False`, observado `False`
+- ✅ no se descargó nada al equipo: esperado `0`, observado `0`
 - ✅ Rojo gana +5 (PDF abierto sin reportar): esperado `5`, observado `5`
 - ✅ Azul suma 10 (misión del documento) = 35: esperado `35`, observado `35`
 - ✅ Rojo pierde los 5 del PDF: esperado `0`, observado `0`
@@ -80,20 +87,31 @@ Generado por `e2e/demo_partida.py` el 2026-10-26T10:26:47-06:00 en 14 s, con un 
 - ✅ el aviso dice el riesgo real de la partida, no solo el −10 de la regla: esperado `True`, observado `True`
 - ✅ la lista del buzón marca el PDF como reportado: esperado `1`, observado `1`
 
-![10_general_pdf_abierto.jpg](10_general_pdf_abierto.jpg)
-![11_azul_reporta_pdf.jpg](11_azul_reporta_pdf.jpg)
+![10_azul_visor_pdf.jpg](10_azul_visor_pdf.jpg)
+![11_general_pdf_abierto.jpg](11_general_pdf_abierto.jpg)
+![12_azul_reporta_pdf.jpg](12_azul_reporta_pdf.jpg)
+
+## 3f. Carpetas y aislamiento del adjunto
+
+- Aviso: ✓ 🧪 Adjunto aislado · regla -5 → riesgo de la partida 0/100
+- ✅ el correo reportado está en «Sospechosos»: esperado `1`, observado `1`
+- ✅ tras aislarlo, el adjunto ya no se puede previsualizar: esperado `True`, observado `True`
+- ✅ aislar no cambia el marcador (Rojo 0, Azul 35): esperado `(0, 35)`, observado `(0, 35)`
+- ✅ Rojo ve en su campaña 1 clic y 1 adjunto abierto (sin saber si se leyó o reportó): esperado `True`, observado `True`
+
+![13_rojo_seguimiento_campana.jpg](13_rojo_seguimiento_campana.jpg)
 
 ## 4. Verificación: misiones, marcador en General y Espectador
 
 - Marcador final antes de cerrar: {'riesgo': 0, 'rojo': 0, 'azul': 35, 'clics': 1, 'contenciones': 1, 'reportes': 2, 'pdf': 1}
-- Líneas de auditoría en General: 19
+- Líneas de auditoría en General: 26
 - ✅ misiones completadas: reportar, contener y documento; la manual pendiente: esperado `[True, True, False, True]`, observado `[True, True, False, True]`
 - ✅ General y Espectador ven el mismo marcador: esperado `{'riesgo': 0, 'rojo': 0, 'azul': 35, 'clics': 1, 'contenciones': 1, 'reportes': 2, 'pdf': 1}`, observado `{'riesgo': 0, 'rojo': 0, 'azul': 35, 'clics': 1, 'contenciones': 1, 'reportes': 2, 'pdf': 1}`
 - ✅ la auditoría de General registró la partida: esperado `True`, observado `True`
 
-![12_azul_misiones.jpg](12_azul_misiones.jpg)
-![13_espectador_marcador.jpg](13_espectador_marcador.jpg)
-![14_general_auditoria_maximizada.jpg](14_general_auditoria_maximizada.jpg)
+![14_azul_misiones.jpg](14_azul_misiones.jpg)
+![15_espectador_marcador.jpg](15_espectador_marcador.jpg)
+![16_general_auditoria_maximizada.jpg](16_general_auditoria_maximizada.jpg)
 
 ## 5. General finaliza la partida y se muestra el resultado
 
@@ -104,22 +122,27 @@ Generado por `e2e/demo_partida.py` el 2026-10-26T10:26:47-06:00 en 14 s, con un 
 - ✅ tras finalizar, Rojo ya no puede enviar (409): esperado `True`, observado `True`
 - ✅ sin errores de consola inesperados en ninguna vista: esperado `[]`, observado `[]`
 
-![15_general_resultado.jpg](15_general_resultado.jpg)
-![16_espectador_resultado.jpg](16_espectador_resultado.jpg)
-![17_rojo_tras_finalizar.jpg](17_rojo_tras_finalizar.jpg)
+![17_general_resultado.jpg](17_general_resultado.jpg)
+![18_espectador_resultado.jpg](18_espectador_resultado.jpg)
+![19_rojo_tras_finalizar.jpg](19_rojo_tras_finalizar.jpg)
 
 ## Eventos escritos en eventos.jsonl (formato para Wazuh)
 
+- `archivo_aislado`: 1
 - `clic_enlace`: 1
+- `correo_abierto`: 3
+- `correo_recibido`: 3
 - `correo_reportado`: 1
 - `enlace_contenido`: 1
+- `enlace_inspeccionado`: 1
 - `mision_completada`: 3
 - `partida_finalizada`: 1
 - `pdf_abierto`: 1
 - `pdf_reportado`: 1
+- `remitente_verificado`: 1
 
 ## Comportamientos inesperados
 
 - (esperado) Error de consola (rojo, paso 1): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es un envío rechazado a propósito (antes de iniciar o tras finalizar)
-- (esperado) Error de consola (rojo, paso 9): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es un envío rechazado a propósito (antes de iniciar o tras finalizar)
+- (esperado) Error de consola (rojo, paso 10): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es un envío rechazado a propósito (antes de iniciar o tras finalizar)
 - Ninguno: todas las comprobaciones pasaron y no hubo errores de consola inesperados.

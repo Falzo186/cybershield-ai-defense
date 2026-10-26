@@ -8,6 +8,7 @@ Ejecutar:  python e2e/demo_partida.py          (requiere: pip install playwright
            python e2e/demo_partida.py --ver    (con el navegador visible)
 Sale con código 1 si alguna comprobación falla.
 """
+import hashlib
 import json
 import os
 import re
@@ -107,7 +108,8 @@ def arrancar_servidor():
     raise RuntimeError("el servidor no arrancó")
 
 
-def abrir_correo(azul, texto):
+def abrir_correo(azul, texto, carpeta="entrada"):
+    azul.click(f'[data-carpeta="{carpeta}"]')
     azul.locator(".buzon-item", has_text=texto).click()
     azul.wait_for_timeout(250)
 
@@ -251,15 +253,32 @@ def main(ver=False):
             captura(azul, "azul_contiene_enlace")
 
             # ---------------------------------------------------------------------------------------------
-            paso("3e. Azul abre el PDF de nómina y luego lo reporta")
+            paso("3e. Azul verifica el remitente de nómina, inspecciona el enlace y previsualiza el PDF")
             abrir_correo(azul, "nómina")
-            with azul.expect_download() as descarga:
-                azul.locator(".buzon-adjunto button", has_text="Abrir PDF").click()
-            d = descarga.value
-            ruta_pdf = Path(tmp) / d.suggested_filename
-            d.save_as(ruta_pdf)
-            chk("se descarga el PDF fijo", "recibo_nomina.pdf", d.suggested_filename)
-            chk("es un PDF de verdad", True, ruta_pdf.read_bytes().startswith(b"%PDF-"))
+            azul.locator("#buzon-detalle button", has_text="Verificar remitente").click()
+            r = esperar(lambda: azul.locator(".buzon-resultado").inner_text().strip()) or ""
+            nota("Verificación: " + r.replace(chr(10), " | "))
+            chk("detecta que el remitente IMITA al dominio oficial", True, "IMITA" in r)
+            azul.locator("#buzon-detalle button", has_text="Inspeccionar enlace").click()
+            r = esperar(lambda: "Destino real" in azul.locator(".buzon-resultado").inner_text()
+                        and azul.locator(".buzon-resultado").inner_text()) or ""
+            chk("inspeccionar muestra que el enlace no va a donde dice", True, "NO va a donde dice" in r)
+            chk("inspeccionar no cuenta como clic (sin «ENLACE CLICADO»)", 0,
+                azul.locator(".buzon-item", has_text="nómina").locator(".marca-clic").count())
+            descargas = []
+            azul.on("download", lambda d: descargas.append(d))
+            azul.locator(".buzon-adjunto button", has_text="Previsualizar").click()
+            ok = esperar(lambda: azul.locator("#visor-modal").is_visible())
+            chk("se abre el visor seguro", True, bool(ok))
+            texto_visor = azul.locator("#visor-texto").inner_text()
+            meta = azul.locator("#visor-meta").inner_text()
+            chk("el visor muestra el texto del propio PDF", True, "Recibo de nomina" in texto_visor)
+            sha = hashlib.sha256((RAIZ / "data" / "pdf" / "recibo_nomina.pdf").read_bytes()).hexdigest()
+            chk("el visor muestra el SHA-256 real del archivo", True, sha in meta)
+            captura(azul, "azul_visor_pdf")
+            azul.keyboard.press("Escape")
+            chk("Esc cierra el visor", False, azul.locator("#visor-modal").is_visible())
+            chk("no se descargó nada al equipo", 0, len(descargas))
             v = esperar(lambda: valores(general)["pdf"] == 1 and valores(general)) or valores(general)
             chk("Rojo gana +5 (PDF abierto sin reportar)", 5, v["rojo"])
             chk("Azul suma 10 (misión del documento) = 35", 35, v["azul"])
@@ -278,6 +297,27 @@ def main(ver=False):
             chk("la lista del buzón marca el PDF como reportado", 1,
                 azul.locator(".buzon-item", has_text="nómina").locator(".marca", has_text="PDF REPORTADO").count())
             captura(azul, "azul_reporta_pdf")
+
+            # ---------------------------------------------------------------------------------------------
+            paso("3f. Carpetas y aislamiento del adjunto")
+            azul.click('[data-carpeta="sospechosos"]')
+            chk("el correo reportado está en «Sospechosos»", 1,
+                azul.locator(".buzon-item", has_text="Acción requerida").count())
+            abrir_correo(azul, "nómina")
+            azul.locator(".buzon-adjunto button", has_text="Aislar").click()
+            t = esperar(lambda: "aislado" in toast(azul) and toast(azul)) or toast(azul)
+            nota("Aviso: " + t)
+            ok = esperar(lambda: azul.locator(".buzon-adjunto button", has_text="Aislado").count() >= 1)
+            chk("tras aislarlo, el adjunto ya no se puede previsualizar", True,
+                bool(ok) and azul.locator(".buzon-adjunto button", has_text="Aislado").first.is_disabled())
+            v = valores(general)
+            chk("aislar no cambia el marcador (Rojo 0, Azul 35)", (0, 35), (v["rojo"], v["azul"]))
+            rojo.click('[data-icono="correo"]')  # Rojo vuelve a abrir su aplicación de correo
+            ok = esperar(lambda: rojo.locator("#rojo-enviados-lista .marca", has_text="ENLACE CLICADO").count() == 1
+                         and rojo.locator("#rojo-enviados-lista .marca", has_text="ADJUNTO ABIERTO").count() == 1)
+            chk("Rojo ve en su campaña 1 clic y 1 adjunto abierto (sin saber si se leyó o reportó)", True, bool(ok)
+                and "REPORTADO" not in rojo.locator("#rojo-enviados-lista").inner_text())
+            captura(rojo, "rojo_seguimiento_campana")
 
             # ---------------------------------------------------------------------------------------------
             paso("4. Verificación: misiones, marcador en General y Espectador")

@@ -27,6 +27,11 @@ EVENTOS_SIEM = {
     "ENLACE_CONTENIDO": ("enlace_contenido", "azul"), "CORREO_REPORTADO": ("correo_reportado", "azul"),
     "PDF_ABIERTO": ("pdf_abierto", "azul"), "PDF_REPORTADO": ("pdf_reportado", "azul"),
     "MISION_COMPLETADA": ("mision_completada", "azul"), "PARTIDA_FINALIZADA": ("partida_finalizada", None),
+    # Fase D: acciones del correo y de los documentos
+    "CORREO_RECIBIDO": ("correo_recibido", "azul"), "CORREO_ABIERTO": ("correo_abierto", "azul"),
+    "REMITENTE_VERIFICADO": ("remitente_verificado", "azul"), "ENLACE_INSPECCIONADO": ("enlace_inspeccionado", "azul"),
+    "CORREO_ARCHIVADO": ("correo_archivado", "azul"), "RESPUESTA_ENVIADA": ("respuesta_enviada", "azul"),
+    "ARCHIVO_AISLADO": ("archivo_aislado", "azul"),
 }
 _CANDADO_EVENTOS = threading.Lock()
 LIMITE_FILAS = 50
@@ -39,6 +44,10 @@ ESPECIFICACION = {
     "incidentes": {"columnas": ("id", "fecha", "sistema", "severidad", "causa_raiz"), "filtros": ("severidad",)},
     "configuracion_admin": {"columnas": ("clave", "valor"), "filtros": ("clave",)},
 }
+
+
+def _ahora():
+    return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 class PermisoDenegado(Exception):
@@ -170,6 +179,7 @@ class Repositorio:
                 "VALUES(?,?,?,?,?,?,?,?)", (partida, de, para_usuario, asunto, cuerpo, plantilla_id, ts, adjunto))
             self.conn.execute("INSERT INTO enlaces(id,correo_id,ruta_local) VALUES(?,?,?)",
                               (enlace_id, cur.lastrowid, ruta))
+        self.registrar(self.identidad(para_usuario), "CORREO_RECIBIDO", f"correo:{cur.lastrowid}", plantilla_id, "BAJO")
         return {"id": cur.lastrowid, "para_usuario": para_usuario, "asunto": asunto, "plantilla_id": plantilla_id,
                 "ts": ts}
 
@@ -182,13 +192,134 @@ class Repositorio:
             "EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'PDF_ABIERTO' AND a.recurso = 'correo:' || c.id) "
             "AS pdf_abierto, "
             "EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'PDF_REPORTADO' AND a.recurso = 'correo:' || c.id) "
-            "AS pdf_reportado "
+            "AS pdf_reportado, "
+            "(SELECT group_concat(participante, ', ') FROM (SELECT l.participante FROM lecturas l "
+            " WHERE l.correo_id = c.id ORDER BY l.ts, l.rowid)) AS leido_por, "  # en orden de lectura
+            "EXISTS(SELECT 1 FROM archivados x WHERE x.correo_id = c.id) AS archivado, "
+            "EXISTS(SELECT 1 FROM aislamientos s WHERE s.correo_id = c.id) AS aislado, "
+            "(SELECT COUNT(*) FROM respuestas q WHERE q.correo_id = c.id) AS respuestas "
             "FROM correos c JOIN enlaces e ON e.correo_id = c.id LEFT JOIN reportes r ON r.correo_id = c.id "
             "LEFT JOIN contenciones k ON k.correo_id = c.id "
             "WHERE c.partida = ? AND c.para_usuario = ? ORDER BY c.id DESC LIMIT ?",
             (partida, usuario, limite)).fetchall()
-        # adjunto -> {id, archivo, titulo} del catálogo fijo (None si el correo no trae PDF)
-        return [{**dict(f), "adjunto": documentos.info(f["adjunto"])} for f in filas]
+        return [self._correo_publico(dict(f)) for f in filas]
+
+    @staticmethod
+    def _correo_publico(f):
+        """Añade lo que sale de la plantilla (prioridad, texto visible del enlace) y la carpeta: archivados > sospechosos
+        (reportado) > entrada. adjunto -> {id, archivo, titulo, riesgo} del catálogo fijo, o None."""
+        p = correos.PLANTILLAS.get(f["plantilla_id"], {})
+        carpeta = "archivados" if f["archivado"] else "sospechosos" if f["reportado"] else "entrada"
+        return {**f, "adjunto": documentos.info(f["adjunto"]), "leido": bool(f["leido_por"]),
+                "prioridad": p.get("prioridad", "normal"), "texto_enlace": p.get("texto_enlace"), "carpeta": carpeta}
+
+    def _correo(self, partida, usuario, correo_id):
+        """El correo correo_id del buzón de ese usuario en esa partida, o None (no existe o no es suyo)."""
+        return next((c for c in self.buzon(partida, usuario, limite=-1) if c["id"] == correo_id), None)
+
+    # ---------- acciones del correo (Fase D): todas exigen que el correo sea del buzón del usuario en la partida ----------
+    def marcar_leido(self, partida, usuario, correo_id, participante):
+        """-> "nuevo" (primera lectura de ese participante) · "ya" · None (no es suyo). Solo la primera se audita."""
+        if self._correo(partida, usuario, correo_id) is None:
+            return None
+        with self.conn:
+            cur = self.conn.execute("INSERT OR IGNORE INTO lecturas(correo_id,participante,ts) VALUES(?,?,?)",
+                                    (correo_id, participante, _ahora()))
+        if not cur.rowcount:
+            return "ya"
+        self.registrar(self.identidad(usuario), "CORREO_ABIERTO", f"correo:{correo_id}", participante, "BAJO")
+        return "nuevo"
+
+    def archivar(self, partida, usuario, correo_id, participante, archivar=True):
+        """Archiva o devuelve a su carpeta. -> True (cambió) · False (ya estaba así) · None (no es suyo)."""
+        c = self._correo(partida, usuario, correo_id)
+        if c is None:
+            return None
+        if bool(c["archivado"]) == archivar:
+            return False
+        with self.conn:
+            if archivar:
+                self.conn.execute("INSERT INTO archivados(correo_id,participante,ts) VALUES(?,?,?)",
+                                  (correo_id, participante, _ahora()))
+            else:
+                self.conn.execute("DELETE FROM archivados WHERE correo_id=?", (correo_id,))
+        self.registrar(self.identidad(usuario), "CORREO_ARCHIVADO", f"correo:{correo_id}",
+                       "ARCHIVADO" if archivar else "DESARCHIVADO", "BAJO")
+        return True
+
+    def verificar_remitente(self, partida, usuario, correo_id):
+        """Comprueba el dominio del remitente contra el oficial. -> {de, dominio, oficial, parecido, detalle,
+        indicadores} o None."""
+        c = self._correo(partida, usuario, correo_id)
+        if c is None:
+            return None
+        v = correos.verificar_remitente(c["de"])
+        resultado = "OFICIAL" if v["oficial"] else "IMITACION" if v["parecido"] else "EXTERNO"
+        self.registrar(self.identidad(usuario), "REMITENTE_VERIFICADO", f"correo:{correo_id}", resultado, "BAJO")
+        indicadores = correos.PLANTILLAS.get(c["plantilla_id"], {}).get("indicadores", [])
+        return {"de": c["de"], **v, "indicadores": list(indicadores)}
+
+    def inspeccionar_enlace(self, partida, usuario, correo_id):
+        """Muestra el destino REAL del enlace sin abrirlo. -> {texto_mostrado, destino_real, coincide, explicacion} o None."""
+        c = self._correo(partida, usuario, correo_id)
+        if c is None:
+            return None
+        self.registrar(self.identidad(usuario), "ENLACE_INSPECCIONADO", f"correo:{correo_id}", "INSPECCIONADO", "BAJO")
+        mostrado = c["texto_enlace"] or c["enlace"]
+        return {"texto_mostrado": mostrado, "destino_real": c["enlace"], "coincide": mostrado == c["enlace"],
+                "explicacion": ("El correo presenta el enlace como «" + mostrado + "», pero lleva a «" + c["enlace"] +
+                                "» (página de entrenamiento del laboratorio). En un ataque real, ese destino sería el "
+                                "del atacante: no coincide con lo que se anuncia.")}
+
+    def responder(self, partida, usuario, correo_id, participante, texto):
+        """Respuesta que NUNCA sale del laboratorio. -> {id, ts, a_phishing} o None. ValueError si el texto no vale."""
+        texto = (texto or "").strip()
+        if not 1 <= len(texto) <= 1000:
+            raise ValueError("La respuesta debe tener entre 1 y 1000 caracteres.")
+        c = self._correo(partida, usuario, correo_id)
+        if c is None:
+            return None
+        a_phishing = not correos.verificar_remitente(c["de"])["oficial"]
+        ts = _ahora()
+        with self.conn:
+            cur = self.conn.execute("INSERT INTO respuestas(correo_id,participante,texto,ts) VALUES(?,?,?,?)",
+                                    (correo_id, participante, texto, ts))
+        self.registrar(self.identidad(usuario), "RESPUESTA_ENVIADA", f"correo:{correo_id}",
+                       "A_PHISHING" if a_phishing else "OK", "MEDIO" if a_phishing else "BAJO")
+        return {"id": cur.lastrowid, "ts": ts, "a_phishing": a_phishing}
+
+    def respuestas(self, partida, usuario):
+        """Carpeta «Enviados» de Azul: sus respuestas, con el correo al que contestan."""
+        filas = self.conn.execute(
+            "SELECT q.id, q.correo_id, q.participante, q.texto, q.ts, c.de AS para, c.asunto FROM respuestas q "
+            "JOIN correos c ON c.id = q.correo_id WHERE c.partida = ? AND c.para_usuario = ? ORDER BY q.id DESC",
+            (partida, usuario)).fetchall()
+        return [dict(f) for f in filas]
+
+    def aislar_adjunto(self, partida, usuario, correo_id, participante):
+        """Aísla el PDF adjunto: ya no se puede previsualizar. -> "aislado" · "ya_aislado" · "sin_adjunto" · None."""
+        c = self._correo(partida, usuario, correo_id)
+        if c is None:
+            return None
+        if not c["adjunto"]:
+            return "sin_adjunto"
+        if c["aislado"]:
+            return "ya_aislado"
+        with self.conn:
+            self.conn.execute("INSERT INTO aislamientos(correo_id,participante,ts) VALUES(?,?,?)",
+                              (correo_id, participante, _ahora()))
+        self.registrar(self.identidad(usuario), "ARCHIVO_AISLADO", f"correo:{correo_id}", c["adjunto"]["id"], "BAJO")
+        return "aislado"
+
+    def enviados_rojo(self, partida):
+        """Carpeta «Enviados» de Rojo: sus correos y lo que una campaña de phishing real podría medir (clic en el
+        enlace, apertura del adjunto). No revela si se leyó ni si se reportó."""
+        filas = self.conn.execute(
+            "SELECT c.id, c.para_usuario, c.asunto, c.plantilla_id, c.ts, c.adjunto IS NOT NULL AS con_adjunto, "
+            "EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'CLIC_ENLACE' AND a.recurso = 'correo:' || c.id) AS clicado, "
+            "EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'PDF_ABIERTO' AND a.recurso = 'correo:' || c.id) "
+            "AS adjunto_abierto FROM correos c WHERE c.partida = ? ORDER BY c.id DESC", (partida,)).fetchall()
+        return [dict(f) for f in filas]
 
     def registrar_clic(self, enlace_id):
         """Registra en auditoría el clic en un enlace de entrenamiento. Si Azul ya lo contuvo, el clic queda
@@ -243,30 +374,37 @@ class Repositorio:
         """Azul abre o reporta el PDF adjunto de un correo SUYO de esta partida. No se ejecuta nada: es solo un
         evento en auditoría. tipo = "pdf_abierto" | "pdf_reportado" (un PDF se reporta una sola vez).
         -> {"doc": {...}} · "sin_adjunto" · "ya_reportado" · None (no es suyo)."""
-        fila = next((c for c in self.buzon(partida, usuario, limite=-1) if c["id"] == correo_id), None)
+        fila = self._correo(partida, usuario, correo_id)
         if fila is None:
             return None
         if not fila["adjunto"]:
             return "sin_adjunto"
+        if tipo == "pdf_abierto" and fila["aislado"]:
+            return "aislado"  # un adjunto aislado ya no se puede previsualizar
         if tipo == "pdf_reportado" and fila["pdf_reportado"]:
             return "ya_reportado"
         accion, resultado = ("PDF_ABIERTO", "ABIERTO") if tipo == "pdf_abierto" else ("PDF_REPORTADO", "REPORTADO")
         self.registrar(self.identidad(usuario), accion, f"correo:{correo_id}", resultado, "BAJO")
-        return {"doc": fila["adjunto"]}
+        r = {"doc": fila["adjunto"]}
+        if tipo == "pdf_abierto":  # lo que muestra el visor seguro (texto del propio archivo + análisis)
+            r["vista"] = documentos.vista_previa(fila["adjunto"]["id"], f"Adjunto del correo «{fila['asunto']}» "
+                                                                       f"de {fila['de']}")
+        return r
 
     def logros_rojo(self, partida):
         """Lo que cuenta para el puntaje de Rojo en la partida: correos con enlace clicado y NO contenido, y correos
-        con PDF abierto y NO reportado. -> {enlaces_sin_contener, pdfs_sin_reportar}"""
+        con PDF abierto y NO reportado ni aislado. -> {enlaces_sin_contener, pdfs_sin_reportar}"""
         fila = self.conn.execute(
             "SELECT COALESCE(SUM(clicado AND NOT contenido), 0) AS enlaces, "
-            "COALESCE(SUM(pdf_abierto AND NOT pdf_reportado), 0) AS pdfs FROM ("
+            "COALESCE(SUM(pdf_abierto AND NOT pdf_reportado AND NOT aislado), 0) AS pdfs FROM ("
             "  SELECT EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'CLIC_ENLACE' AND a.recurso = 'correo:' || c.id)"
             "         AS clicado,"
             "         EXISTS(SELECT 1 FROM contenciones k WHERE k.correo_id = c.id) AS contenido,"
             "         EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'PDF_ABIERTO' AND a.recurso = 'correo:' || c.id)"
             "         AS pdf_abierto,"
             "         EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'PDF_REPORTADO' AND a.recurso = 'correo:' || c.id)"
-            "         AS pdf_reportado"
+            "         AS pdf_reportado,"
+            "         EXISTS(SELECT 1 FROM aislamientos s WHERE s.correo_id = c.id) AS aislado"
             "  FROM correos c WHERE c.partida = ?)", (partida,)).fetchone()
         return {"enlaces_sin_contener": fila["enlaces"], "pdfs_sin_reportar": fila["pdfs"]}
 

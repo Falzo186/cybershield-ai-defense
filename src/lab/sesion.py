@@ -11,12 +11,36 @@ CONTENIDOS = ("DEFENSA_EXITOSA", "DEFENSA_EN_PROFUNDIDAD")
 # Evento del laboratorio -> consecuencia FIJA (determinista, sin aprendizaje). Lista editable:
 #   riesgo: puntos que suma/resta al riesgo de la sesión · mision: si el evento completa las misiones cuya
 #   condicion_evento es ese mismo evento.
+# explicacion: qué acción lo produjo, qué control falló (o funcionó) y cómo se evita; la UI la muestra tal cual.
 REGLAS_EVENTO = {
-    "CLIC_ENLACE": {"riesgo": +15, "mision": False},       # alguien de Azul abrió un enlace de entrenamiento
-    "correo_reportado": {"riesgo": -10, "mision": True},   # Azul reportó un correo sospechoso
-    "enlace_contenido": {"riesgo": -15, "mision": True},   # Azul contuvo un enlace ya clicado (anula su +15)
-    "pdf_abierto": {"riesgo": 0, "mision": True},          # Azul revisó un PDF adjunto (benigno: no suma riesgo)
-    "pdf_reportado": {"riesgo": -10, "mision": False},     # Azul reportó un PDF adjunto sospechoso
+    "CLIC_ENLACE": {"riesgo": +15, "mision": False, "explicacion": (
+        "Un empleado abrió el enlace de un correo de phishing. Control que falló: comprobar el remitente y el destino "
+        "real antes de pulsar. Se mitiga conteniendo el enlace.")},
+    "correo_reportado": {"riesgo": -10, "mision": True, "explicacion": (
+        "Reportar el correo avisa al equipo de seguridad y permite actuar antes de que otros caigan.")},
+    "enlace_contenido": {"riesgo": -15, "mision": True, "explicacion": (
+        "Contener el enlace clicado bloquea nuevos accesos y anula el beneficio que obtenía Rojo.")},
+    "pdf_abierto": {"riesgo": 0, "mision": True, "explicacion": (
+        "Previsualizar en el visor seguro no ejecuta nada. Aun así Rojo puntúa mientras el PDF siga sin reportar ni "
+        "aislar, porque se abrió un documento de una fuente no verificada.")},
+    "pdf_reportado": {"riesgo": -10, "mision": False, "explicacion": (
+        "Reportar el adjunto sospechoso lo pone en manos del equipo de seguridad; Rojo pierde sus puntos por él.")},
+    # Fase D: acciones del correo. Leer, verificar o inspeccionar no comprometen nada (riesgo 0) y quedan registradas.
+    "correo_abierto": {"riesgo": 0, "mision": False, "explicacion": (
+        "Abrir y leer un correo no compromete la cuenta: lo que importa es lo que se hace después.")},
+    "remitente_verificado": {"riesgo": 0, "mision": False, "explicacion": (
+        "Comprobar el dominio del remitente es el primer control frente al phishing.")},
+    "enlace_inspeccionado": {"riesgo": 0, "mision": False, "explicacion": (
+        "Inspeccionar el enlace sin abrirlo revela que el texto visible y el destino real no coinciden.")},
+    "correo_archivado": {"riesgo": 0, "mision": False, "explicacion": (
+        "Archivar ordena el buzón, pero no avisa a nadie: si el correo era sospechoso, conviene reportarlo.")},
+    "respuesta_enviada": {"riesgo": 0, "mision": False, "explicacion": (
+        "Respuesta a un remitente de la organización: queda registrada dentro del laboratorio.")},
+    "respuesta_a_phishing": {"riesgo": +10, "mision": False, "explicacion": (
+        "Responder a un correo de phishing confirma al atacante que la dirección está activa. Control que falló: "
+        "verificar el remitente antes de responder.")},
+    "archivo_aislado": {"riesgo": -5, "mision": False, "explicacion": (
+        "Aislar el adjunto impide que nadie más lo abra; Rojo pierde sus puntos por ese PDF.")},
 }
 
 # Puntaje de Rojo (determinista). Se CALCULA del estado de la partida en cada momento, no se otorga y se quita:
@@ -55,7 +79,7 @@ class EstadoSesion:
         self._eventos = max(0, min(100, self._eventos + regla["riesgo"]))
         self.eventos_vistos[evento] = self.eventos_vistos.get(evento, 0) + 1
         return {"evento": evento, "riesgo": regla["riesgo"], "mision": regla["mision"],
-                "riesgo_acumulado": self.riesgo_acumulado}
+                "explicacion": regla.get("explicacion"), "riesgo_acumulado": self.riesgo_acumulado}
 
     @property
     def circuito_activo(self):

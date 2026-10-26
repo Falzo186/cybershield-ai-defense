@@ -39,6 +39,16 @@ CREATE TABLE IF NOT EXISTS progreso_mision(
 CREATE TABLE IF NOT EXISTS contenciones(
     correo_id INTEGER PRIMARY KEY REFERENCES correos(id), usuario TEXT NOT NULL REFERENCES usuarios(usuario),
     ts TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS lecturas(
+    correo_id INTEGER NOT NULL REFERENCES correos(id), participante TEXT NOT NULL, ts TEXT NOT NULL,
+    PRIMARY KEY(correo_id, participante));
+CREATE TABLE IF NOT EXISTS archivados(
+    correo_id INTEGER PRIMARY KEY REFERENCES correos(id), participante TEXT NOT NULL, ts TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS respuestas(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, correo_id INTEGER NOT NULL REFERENCES correos(id),
+    participante TEXT NOT NULL, texto TEXT NOT NULL CHECK(length(texto) BETWEEN 1 AND 1000), ts TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS aislamientos(
+    correo_id INTEGER PRIMARY KEY REFERENCES correos(id), participante TEXT NOT NULL, ts TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS reportes(
     correo_id INTEGER PRIMARY KEY REFERENCES correos(id), usuario TEXT NOT NULL REFERENCES usuarios(usuario),
     ts TEXT NOT NULL);
