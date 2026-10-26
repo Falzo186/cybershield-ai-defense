@@ -111,15 +111,15 @@ Cada equipo tiene su propia Ollama; el servidor escucha en `0.0.0.0:$PUERTO` (po
 - El defensor recibe una línea `Patrón de la sesión: …` (categorías vistas, rechazos seguidos, riesgo acumulado) como contexto; es una señal, no una sentencia.
 - `partida_fin` incluye `informe {rondas_totales, rondas_validas, puntos_atacante, puntos_defensor, ganador, veredictos_por_tipo{FALLA_DEFENSA, DEFENSA_EXITOSA, DEFENSA_EN_PROFUNDIDAD, PERMITIDO_CORRECTO, ERROR}, fugas_parciales, activaciones_circuito_sesion, bloqueos_filtro_rapido, riesgo_acumulado_final, dificultad, usuario, modelos_usados{atacante, defensor}}`. La UI lo exporta como `informe_sesion_<fecha>.json`.
 
-### Token de equipo verificado por el servidor (añadido)
-- `POST /api/equipo/reclamar` `{equipo:"rojo"|"azul"|"general"}` -> `{equipo, token}`. El token de cada equipo se entrega UNA sola vez por partida (proceso del servidor); un segundo reclamo -> 409.
-- Toda ruta `/api/*` exige la cabecera `X-Equipo-Token`, salvo `GET /api/eventos` y `GET /api/estado` (espectador, solo lectura). Sin token válido -> 403.
+### Token verificado por el servidor (añadido; desde la Fase C el token es de un PARTICIPANTE, ver «Sesiones y partida»)
+- ~~`POST /api/equipo/reclamar`~~ (un token por equipo): **sustituido** por `POST /api/sesion` en la Fase C.
+- Toda ruta `/api/*` exige la cabecera `X-Equipo-Token` (hoy, el token de sesión del participante), salvo `GET /api/eventos` y `GET /api/estado` (espectador, solo lectura). Sin token válido -> 403. «solo token `rojo`» significa: la sesión de cualquier participante del equipo rojo.
 - El rol declarado (`de_rol`, `rol`, `?rol=` de `/api/ollama/probar`) debe coincidir con el equipo del token (la vista `general` puede confirmar ambos modelos); si no -> 403. Quien responde un reto es el dueño del token.
 - `POST /api/detener` solo con el token de `general` (árbitro); con otro token -> 403. La UI oculta las acciones sin token (y DETENER fuera de la vista general). `?rol=espectador` abre la vista de solo lectura, que nunca reclama token.
 
 ### Buzón interno de correos de entrenamiento (añadido)
 Nada sale del laboratorio: sin SMTP, plantillas fijas (`src/lab/correos.py`) y enlaces locales generados por el servidor.
-- `POST /api/equipo/reclamar` acepta `usuario` (solo `azul`; por defecto `ana.perez`): usuario semilla dueño del buzón. Respuesta `+usuario`.
+- El primer participante azul fija el usuario semilla dueño del buzón del equipo (`usuario` en `POST /api/sesion`; por defecto `ana.perez`); los siguientes comparten ese buzón. Respuesta `+usuario_azul`.
 - `GET /api/correo/plantillas` (cualquier token) -> `{plantillas:[{id, nombre}]}`.
 - `POST /api/correo` (solo token `rojo`) `{plantilla, para_usuario?}` -> `{id, para_usuario, asunto, plantilla_id, ts}`. Sin `para_usuario` va al usuario de azul (409 si azul no entró). La respuesta NO incluye el enlace. Emite `auditoria` ATTACKER `CORREO_ENVIADO`.
 - `GET /api/buzon` (solo token `azul`) -> `{usuario, correos:[{id, de, asunto, cuerpo, plantilla_id, ts, enlace:"/l/<id>"}]}`, solo de la partida actual (proceso del servidor).
@@ -178,3 +178,16 @@ PDFs fijos de solo texto en `data/pdf/` (catálogo `src/lab/documentos.py`; nunc
 - `POST /api/partida/finalizar` (solo token `general`) congela los puntajes del marcador y declara `ganador` (`rojo`|`azul`|`empate`) -> `{partida, puntos_rojo, puntos_azul, ganador, ts}`. 409 si ya estaba finalizada. Registra `PARTIDA_FINALIZADA` en auditoría (y en el JSONL, tipo `partida_finalizada`).
 - SSE `partida_finalizada` `{..., marcador}`; a partir de ahí `marcador_partida` es el congelado, con `final:{...}` (antes `final:null`). La UI de General y Espectador muestra la pantalla de resultado (también al conectar tarde).
 - Tras finalizar, `POST /api/correo`, `/api/correo/{id}/reportar`, `/api/correo/{id}/contener`, `/api/evento` y `/api/misiones/{id}/completar` -> 409, y `/l/{id}` -> 409 sin registrar el clic. Leer (buzón, misiones, marcador) sigue permitido. Una partida nueva = reiniciar el servidor.
+
+### Sesiones y partida (Fase C)
+Sesión por **participante** y partida con fases; lógica en `server/partida.py`.
+- `POST /api/sesion` `{nombre, equipo:"rojo"|"azul"|"general"|"espectador", codigo?, usuario?}` -> `{token, participante:{id, nombre, equipo, rol, unido}, partida, usuario_azul}`. Nombre de 2-24 caracteres (letras, números, espacio, `. _ -`), único en la sala sin distinguir mayúsculas (409). `general` (rol `arbitro`) exige `codigo` = el código de árbitro que el servidor imprime al arrancar (o `CS_CODIGO_ARBITRO`); 403 si falla y 429 tras 5 fallos del mismo cliente (bloqueo 5 min). Varios participantes por equipo, cada uno con su token.
+- `GET /api/sesion` (con token) -> `{participante, partida}`: reconexión; 403 si el servidor no reconoce el token (p. ej. tras reiniciar). Las sesiones viven mientras viva el proceso y sobreviven a «nueva partida».
+- Una sesión de `espectador` solo puede hacer GET (403 en cualquier POST). Sin sesión, como antes, solo `GET /api/eventos` y `/api/estado`.
+- `GET /api/partida` (con token) -> `{id, fase:"preparacion"|"en_curso"|"finalizada", duracion_s, restante_s, inicio, fin, motivo_fin:"arbitro"|"tiempo"|null, participantes:[...sin token]}`.
+- `POST /api/partida/iniciar` (solo árbitro) `{duracion_min: 5|10|15}`: preparación -> en curso. 409 si ya empezó; 400 con otra duración.
+- `POST /api/partida/finalizar` (solo árbitro): termina antes de tiempo; 409 si no está en curso. Al agotarse el tiempo la partida se cierra sola (`motivo_fin:"tiempo"`): lo hace una tarea del servidor y, además, se comprueba en cada petición, así que el resultado no depende de que el cliente esté conectado.
+- `POST /api/partida/nueva` (solo árbitro, con la partida finalizada): partida nueva en preparación sin reiniciar el servidor; correos, misiones, riesgo y marcador empiezan de cero; las sesiones se conservan.
+- Las acciones de Rojo/Azul (correo, reportar, contener, `/api/evento`, misión manual, clic en `/l/{id}`) solo valen **en curso**: en preparación -> 409 «La partida aún no ha empezado», tras finalizar -> 409.
+- SSE `partida_estado` (= `GET /api/partida`): al conectar, en cada cambio (unirse, iniciar, finalizar, nueva) y cada 15 s en curso, para que los relojes de las vistas se resincronicen con el del servidor.
+- Auditoría: `PARTICIPANTE_UNIDO`, `PARTIDA_INICIADA` (también en la tabla), `PARTIDA_FINALIZADA` (con `motivo`), `PARTIDA_NUEVA`.

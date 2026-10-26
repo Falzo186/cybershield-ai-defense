@@ -171,12 +171,19 @@ correos de entrenamiento al 🔵 **Equipo Azul**, que debe detectarlos y contene
 no hay SMTP, ningún enlace sale del laboratorio, los documentos son PDFs inocuos y la progresión la deciden
 **reglas fijas** (evento → consecuencia), no un modelo que aprenda.
 
-### Equipos, tokens y vistas
+### Participantes, equipos y partida
 
-Cada navegador elige su vista: `?rol=rojo`, `?rol=azul`, `?rol=general` (árbitro) o `?rol=espectador`.
-El servidor entrega **un token por equipo una sola vez por partida** y verifica el equipo con ese token en cada
-acción, nunca con lo que declare el cliente. El espectador no tiene token: solo ve eventos y estado, sin botones.
-Reiniciar el servidor = **partida nueva** (buzón, misiones y marcador empiezan limpios).
+Cada navegador elige su vista: `?rol=rojo`, `?rol=azul`, `?rol=general` (árbitro) o `?rol=espectador`, y cada
+participante **se une con su nombre visible**. El servidor le da **su propio token de sesión** (puede haber varios
+participantes por equipo) y verifica el equipo con esa sesión en cada acción, nunca con lo que declare el cliente.
+La vista **General** exige además el **código de árbitro** que el servidor imprime al arrancar
+(`Código de árbitro (vista General): 123456`). El espectador no necesita sesión: solo observa.
+
+La sesión se guarda en el navegador: recargar o reabrir la pestaña reconecta sin volver a unirse.
+La **partida** pasa por *preparación → en curso → finalizada*: el árbitro elige **5, 10 o 15 minutos** e inicia;
+el **tiempo lo cuenta el servidor** (todas las vistas ven el mismo reloj, y recargar no lo reinicia) y, al
+agotarse, la partida se cierra sola. Correos, clics, reportes y misiones solo cuentan con la partida en curso.
+*↻ Nueva partida* prepara otra con los mismos participantes, sin reiniciar el servidor.
 
 ### Buzón de correos de entrenamiento
 
@@ -251,8 +258,8 @@ BD en memoria). La partida completa en navegadores reales: `python e2e/demo_part
 `pip install playwright` y `playwright install chromium`; escribe las capturas en `docs/capturas_demo/`).
 Guion para la exposición: [`docs/GUION_DEMO.md`](docs/GUION_DEMO.md).
 
-> Los tokens de equipo evitan que una vista se haga pasar por otra, pero **no son autenticación de usuarios**:
-> el aviso del Modo LAN sigue vigente (solo red local de confianza).
+> Las sesiones evitan que un participante se haga pasar por otro o por otro equipo, y el código protege la vista
+> del árbitro, pero **no son cuentas con contraseña**: el aviso del Modo LAN sigue vigente (solo red local de confianza).
 
 ## Estructura
 

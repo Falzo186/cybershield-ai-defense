@@ -190,3 +190,52 @@ servidor. Propuesta:
 - **Riesgo de regresión:** bajo. Solo cambia cómo se abre la conexión; los demás hosts no se tocan y el reintento cubre IPv6.
 - **Criterios de aceptación cumplidos en A:** 3 (los modelos se consultan de verdad), 4 (errores honestos), 13 (las pruebas
   pasan), y 15 parcial (la batalla real no depende de respuestas prefabricadas).
+
+## 11. Informe de la Fase C — participantes y partida (rama `feature/fase-c-identidad`)
+
+- **Objetivo:** identidad por participante, árbitro protegido y partida con fases y temporizador autoritativo, sin
+  reescribir lo existente.
+- **Estado inicial:** un token por equipo (de 1 persona); la partida era el proceso del servidor; no había duración.
+- **Archivos:**
+  - `server/partida.py` (nuevo: `Sala`, `Participante`, `Partida`, lógica pura con reloj inyectable);
+  - `server/app.py` (middleware de sesión, `/api/sesion`, `/api/partida{,/iniciar,/finalizar,/nueva}`, tarea del temporizador);
+  - `server/test_partida.py` (nuevo) y `server/test_app.py`;
+  - `ui/index.html`, `app.js`, `render.js`, `api.js`, `escritorio.js`, `styles.css`;
+  - `e2e/demo_partida.py`, `e2e/capturas_vistas.py`;
+  - `docs/CONTRATO_API.md`, `README.md`, `docs/GUION_DEMO.md`.
+- **Cambios:**
+  - **Sesiones por participante:** cada participante se une con su nombre visible (único) y su equipo, y recibe su propio
+    token; puede haber varios por equipo.
+  - **Árbitro protegido:** la vista General exige el código impreso al arrancar, con bloqueo de 5 min tras 5 fallos
+    del mismo cliente.
+  - **Espectadores:** una sesión de espectador nunca escribe.
+  - **Reconexión:** con el token guardado en el navegador, sin volver a unirse.
+  - **Partida:** *preparación → en curso → finalizada*, de 5, 10 o 15 min. El tiempo lo cuenta el servidor con un reloj
+    monótono y la partida se cierra sola (tarea en segundo plano, más una comprobación en cada petición). Las acciones
+    solo valen en curso. Hay **nueva partida** sin reiniciar el servidor.
+  - **UI:** diálogo para unirse con errores comprensibles; fase y cuenta atrás en la cabecera, resincronizada por SSE
+    cada 15 s; controles del árbitro según la fase.
+- **Pruebas (resultados reales):**
+  - `test_partida` 29/29 (nuevo);
+  - `test_app` 112/112: antes 88; se adaptaron las comprobaciones de `reclamar` al nuevo modelo, sin borrar ninguna, y
+    se añadieron sesiones, árbitro, preparación, inicio, fin por tiempo y nueva partida;
+  - `e2e/demo_partida.py` 42/42: antes 38; añade la preparación, el 409 previo al inicio y la cuenta atrás igual en las
+    4 vistas, que mostraron `05:00` las cuatro;
+  - comprobación en navegador real, 18/18: código erróneo, nombre repetido, reconexión al recargar, reloj que no se
+    reinicia al recargar, espectador con cuenta atrás y nueva partida en todas las vistas;
+  - el resto de la batería, sin cambios.
+- **Cambio de contrato:** `POST /api/equipo/reclamar` desaparece, sustituido por `POST /api/sesion`. La sesión se guarda
+  en `localStorage` (`cs_sesion_<rol>`) en vez de en `sessionStorage`.
+- **Pendiente** (otras fases):
+  - la batalla IA vs IA aún no depende de la fase de la partida → F;
+  - las misiones siguen siendo del equipo azul, no de cada participante → E;
+  - las sesiones viven en memoria y se pierden al reiniciar el servidor;
+  - el espectador anónimo no aparece en la lista de participantes.
+- **Riesgos de regresión:** medios. Cambió el modelo de identidad, pero lo cubren las 3 suites de servidor y E2E.
+  Las posiciones de ventanas guardadas no se ven afectadas.
+- **Criterios de aceptación cumplidos en C:**
+  - **1 y 2:** cada participante entra en su escritorio, y los permisos se comprueban en el servidor por sesión;
+  - **10:** las sesiones de espectador dan 403 en cualquier escritura;
+  - **11:** el temporizador y el resultado los da el servidor, y las 4 vistas mostraron el mismo reloj;
+  - **13:** todas las pruebas pasan.
+- **Avance global estimado: ~43 %.** El bloque identidad y partida (peso 20) pasa de ~15 % a ~55 %.
