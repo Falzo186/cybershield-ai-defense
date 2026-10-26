@@ -3,6 +3,7 @@ import json
 import re
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -11,8 +12,35 @@ RUTA_DEBUG = Path(__file__).resolve().parents[2] / "data" / "debug_respuestas.lo
 MENSAJE_REINTENTO = "Tu respuesta anterior no era JSON válido. Responde SOLO con el JSON, sin explicación."
 
 
+def _ipv4_si_localhost(url):
+    """En Windows, conectar a «localhost» hace que urllib pruebe antes ::1; si Ollama solo escucha en IPv4, cada
+    llamada pierde ~2 s (medido: 2 350 ms frente a 350 ms con 127.0.0.1), y esos 2 s se contaban como latencia del
+    modelo. -> la misma URL con 127.0.0.1, o None si el host no es localhost."""
+    u = urllib.parse.urlsplit(url)
+    if u.hostname != "localhost":
+        return None
+    return urllib.parse.urlunsplit((u.scheme, "127.0.0.1" + (f":{u.port}" if u.port else ""), u.path, u.query, u.fragment))
+
+
+def _abrir(url, timeout, data=None):
+    """urlopen con el atajo IPv4 para localhost; si 127.0.0.1 rechaza la conexión (Ollama solo en IPv6), se reintenta
+    con la URL original, así que ninguna instalación que antes funcionara deja de hacerlo."""
+    def peticion(u):
+        if data is None:
+            return u
+        return urllib.request.Request(u, data=data, headers={"Content-Type": "application/json"}, method="POST")
+    rapida = _ipv4_si_localhost(url)
+    if rapida:
+        try:
+            return urllib.request.urlopen(peticion(rapida), timeout=timeout)
+        except urllib.error.URLError as exc:
+            if not isinstance(getattr(exc, "reason", None), ConnectionRefusedError):
+                raise
+    return urllib.request.urlopen(peticion(url), timeout=timeout)
+
+
 def _get_json(host, ruta, timeout):
-    with urllib.request.urlopen(host.rstrip("/") + ruta, timeout=timeout) as r:
+    with _abrir(host.rstrip("/") + ruta, timeout) as r:
         return r.status, json.loads(r.read().decode("utf-8"))
 
 
@@ -156,16 +184,18 @@ def generar(host, modelo, system, user, formato=None, timeout=120, temperature=0
     }
     if formato == "json":
         cuerpo["format"] = "json"
-    req = urllib.request.Request(
-        host.rstrip("/") + "/api/chat", data=json.dumps(cuerpo).encode("utf-8"),
-        headers={"Content-Type": "application/json"}, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with _abrir(host.rstrip("/") + "/api/chat", timeout, data=json.dumps(cuerpo).encode("utf-8")) as r:
             if r.status != 200:
                 return resultado(False, error=f"HTTP {r.status}")
             datos = json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        return resultado(False, error=f"HTTP {exc.code}: {exc.reason}")
+        # Ollama explica el fallo en el cuerpo ({"error": "..."}): se muestra tal cual en vez de solo el código.
+        try:
+            detalle = json.loads(exc.read().decode("utf-8", "replace")).get("error")
+        except Exception:  # noqa: BLE001 - cuerpo vacío o no JSON
+            detalle = None
+        return resultado(False, error=f"HTTP {exc.code}: {detalle or exc.reason}")
     except Exception as exc:  # noqa: BLE001 - timeout, conexión rechazada, JSON inválido...
         return resultado(False, error=f"{type(exc).__name__}: {exc}")
     # Se descarta el razonamiento <think> para que defensor y atacante reciban solo la respuesta útil.
