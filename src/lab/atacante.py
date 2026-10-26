@@ -101,7 +101,12 @@ def generar_ataque(host, modelo, rol, historial_corto=None, intensidad=2, escena
     if not r["ok"]:
         return out
     obj = r["obj"]
-    if obj and isinstance(obj.get("prompt"), str) and obj["prompt"].strip():
+    if obj and not (isinstance(obj.get("prompt"), str) and obj["prompt"].strip()):
+        # JSON válido pero sin mensaje (visto con llama3.2:3b: {"prompt":""}): es un fallo del modelo, no un ataque.
+        # Antes se enviaba el JSON literal al defensor como si fuera el texto del ataque.
+        out.update(ok=False, error="el modelo devolvió un JSON sin mensaje (prompt vacío)")
+        return out
+    if obj:
         cat = obj.get("categoria")
         out.update(prompt=obj["prompt"].strip()[:1200], parse_ok=True,
                    categoria=cat if cat in CATEGORIAS else "sin_clasificar")
