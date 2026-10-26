@@ -1,29 +1,35 @@
 # Prueba de extremo a extremo — partida Rojo vs Azul
 
-Generado por `e2e/demo_partida.py` el 2026-10-24T06:40:29-06:00 en 12 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
+Generado por `e2e/demo_partida.py` el 2026-10-26T10:26:47-06:00 en 14 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
 
-**Resultado: 38/38 comprobaciones correctas.**
+**Resultado: 42/42 comprobaciones correctas.**
 
-## 1. Arranque: General abre la partida; Rojo y Azul reclaman sus tokens; entra un espectador
+## 1. Preparación: cada participante entra con su nombre, entra un espectador y el árbitro inicia la partida
 
-- La partida empieza al arrancar el servidor (no hay botón de inicio); cada vista reclama su token al entrar.
-- ✅ general tiene token de equipo: esperado `True`, observado `True`
-- ✅ rojo tiene token de equipo: esperado `True`, observado `True`
-- ✅ azul tiene token de equipo: esperado `True`, observado `True`
+- Cada vista se une con un nombre visible (POST /api/sesion); la General, además, con el código de árbitro.
+- Reloj en cada vista: ⏱ 05:00 | ⏱ 05:00 | ⏱ 05:00 | ⏱ 05:00
+- ✅ general tiene su sesión y su nombre en la cabecera: esperado `True`, observado `True`
+- ✅ rojo tiene su sesión y su nombre en la cabecera: esperado `True`, observado `True`
+- ✅ azul tiene su sesión y su nombre en la cabecera: esperado `True`, observado `True`
+- ✅ todas las vistas ven la partida en preparación: esperado `['PREPARACIÓN', 'PREPARACIÓN', 'PREPARACIÓN', 'PREPARACIÓN']`, observado `['PREPARACIÓN', 'PREPARACIÓN', 'PREPARACIÓN', 'PREPARACIÓN']`
+- ✅ antes de iniciar, Rojo no puede enviar (409): esperado `True`, observado `True`
+- ✅ al iniciar, las 4 vistas muestran la cuenta atrás: esperado `True`, observado `True`
+- ✅ todas cuentan lo mismo (±2 s, el reloj lo manda el servidor): esperado `True`, observado `True`
 - ✅ el espectador no tiene token ni botones de acción: esperado `True`, observado `True`
 - ✅ marcador inicial en General: esperado `{'riesgo': 0, 'rojo': 0, 'azul': 0}`, observado `{'riesgo': 0, 'rojo': 0, 'azul': 0}`
 
-![01_general_inicio.jpg](01_general_inicio.jpg)
-![02_rojo_inicio.jpg](02_rojo_inicio.jpg)
-![03_azul_inicio.jpg](03_azul_inicio.jpg)
+![01_general_preparacion.jpg](01_general_preparacion.jpg)
+![02_general_inicio.jpg](02_general_inicio.jpg)
+![03_rojo_inicio.jpg](03_rojo_inicio.jpg)
+![04_azul_inicio.jpg](04_azul_inicio.jpg)
 
 ## 2. Rojo envía 3 correos (uno sin adjunto y dos con PDF)
 
-- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Actualización de tu recibo de nómina (24/10/2026)» | ✓ Correo enviado a ana.perez: «Tu paquete no pudo ser entregado»
+- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Actualización de tu recibo de nómina (26/10/2026)» | ✓ Correo enviado a ana.perez: «Tu paquete no pudo ser entregado»
 - ✅ los 3 envíos se confirman: esperado `3`, observado `3`
 - ✅ el buzón de Azul se actualiza solo por SSE: esperado `3`, observado `3`
 
-![04_rojo_envia_correos.jpg](04_rojo_envia_correos.jpg)
+![05_rojo_envia_correos.jpg](05_rojo_envia_correos.jpg)
 
 ## 3a. Azul abre su buzón y lee un correo
 
@@ -31,7 +37,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-24T06:40:29-06:00 en 12 s, con un 
 - ✅ dos traen PDF adjunto: esperado `2`, observado `2`
 - ✅ el detalle muestra el enlace local: esperado `True`, observado `True`
 
-![05_azul_lee_correo.jpg](05_azul_lee_correo.jpg)
+![06_azul_lee_correo.jpg](06_azul_lee_correo.jpg)
 
 ## 3b. El «empleado distraído» hace clic en el enlace del correo de paquetería
 
@@ -41,8 +47,8 @@ Generado por `e2e/demo_partida.py` el 2026-10-24T06:40:29-06:00 en 12 s, con un 
 - ✅ riesgo sube +15: esperado `15`, observado `15`
 - ✅ Rojo gana +10 (enlace sin contener): esperado `10`, observado `10`
 
-![06_enlace_de_prueba.jpg](06_enlace_de_prueba.jpg)
-![07_general_tras_clic.jpg](07_general_tras_clic.jpg)
+![07_enlace_de_prueba.jpg](07_enlace_de_prueba.jpg)
+![08_general_tras_clic.jpg](08_general_tras_clic.jpg)
 
 ## 3c. Azul reporta el correo de soporte técnico
 
@@ -60,7 +66,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-24T06:40:29-06:00 en 12 s, con un 
 - ✅ Rojo pierde los 10 del enlace: esperado `0`, observado `0`
 - ✅ Azul suma 15 (25): esperado `25`, observado `25`
 
-![08_azul_contiene_enlace.jpg](08_azul_contiene_enlace.jpg)
+![09_azul_contiene_enlace.jpg](09_azul_contiene_enlace.jpg)
 
 ## 3e. Azul abre el PDF de nómina y luego lo reporta
 
@@ -74,20 +80,20 @@ Generado por `e2e/demo_partida.py` el 2026-10-24T06:40:29-06:00 en 12 s, con un 
 - ✅ el aviso dice el riesgo real de la partida, no solo el −10 de la regla: esperado `True`, observado `True`
 - ✅ la lista del buzón marca el PDF como reportado: esperado `1`, observado `1`
 
-![09_general_pdf_abierto.jpg](09_general_pdf_abierto.jpg)
-![10_azul_reporta_pdf.jpg](10_azul_reporta_pdf.jpg)
+![10_general_pdf_abierto.jpg](10_general_pdf_abierto.jpg)
+![11_azul_reporta_pdf.jpg](11_azul_reporta_pdf.jpg)
 
 ## 4. Verificación: misiones, marcador en General y Espectador
 
 - Marcador final antes de cerrar: {'riesgo': 0, 'rojo': 0, 'azul': 35, 'clics': 1, 'contenciones': 1, 'reportes': 2, 'pdf': 1}
-- Líneas de auditoría en General: 18
+- Líneas de auditoría en General: 19
 - ✅ misiones completadas: reportar, contener y documento; la manual pendiente: esperado `[True, True, False, True]`, observado `[True, True, False, True]`
 - ✅ General y Espectador ven el mismo marcador: esperado `{'riesgo': 0, 'rojo': 0, 'azul': 35, 'clics': 1, 'contenciones': 1, 'reportes': 2, 'pdf': 1}`, observado `{'riesgo': 0, 'rojo': 0, 'azul': 35, 'clics': 1, 'contenciones': 1, 'reportes': 2, 'pdf': 1}`
 - ✅ la auditoría de General registró la partida: esperado `True`, observado `True`
 
-![11_azul_misiones.jpg](11_azul_misiones.jpg)
-![12_espectador_marcador.jpg](12_espectador_marcador.jpg)
-![13_general_auditoria_maximizada.jpg](13_general_auditoria_maximizada.jpg)
+![12_azul_misiones.jpg](12_azul_misiones.jpg)
+![13_espectador_marcador.jpg](13_espectador_marcador.jpg)
+![14_general_auditoria_maximizada.jpg](14_general_auditoria_maximizada.jpg)
 
 ## 5. General finaliza la partida y se muestra el resultado
 
@@ -98,9 +104,9 @@ Generado por `e2e/demo_partida.py` el 2026-10-24T06:40:29-06:00 en 12 s, con un 
 - ✅ tras finalizar, Rojo ya no puede enviar (409): esperado `True`, observado `True`
 - ✅ sin errores de consola inesperados en ninguna vista: esperado `[]`, observado `[]`
 
-![14_general_resultado.jpg](14_general_resultado.jpg)
-![15_espectador_resultado.jpg](15_espectador_resultado.jpg)
-![16_rojo_tras_finalizar.jpg](16_rojo_tras_finalizar.jpg)
+![15_general_resultado.jpg](15_general_resultado.jpg)
+![16_espectador_resultado.jpg](16_espectador_resultado.jpg)
+![17_rojo_tras_finalizar.jpg](17_rojo_tras_finalizar.jpg)
 
 ## Eventos escritos en eventos.jsonl (formato para Wazuh)
 
@@ -114,5 +120,6 @@ Generado por `e2e/demo_partida.py` el 2026-10-24T06:40:29-06:00 en 12 s, con un 
 
 ## Comportamientos inesperados
 
-- (esperado) Error de consola (rojo, paso 9): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es el envío rechazado a propósito tras finalizar
+- (esperado) Error de consola (rojo, paso 1): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es un envío rechazado a propósito (antes de iniciar o tras finalizar)
+- (esperado) Error de consola (rojo, paso 9): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es un envío rechazado a propósito (antes de iniciar o tras finalizar)
 - Ninguno: todas las comprobaciones pasaron y no hubo errores de consola inesperados.
