@@ -23,7 +23,8 @@ const API = (() => {
   }
 
   const TIPOS = ["ronda_inicio", "ataque", "etapa", "decision", "auditoria", "metricas", "fin", "error",
-    "ollama_estado", "ronda_error", "reto_enviado", "reto_respondido", "reto_cancelado", "partida_fin", "marcador_partida", "partida_finalizada"];
+    "ollama_estado", "ronda_error", "reto_enviado", "reto_respondido", "reto_cancelado", "partida_fin", "marcador_partida", "partida_finalizada",
+    "partida_estado"];
 
   // handlers: {tipo: fn(data)}; onEstado("conectado"|"reconectando")
   function conectar(handlers, onEstado) {
@@ -55,9 +56,12 @@ const API = (() => {
 
   return {
     setToken: (t) => { token = t || null; },
+    // Sesión por participante: nombre visible + equipo (+ código si es el árbitro) -> {token, participante, partida}
+    unirse: (nombre, equipo, codigo) => req("POST", "/api/sesion", { nombre, equipo, codigo: codigo || undefined }),
+    miSesion: () => req("GET", "/api/sesion"),
+    iniciarPartida: (duracion_min) => req("POST", "/api/partida/iniciar", { duracion_min }),
+    nuevaPartida: () => req("POST", "/api/partida/nueva", {}),
     tieneToken: () => !!token,
-    // El servidor entrega el token de cada equipo UNA sola vez por partida -> {equipo, token}; 409 si ya está tomado.
-    reclamarEquipo: (equipo) => req("POST", "/api/equipo/reclamar", { equipo }),
     estado: () => req("GET", "/api/estado"),
     metricas: () => req("GET", "/api/metricas"),
     iniciarSimulacion: () => req("POST", "/api/simulacion/iniciar", {}),

@@ -458,14 +458,76 @@ const R = (() => {
   // Controles que el servidor rechazaría (403) sin token de equipo. Exportar y cambiar de pestaña son locales.
   const ACCIONES_EQUIPO = "#main-wrap, #term-form, [data-refrescar], [data-probar], [data-probar-modelo], " +
     "#reto-aceptar, #reto-rechazar, #partida-revancha";
-  // Sin token válido (sin reclamar o espectador) las acciones se ocultan; DETENER es solo del árbitro (general).
+  // Sin sesión válida (sin unirse o espectador) las acciones se ocultan; DETENER es solo del árbitro (general).
   // Se usa style.display (no `hidden`) porque .btn fija su propio display.
+  const vista = { conToken: false, rol: "", partida: null };
+  const ocultar = (sel, si) => document.querySelectorAll(sel).forEach((n) => { n.style.display = si ? "none" : ""; });
   function setPermisos(conToken, rol) {
-    const ocultar = (sel, si) => document.querySelectorAll(sel).forEach((n) => { n.style.display = si ? "none" : ""; });
+    Object.assign(vista, { conToken, rol });
     ocultar(ACCIONES_EQUIPO, !conToken);
     ocultar("#btn-stop", !conToken || rol !== "general");
     ocultar("#btn-buzon", !conToken || (rol !== "rojo" && rol !== "azul")); // correos: Rojo envía, Azul recibe
-    ocultar("#btn-finalizar", !conToken || rol !== "general"); // cerrar la partida es cosa del árbitro
+    pintarArbitro();
+  }
+  // Controles del árbitro según la fase: preparación -> duración + iniciar; en curso -> finalizar; finalizada -> nueva.
+  function pintarArbitro() {
+    const arb = vista.conToken && vista.rol === "general";
+    const fase = vista.partida ? vista.partida.fase : "preparacion";
+    ocultar("#duracion-wrap, #btn-iniciar-partida", !arb || fase !== "preparacion");
+    ocultar("#btn-finalizar", !arb || fase !== "en_curso");
+    ocultar("#btn-nueva-partida", !arb || fase !== "finalizada");
+  }
+
+  // ---------- partida: fase y cuenta atrás (el servidor manda; aquí solo se interpola entre sus avisos) ----------
+  let relojPartida = null;
+  const mmss = (s) => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  function setPartida(p) {
+    vista.partida = p;
+    const el = $("partida-estado");
+    const base = performance.now();
+    const pintar = () => {
+      if (p.fase === "en_curso") {
+        const s = Math.max(0, Math.round(p.restante_s - (performance.now() - base) / 1000));
+        el.textContent = "⏱ " + mmss(s) + (s === 0 ? " · cerrando…" : "");
+        el.classList.toggle("pe-ultimo", s <= 60);
+      } else {
+        el.textContent = p.fase === "preparacion" ? "PREPARACIÓN" : "FINALIZADA" + (p.motivo_fin === "tiempo" ? " (tiempo)" : "");
+        el.classList.remove("pe-ultimo");
+      }
+    };
+    el.className = "partida-estado pe-" + p.fase;
+    const quien = (p.participantes || []).map((x) => x.nombre + " (" + (NOMBRE_EQUIPO[x.equipo] || x.equipo) + ")");
+    el.title = "Partida " + p.id + (p.duracion_s ? " · " + p.duracion_s / 60 + " min" : "") +
+      "\nParticipantes (" + quien.length + "): " + (quien.join(", ") || "—");
+    clearInterval(relojPartida);
+    pintar();
+    if (p.fase === "en_curso") relojPartida = setInterval(pintar, 1000);
+    pintarArbitro();
+  }
+
+  // ---------- unirse a la partida: nombre visible (+ código de árbitro) ----------
+  function mostrarUnirse(rol, nombrePrevio, onEnviar) {
+    $("unirse-t").textContent = "ENTRAR COMO " + (NOMBRE_EQUIPO[rol] || rol.toUpperCase());
+    $("unirse-codigo-wrap").hidden = rol !== "general";
+    $("unirse-codigo").required = rol === "general";
+    $("unirse-nombre").value = nombrePrevio || "";
+    $("unirse-error").hidden = true;
+    $("unirse-form").onsubmit = (ev) => {
+      ev.preventDefault();
+      $("unirse-entrar").disabled = true;
+      onEnviar($("unirse-nombre").value.trim(), $("unirse-codigo").value.trim());
+    };
+    $("unirse-modal").hidden = false;
+    $("unirse-nombre").focus();
+  }
+  function errorUnirse(msg) {
+    $("unirse-error").textContent = msg;
+    $("unirse-error").hidden = false;
+    $("unirse-entrar").disabled = false;
+  }
+  function cerrarUnirse() { $("unirse-modal").hidden = true; $("unirse-entrar").disabled = false; }
+  function setParticipante(p, rol) {
+    $("equipo-tag").textContent = (NOMBRE_EQUIPO[rol] || "SIN EQUIPO") + (p ? " · " + p.nombre : "");
   }
   function setEquipo(rol) {
     const r = NOMBRE_EQUIPO[rol] ? rol : "";
@@ -788,6 +850,7 @@ const R = (() => {
     terminalAdd, terminalDatos, terminalLimpiarDatos,
     setModo, setCorriendo, setConexion, setInfo, toast,
     setVeredictoError, setOrigen, setManualOrigen, setEquipo, setPermisos, mostrarSelector,
+    setPartida, mostrarUnirse, errorUnirse, cerrarUnirse, setParticipante,
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
     mostrarBuzon, buzonAbierto, buzonEsModal, alojarBuzon, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,

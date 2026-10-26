@@ -72,7 +72,7 @@
         accion: () => { if (pulsar("btn-buzon", "Tu vista aún no tiene token de equipo.")) clicEn('[data-azul="misiones"]'); } },
       { id: "finalizar", titulo: "Finalizar partida", icono: "🏁", roles: ["general"],
         ayuda: "Finalizar la partida: congela los puntajes y muestra el resultado",
-        accion: () => pulsar("btn-finalizar", "Necesitas el token de la vista general.") },
+        accion: () => pulsar("btn-finalizar", "Solo el árbitro puede finalizar, y solo con la partida en curso.") },
     ];
 
     function visible(n) { return !!n && getComputedStyle(n).display !== "none" && !n.disabled; }

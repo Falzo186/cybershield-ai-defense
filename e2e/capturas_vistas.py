@@ -18,6 +18,8 @@ from playwright.sync_api import sync_playwright
 
 RAIZ = Path(__file__).resolve().parents[1]
 RESOLUCIONES = [(1366, 768), (1920, 1080)]
+CODIGO_ARBITRO = "246810"
+NOMBRES = {"general": "Juez", "azul": "Beto", "rojo": "Rita"}
 VISTAS = ["general", "azul", "rojo", "espectador"]  # Azul antes que Rojo, como en una partida real
 
 
@@ -26,7 +28,8 @@ def servidor():
     s.bind(("127.0.0.1", 0))
     puerto = s.getsockname()[1]
     s.close()
-    env = {**os.environ, "PUERTO": str(puerto), "CS_LAB_DB": str(Path(tempfile.mkdtemp()) / "lab.db")}
+    env = {**os.environ, "PUERTO": str(puerto), "CS_LAB_DB": str(Path(tempfile.mkdtemp()) / "lab.db"),
+           "CS_CODIGO_ARBITRO": CODIGO_ARBITRO}
     proc = subprocess.Popen([sys.executable, "server/app.py"], cwd=RAIZ, env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     base = f"http://127.0.0.1:{puerto}"
@@ -59,7 +62,14 @@ def main(destino):
                     pg = nav.new_context(viewport={"width": ancho, "height": alto}).new_page()
                     pg.goto(f"{base}/?rol={rol}")
                     pg.wait_for_selector(".ventana", state="attached")
-                    pg.wait_for_timeout(2500)  # token, SSE y estado de Ollama
+                    if rol in NOMBRES:  # cada participante se une con su nombre (el árbitro, con su código)
+                        pg.wait_for_selector("#unirse-modal:not([hidden])")
+                        pg.fill("#unirse-nombre", NOMBRES[rol])
+                        if rol == "general":
+                            pg.fill("#unirse-codigo", CODIGO_ARBITRO)
+                        pg.click("#unirse-entrar")
+                        pg.wait_for_selector("#unirse-modal", state="hidden")
+                    pg.wait_for_timeout(2500)  # sesión, SSE y estado de Ollama
                     archivo = f"{ancho}x{alto}_{rol}.png"
                     pg.screenshot(path=str(salida / archivo))
                     medidas = pg.evaluate(MEDIR)

@@ -19,12 +19,22 @@
           <span id="conn-ico" aria-hidden="true">◐</span><span id="conn-txt">Reconectando…</span>
         </span>
         <span id="equipo-tag" class="equipo-tag eq-ninguno" title="Equipo de esta sesión">SIN EQUIPO</span>
+        <span id="partida-estado" class="partida-estado pe-preparacion" role="status" title="Estado de la partida (lo cuenta el servidor)">PREPARACIÓN</span>
       </div>
       <!-- 2. Acciones de la sesión (escritorio.js añade «Vista clásica» tras «Cambiar de equipo») -->
       <div class="hdr-grupo hdr-acciones">
         <a id="lnk-equipo" class="lnk" href="?cambiar=1">⇄ Cambiar de equipo</a>
         <button type="button" id="btn-buzon" class="btn btn-mini" aria-haspopup="dialog">✉ CORREOS</button>
+        <label id="duracion-wrap" class="rondas" title="Duración de la partida (la cuenta el servidor)">Duración
+          <select id="sel-duracion" class="sel" aria-label="Duración de la partida">
+            <option value="5">5 min</option>
+            <option value="10" selected>10 min</option>
+            <option value="15">15 min</option>
+          </select>
+        </label>
+        <button type="button" id="btn-iniciar-partida" class="btn btn-mini btn-primary" title="Empieza la partida: desde ahora cuentan correos, clics, reportes y misiones">▶ INICIAR PARTIDA</button>
         <button type="button" id="btn-finalizar" class="btn btn-mini btn-danger" title="Congela los puntajes de Rojo y Azul y declara el ganador">🏁 FINALIZAR PARTIDA</button>
+        <button type="button" id="btn-nueva-partida" class="btn btn-mini" title="Prepara otra partida con los mismos participantes">↻ NUEVA PARTIDA</button>
       </div>
       <!-- 3. Marcadores -->
       <div class="hdr-grupo hdr-marcadores">
@@ -278,6 +288,24 @@
     </div>
     <button type="button" id="buzon-cerrar" class="btn">CERRAR (Esc)</button>
   </div>
+</div>
+
+<div id="unirse-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="unirse-t">
+  <form id="unirse-form" class="modal-card reto-card unirse-card" autocomplete="off">
+    <h2 id="unirse-t">ENTRAR A LA PARTIDA</h2>
+    <p class="muted">Tu nombre lo verán los demás participantes en la cronología y en los resultados.</p>
+    <label class="unirse-campo">Tu nombre
+      <input id="unirse-nombre" class="sel" type="text" maxlength="24" required spellcheck="false" placeholder="p. ej. Ana">
+    </label>
+    <label id="unirse-codigo-wrap" class="unirse-campo" hidden>Código de árbitro
+      <input id="unirse-codigo" class="sel mono" type="text" maxlength="20" inputmode="numeric" spellcheck="false" placeholder="se muestra en la consola del servidor">
+    </label>
+    <p id="unirse-error" class="unirse-error" role="alert" hidden></p>
+    <div class="reto-botones">
+      <button type="submit" id="unirse-entrar" class="btn btn-primary">ENTRAR</button>
+      <a class="btn" href="?cambiar=1">Cambiar de equipo</a>
+    </div>
+  </form>
 </div>
 
 <div id="final-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="final-t">

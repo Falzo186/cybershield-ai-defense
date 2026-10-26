@@ -363,6 +363,7 @@
       $("partida-informe").hidden = !estado.informe;
       R.mostrarPartida(d, !!estado.ultimaFin);
     },
+    partida_estado(d) { aplicarPartida(d); },
     // Marcador de la partida Rojo/Azul: solo lo muestran el árbitro (general) y los espectadores.
     marcador_partida(d) {
       if (estado.rol !== "general" && estado.rol !== "espectador") return;
@@ -638,32 +639,56 @@
     return rol;
   }
 
-  // El token se guarda por pestaña (sessionStorage): sobrevive a recargas, pero no se comparte entre equipos.
-  const SS = {
-    get(k) { try { return sessionStorage.getItem(k); } catch (_) { return null; } },
-    set(k, v) { try { sessionStorage.setItem(k, v); } catch (_) { /* almacenamiento bloqueado */ } },
-  };
-
-  // -> true si la vista quedó con token de equipo. El espectador nunca reclama: solo observa.
+  // Sesión del participante: se guarda en este navegador (localStorage) para reconectar al recargar o reabrir la
+  // pestaña; si el servidor ya no la reconoce (reinicio), se vuelve a pedir el nombre. -> true si hay sesión.
+  // El espectador no necesita sesión: solo observa.
   async function prepararToken(rol) {
     if (!rol || rol === "espectador") return false;
-    let token = SS.get("cs_token_" + rol);
-    if (token) { // un token guardado puede ser de una partida anterior (servidor reiniciado): se comprueba
+    const clave = "cs_sesion_" + rol;
+    const token = LS.get(clave);
+    if (token) {
       API.setToken(token);
-      try { await API.usuarios(); } catch (e) { if (e.status === 403) token = null; }
-      API.setToken(null);
-    }
-    if (!token) {
       try {
-        token = (await API.reclamarEquipo(rol)).token;
-        SS.set("cs_token_" + rol, token);
+        const s = await API.miSesion();
+        aplicarSesion(s.participante, s.partida);
+        return true;
       } catch (e) {
-        R.toast(e.message + " (sin token solo puede observar).");
-        return false;
+        API.setToken(null);
+        if (e.status !== 403) { R.toast("No se pudo comprobar la sesión: " + e.message); return false; }
+        LS.set(clave, ""); // el servidor no la reconoce: hay que volver a unirse
       }
     }
-    API.setToken(token);
-    return true;
+    return new Promise((resolve) => {
+      R.mostrarUnirse(rol, LS.get("cs_nombre"), async (nombre, codigo) => {
+        try {
+          const r = await API.unirse(nombre, rol, codigo);
+          LS.set(clave, r.token);
+          LS.set("cs_nombre", r.participante.nombre);
+          API.setToken(r.token);
+          aplicarSesion(r.participante, r.partida);
+          R.cerrarUnirse();
+          resolve(true);
+        } catch (e) { R.errorUnirse(e.message); }
+      });
+    });
+  }
+
+  function aplicarSesion(participante, partida) {
+    estado.participante = participante;
+    R.setParticipante(participante, estado.rol);
+    if (partida) aplicarPartida(partida);
+  }
+
+  // Estado de la partida (SSE al conectar, cada cambio y cada 15 s). Una partida nueva (otro id) limpia la vista.
+  function aplicarPartida(p) {
+    const nueva = estado.partida && estado.partida.id !== p.id;
+    estado.partida = p;
+    R.setPartida(p);
+    if (nueva) {
+      estado.finalMostrado = false;
+      R.cerrarResultado();
+      if (estado.rol === "azul" && API.tieneToken()) { cargarBuzon(); cargarMisiones(); }
+    }
   }
 
   function elegirEquipo(rol) {
@@ -700,6 +725,15 @@
     });
     document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && R.partidaAbierta()) R.cerrarPartida(); });
     $("btn-buzon").addEventListener("click", abrirBuzon);
+    $("btn-iniciar-partida").addEventListener("click", async () => {
+      const min = Number(R.valorSelect("sel-duracion"));
+      if (!window.confirm("¿Iniciar la partida de " + min + " minutos? Desde ahora cuentan correos, clics, reportes y misiones.")) return;
+      try { await API.iniciarPartida(min); } catch (e) { R.toast(e.message); } // el estado llega por SSE
+    });
+    $("btn-nueva-partida").addEventListener("click", async () => {
+      if (!window.confirm("¿Preparar una partida nueva? Correos, misiones y marcador empiezan de cero (los participantes se conservan).")) return;
+      try { await API.nuevaPartida(); } catch (e) { R.toast(e.message); }
+    });
     $("btn-finalizar").addEventListener("click", async () => {
       if (!window.confirm("¿Finalizar la partida? Se congelan los puntajes y Rojo/Azul ya no podrán actuar.")) return;
       try { await API.finalizarPartida(); } catch (e) { R.toast(e.message); } // el resultado llega por SSE

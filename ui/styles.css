@@ -590,3 +590,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   body.escritorio .aud-head h2 { font-size: 12px; }
   body.escritorio .aud .log { padding: 3px 8px; }
 }
+
+/* ---------- Fase C: estado de la partida, unirse con nombre ---------- */
+.partida-estado { font: 700 12px var(--mono); letter-spacing: .05em; padding: 3px 9px; border-radius: 12px; border: 1px solid var(--borde); white-space: nowrap; }
+.pe-preparacion { color: var(--warn); border-color: var(--warn); }
+.pe-en_curso { color: var(--ok); border-color: var(--ok); }
+.pe-en_curso.pe-ultimo { color: var(--bad); border-color: var(--bad); }
+.pe-finalizada { color: var(--texto-sec); }
+.unirse-card { text-align: left; max-width: 440px; }
+.unirse-card h2 { justify-content: flex-start; }
+.unirse-campo { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; font-size: 13px; color: var(--texto-sec); }
+.unirse-campo input { font-size: 15px; padding: 8px 10px; }
+.unirse-error { color: var(--bad); font-size: 13px; margin: 6px 0 0; }

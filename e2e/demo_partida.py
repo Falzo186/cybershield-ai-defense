@@ -25,6 +25,8 @@ from playwright.sync_api import sync_playwright
 RAIZ = Path(__file__).resolve().parents[1]
 SALIDA = RAIZ / "docs" / "capturas_demo"
 VIEWPORT = {"width": 1366, "height": 768}
+CODIGO_ARBITRO = "246810"  # se fija con CS_CODIGO_ARBITRO para el servidor de la prueba
+NOMBRES = {"general": "Juez Demo", "rojo": "Rita Rojo", "azul": "Beto Azul"}
 
 pasos = []       # [{titulo, notas, checks: [(ok, nombre, esperado, observado)], capturas: [archivo]}]
 errores_js = []  # (paso, vista, texto) de los errores de consola
@@ -90,7 +92,8 @@ def arrancar_servidor():
     puerto = s.getsockname()[1]
     s.close()
     tmp = Path(tempfile.mkdtemp(prefix="cs_e2e_"))
-    env = {**os.environ, "PUERTO": str(puerto), "CS_LAB_DB": str(tmp / "lab.db"), "PYTHONIOENCODING": "utf-8"}
+    env = {**os.environ, "PUERTO": str(puerto), "CS_LAB_DB": str(tmp / "lab.db"), "PYTHONIOENCODING": "utf-8",
+           "CS_CODIGO_ARBITRO": CODIGO_ARBITRO}
     proc = subprocess.Popen([sys.executable, "server/app.py"], cwd=RAIZ, env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     base = f"http://127.0.0.1:{puerto}"
@@ -128,21 +131,48 @@ def main(ver=False):
                 pg = ctx.new_page()
                 pg.on("console", lambda m, r=rol: errores_js.append((len(pasos), r, m.text)) if m.type == "error" else None)
                 pg.on("pageerror", lambda e, r=rol: errores_js.append((len(pasos), r, str(e))))
+                pg.on("dialog", lambda dlg: dlg.accept())  # confirmaciones (iniciar, finalizar)
                 pg.goto(f"{base}/?rol={rol}")
                 pg.wait_for_selector(".ventana", state="attached")
+                if rol in NOMBRES:  # cada participante se une con su nombre (el árbitro, además, con su código)
+                    pg.wait_for_selector("#unirse-modal:not([hidden])")
+                    pg.fill("#unirse-nombre", NOMBRES[rol])
+                    if rol == "general":
+                        pg.fill("#unirse-codigo", CODIGO_ARBITRO)
+                    pg.click("#unirse-entrar")
+                    pg.wait_for_selector("#unirse-modal", state="hidden")
                 pg.wait_for_timeout(700)
                 return ctx, pg
 
             # ---------------------------------------------------------------------------------------------
-            paso("1. Arranque: General abre la partida; Rojo y Azul reclaman sus tokens; entra un espectador")
-            nota("La partida empieza al arrancar el servidor (no hay botón de inicio); cada vista reclama su token al entrar.")
+            paso("1. Preparación: cada participante entra con su nombre, entra un espectador y el árbitro inicia la partida")
+            nota("Cada vista se une con un nombre visible (POST /api/sesion); la General, además, con el código de árbitro.")
             _, general = vista("general")
             _, rojo = vista("rojo")
             _, azul = vista("azul")
             _, espectador = vista("espectador")
             for rol, pg in (("general", general), ("rojo", rojo), ("azul", azul)):
-                chk(f"{rol} tiene token de equipo", True,
-                    bool(pg.evaluate(f"sessionStorage.getItem('cs_token_{rol}')")))
+                chk(f"{rol} tiene su sesión y su nombre en la cabecera", True,
+                    bool(pg.evaluate(f"localStorage.getItem('cs_sesion_{rol}')"))
+                    and NOMBRES[rol] in pg.inner_text("#equipo-tag"))
+            chk("todas las vistas ven la partida en preparación", ["PREPARACIÓN"] * 4,
+                [pg.inner_text("#partida-estado") for pg in (general, rojo, azul, espectador)])
+            rojo.click('[data-icono="correo"]')
+            rojo.wait_for_selector('[data-ventana="buzon"]:not([hidden])')
+            rojo.click("#btn-correo")
+            t = esperar(lambda: "no ha empezado" in toast(rojo) and toast(rojo)) or toast(rojo)
+            chk("antes de iniciar, Rojo no puede enviar (409)", True, "no ha empezado" in t)
+            rojo.locator('[data-ventana="buzon"] .ventana-cerrar').click()
+            captura(general, "general_preparacion")
+            general.select_option("#sel-duracion", "5")
+            general.click("#btn-iniciar-partida")
+            ok = esperar(lambda: all(pg.inner_text("#partida-estado").startswith("⏱") for pg in (general, rojo, azul, espectador)))
+            chk("al iniciar, las 4 vistas muestran la cuenta atrás", True, bool(ok))
+            restantes = [pg.inner_text("#partida-estado") for pg in (general, rojo, azul, espectador)]
+            nota("Reloj en cada vista: " + " | ".join(restantes))
+            segundos = [int(r[2:4]) * 60 + int(r[5:7]) for r in restantes]
+            chk("todas cuentan lo mismo (±2 s, el reloj lo manda el servidor)", True, max(segundos) - min(segundos) <= 2
+                and 290 <= min(segundos) <= 300)
             chk("el espectador no tiene token ni botones de acción", True,
                 espectador.locator("#main-wrap").is_hidden() and espectador.locator("#btn-finalizar").is_hidden())
             chk("marcador inicial en General", {"riesgo": 0, "rojo": 0, "azul": 0}, {k: valores(general)[k] for k in ("riesgo", "rojo", "azul")})
@@ -273,7 +303,6 @@ def main(ver=False):
 
             # ---------------------------------------------------------------------------------------------
             paso("5. General finaliza la partida y se muestra el resultado")
-            general.on("dialog", lambda dlg: dlg.accept())
             general.click('[data-icono="finalizar"]')
             ok = esperar(lambda: general.locator("#final-modal").is_visible())
             chk("General ve la pantalla de resultado", True, bool(ok))
@@ -288,7 +317,7 @@ def main(ver=False):
             t = esperar(lambda: "finalizó" in toast(rojo) and toast(rojo)) or toast(rojo)
             chk("tras finalizar, Rojo ya no puede enviar (409)", True, "finalizó" in t)
             captura(rojo, "rojo_tras_finalizar")
-            inesperados = [f"{r}: {e}" for n, r, e in errores_js if not (n == len(pasos) and r == "rojo" and "409" in e)]
+            inesperados = [f"{r}: {e}" for n, r, e in errores_js if not (n in (1, len(pasos)) and r == "rojo" and "409" in e)]
             chk("sin errores de consola inesperados en ninguna vista", [], inesperados)
 
             nav.close()
@@ -326,10 +355,10 @@ def escribir_resumen(duracion, eventos):
     lineas += ["", "## Comportamientos inesperados", ""]
     fallos = [(p["titulo"], nombre, esp, obs) for p in pasos for ok, nombre, esp, obs in p["checks"] if not ok]
     lineas += [f"- ❌ {t} — {n}: esperado `{e}`, observado `{o}`" for t, n, e, o in fallos]
-    # El 409 de Rojo en el último paso es el intento deliberado de enviar con la partida ya finalizada.
-    esperado = lambda n, r, e: n == len(pasos) and r == "rojo" and "409" in e  # noqa: E731
+    # Los 409 de Rojo en el primer y el último paso son intentos deliberados de enviar antes de iniciar / tras finalizar.
+    esperado = lambda n, r, e: n in (1, len(pasos)) and r == "rojo" and "409" in e  # noqa: E731
     lineas += [f"- Error de consola ({r}, paso {n}): `{e}`" for n, r, e in errores_js if not esperado(n, r, e)]
-    lineas += [f"- (esperado) Error de consola ({r}, paso {n}): `{e}` — es el envío rechazado a propósito tras finalizar"
+    lineas += [f"- (esperado) Error de consola ({r}, paso {n}): `{e}` — es un envío rechazado a propósito (antes de iniciar o tras finalizar)"
                for n, r, e in errores_js if esperado(n, r, e)]
     if not fallos and not [x for x in errores_js if not esperado(*x)]:
         lineas.append("- Ninguno: todas las comprobaciones pasaron y no hubo errores de consola inesperados.")

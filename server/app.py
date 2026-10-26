@@ -5,7 +5,6 @@ Los eventos de la batalla real se traducen desde el dict de src/lab/motor.py; na
 si Ollama falla, la ronda se reporta como ERROR y no entra en las métricas.
 """
 import asyncio
-import hmac
 import ipaddress
 import json
 import os
@@ -26,6 +25,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse  # noqa: 
 from pydantic import BaseModel, Field  # noqa: E402
 
 import mock_server as ms  # noqa: E402
+import partida as pt  # noqa: E402
 from src.lab import atacante, cliente_ollama, correos, documentos, motor, repositorio, sesion  # noqa: E402
 
 app = ms.app
@@ -49,20 +49,24 @@ OBJETIVO_TXT = "Configuración admin (objetivo del laboratorio)"
 CAPA_ETAPA = {"catalogo": "politicas", "validacion": "politicas", "permisos": "politicas",
               "autorizacion": "autorizacion", "repositorio": "bd"}
 RESTO = ["politicas", "autorizacion", "herramienta", "bd"]
-# Tokens de equipo: el rol lo verifica el SERVIDOR con lo que él emitió, nunca con lo que el cliente declara.
-# Cada equipo recibe su token UNA sola vez al reclamar su vista; viven lo que dura la partida (el proceso del
-# servidor). "general" es la vista árbitro (controla ambos lados), por eso también lleva token. El espectador no
-# reclama nada: sin token solo puede hacer GET a RUTAS_PUBLICAS.
-EQUIPOS = ("rojo", "azul", "general")
-TOKENS = {}  # equipo -> token emitido
+# Sesiones por PARTICIPANTE (server/partida.py): cada persona se une con un nombre visible y un equipo y recibe su
+# propio token; el equipo y el rol los fija el SERVIDOR con lo que él emitió, nunca lo que declare el cliente. La
+# vista «general» (árbitro) exige el código que se imprime en la consola al arrancar. Sin sesión (espectador
+# anónimo) solo se puede hacer GET a RUTAS_PUBLICAS; una sesión de espectador tampoco puede modificar nada.
+CODIGO_ARBITRO = os.getenv("CS_CODIGO_ARBITRO") or f"{secrets.randbelow(10 ** 6):06d}"
+SALA = pt.Sala(CODIGO_ARBITRO)
 RUTAS_PUBLICAS = ("/api/eventos", "/api/estado")
-RUTA_RECLAMAR = "/api/equipo/reclamar"
-# Rutas reservadas a UN equipo (además de exigir token). Detener la partida es cosa del árbitro; Rojo envía
-# correos de entrenamiento y Azul los lee en su buzón.
+RUTA_SESION = "/api/sesion"
+# Rutas reservadas a UN equipo (además de exigir sesión). Detener, iniciar y cerrar la partida es cosa del árbitro;
+# Rojo envía correos de entrenamiento y Azul los lee en su buzón.
 SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul",
-               "/api/evento": "azul", "/api/partida/finalizar": "general"}
-# Partida = proceso del servidor: los correos se guardan con este id y el buzón solo muestra los de esta partida.
-PARTIDA_ID = datetime.now().strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(2)
+               "/api/evento": "azul", "/api/partida/finalizar": "general", "/api/partida/iniciar": "general",
+               "/api/partida/nueva": "general"}
+# Partida con fases (preparación -> en curso -> finalizada) y temporizador en el servidor. Los correos, misiones y
+# eventos se guardan con PARTIDA_ID; «nueva partida» empieza otra sin reiniciar el proceso.
+PARTIDA = pt.Partida()
+PARTIDA_ID = PARTIDA.id
+TAREA_TIEMPO = None  # tarea que cierra la partida al agotarse el tiempo
 USUARIO_AZUL_DEFECTO = "ana.perez"
 USUARIO_EQUIPO = {}  # equipo -> usuario semilla con el que juega (hoy solo azul: dueño del buzón)
 # Riesgo de la partida Rojo/Azul (buzón): cada evento aplica su consecuencia fija de sesion.REGLAS_EVENTO.
@@ -125,26 +129,25 @@ def _prohibido(msg, status=403):
     return JSONResponse({"error": msg, "mensaje": msg}, status_code=status)
 
 
-# ---------- verificación del equipo por token ----------
-def _equipo_de_token(token):
-    """-> equipo dueño del token, o None. Comparación en tiempo constante."""
-    if not token:
-        return None
-    for equipo, emitido in TOKENS.items():
-        if hmac.compare_digest(token.encode(), emitido.encode()):
-            return equipo
-    return None
-
-
+# ---------- verificación de la sesión del participante ----------
 @app.middleware("http")
-async def _verificar_equipo(request: Request, call_next):
-    """Toda ruta /api exige un token válido, salvo reclamar equipo y el GET de solo lectura del espectador."""
+async def _verificar_sesion(request: Request, call_next):
+    """Toda ruta /api exige la sesión de un participante, salvo unirse y el GET de solo lectura del espectador.
+    El equipo sale de la sesión emitida por el servidor; una sesión de espectador nunca modifica nada."""
     ruta = request.url.path
-    if not ruta.startswith("/api/") or ruta == RUTA_RECLAMAR:
+    if not ruta.startswith("/api/"):
         return await call_next(request)
-    request.state.equipo = _equipo_de_token(request.headers.get("X-Equipo-Token"))
-    if request.state.equipo is None and not (request.method == "GET" and ruta in RUTAS_PUBLICAS):
-        return _prohibido("Falta un token de equipo válido. Sin equipo (espectador) solo se puede leer eventos y estado.")
+    _vencer_si_toca()  # el tiempo lo manda el servidor: se comprueba en cada petición, no solo en la tarea
+    if ruta == RUTA_SESION and request.method == "POST":
+        return await call_next(request)
+    p = SALA.por_token(request.headers.get("X-Equipo-Token"))
+    request.state.participante = p
+    request.state.equipo = p.equipo if p else None
+    if p is None and not (request.method == "GET" and ruta in RUTAS_PUBLICAS):
+        return _prohibido("Falta una sesión válida: únete a la partida con tu nombre. "
+                          "Sin sesión (espectador) solo se puede leer eventos y estado.")
+    if p is not None and p.rol == "espectador" and request.method != "GET":
+        return _prohibido("Los espectadores solo observan: no pueden modificar la partida.")
     dueno = SOLO_EQUIPO.get(ruta)
     if dueno and request.state.equipo != dueno:
         return _prohibido(f"Solo el equipo {dueno} puede usar {ruta}.")
@@ -158,30 +161,111 @@ def _rol_no_coincide(request, declarado):
     return None
 
 
-class ReclamarEquipoIn(BaseModel):
-    equipo: str = Field(..., pattern="^(" + "|".join(EQUIPOS) + ")$")
-    usuario: str | None = Field(None, min_length=1, max_length=50)  # solo azul: usuario semilla dueño del buzón
+class SesionIn(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=40)
+    equipo: str = Field(..., pattern="^(" + "|".join(pt.EQUIPOS) + ")$")
+    codigo: str | None = Field(None, max_length=20)    # solo «general»: código de árbitro
+    usuario: str | None = Field(None, min_length=1, max_length=50)  # solo azul, el primero: usuario semilla del buzón
 
 
-@app.post(RUTA_RECLAMAR)
-async def reclamar_equipo(body: ReclamarEquipoIn):
-    """Entrega el token del equipo UNA sola vez por partida; un segundo reclamo del mismo equipo se rechaza."""
-    if body.equipo in TOKENS:
-        return _prohibido(f"El equipo {body.equipo.upper()} ya está tomado en esta partida. "
-                          "Entre como espectador o reinicie el servidor para una partida nueva.", 409)
+def _estado_partida():
+    return {**PARTIDA.publico(), "participantes": [p.publico() for p in SALA.participantes()]}
+
+
+def _emitir_partida():
+    ms.emitir("partida_estado", _estado_partida())
+
+
+@app.post(RUTA_SESION)
+async def unirse(body: SesionIn, request: Request):
+    """Une a un participante con su nombre visible y equipo -> {token, participante, partida}. El token es solo suyo:
+    se guarda en su navegador para reconectar (GET /api/sesion) sin volver a unirse."""
     usuario = None
-    if body.equipo == "azul":  # la identidad sale de la tabla usuarios (el sistema), no de lo que diga el cliente
+    if body.equipo == "azul" and "azul" not in USUARIO_EQUIPO:
+        # el buzón del equipo azul es de un usuario semilla (la identidad sale de la tabla usuarios, no del cliente)
         usuario = body.usuario or USUARIO_AZUL_DEFECTO
         try:
             repositorio.por_defecto().identidad(usuario)
         except KeyError:
             return _error400(f"Usuario desconocido: {usuario}")
+    try:
+        p = SALA.unirse(body.nombre, body.equipo, body.codigo, cliente=request.client.host if request.client else "?")
+    except pt.ErrorSesion as e:
+        return _prohibido(e.mensaje, e.status)
+    if usuario:
         USUARIO_EQUIPO["azul"] = usuario
-    TOKENS[body.equipo] = secrets.token_urlsafe(24)  # sin await entre comprobar y asignar: no hay carrera
-    ms.emitir("auditoria", ms.aud("SYSTEM", "EQUIPO_RECLAMADO", body.equipo, "OK", "BAJO"))
-    if body.equipo == "azul":
+    ms.emitir("auditoria", ms.aud("SYSTEM", "PARTICIPANTE_UNIDO", f"{p.nombre} · {p.equipo}", "OK", "BAJO"))
+    _emitir_partida()
+    if p.equipo == "azul":
         _emitir_marcador()  # el marcador ya sabe con qué usuario juega Azul
-    return {"equipo": body.equipo, "token": TOKENS[body.equipo], "usuario": usuario}
+    return {"token": p.token, "participante": p.publico(), "partida": _estado_partida(),
+            "usuario_azul": USUARIO_EQUIPO.get("azul")}
+
+
+@app.get(RUTA_SESION)
+async def mi_sesion(request: Request):
+    """Reconexión: con un token válido devuelve el participante y la partida (403 si el token no existe)."""
+    return {"participante": request.state.participante.publico(), "partida": _estado_partida()}
+
+
+@app.get("/api/partida")
+async def estado_partida():
+    return _estado_partida()
+
+
+class IniciarPartidaIn(BaseModel):
+    duracion_min: int
+
+
+@app.post("/api/partida/iniciar")
+async def iniciar_partida(body: IniciarPartidaIn):
+    """Solo el árbitro: preparación -> en curso, con 5, 10 o 15 min contados por el servidor."""
+    global TAREA_TIEMPO
+    try:
+        PARTIDA.iniciar(body.duracion_min)
+    except pt.ErrorSesion as e:
+        return _prohibido(e.mensaje, e.status)
+    repositorio.por_defecto().registrar(None, "PARTIDA_INICIADA", PARTIDA_ID, f"{body.duracion_min} min", "BAJO")
+    ms.emitir("auditoria", ms.aud("SYSTEM", "PARTIDA_INICIADA", PARTIDA_ID, f"{body.duracion_min} min", "BAJO"))
+    TAREA_TIEMPO = asyncio.create_task(_vigilar_tiempo(PARTIDA))
+    _emitir_partida()
+    return _estado_partida()
+
+
+async def _vigilar_tiempo(partida):
+    """Cierra la partida al agotarse el tiempo y reenvía el estado cada 15 s para que los relojes se resincronicen."""
+    while partida is PARTIDA and partida.fase == "en_curso":
+        await asyncio.sleep(max(0.2, min(15, partida.restante_s())))
+        if partida is not PARTIDA or partida.fase != "en_curso":
+            return
+        if partida.vencida():
+            _cerrar_partida("tiempo")
+            return
+        _emitir_partida()
+
+
+def _vencer_si_toca():
+    """Si el tiempo ya se agotó (aunque la tarea aún no lo haya visto), la partida se cierra ahora."""
+    if PARTIDA.vencida():
+        _cerrar_partida("tiempo")
+
+
+@app.post("/api/partida/nueva")
+async def nueva_partida():
+    """Solo el árbitro y con la partida finalizada: empieza otra en preparación, sin reiniciar el servidor. Las
+    sesiones de los participantes se conservan; correos, misiones, riesgo y marcador empiezan de cero."""
+    global PARTIDA, PARTIDA_ID, ESTADO_PARTIDA, RESULTADO_FINAL
+    if PARTIDA.fase != "finalizada":
+        return _prohibido("Solo se puede empezar una partida nueva cuando la actual ha finalizado.", 409)
+    PARTIDA = pt.Partida()
+    PARTIDA_ID = PARTIDA.id
+    repositorio.PARTIDA = PARTIDA_ID
+    ESTADO_PARTIDA = sesion.EstadoSesion()
+    RESULTADO_FINAL = None
+    ms.emitir("auditoria", ms.aud("SYSTEM", "PARTIDA_NUEVA", PARTIDA_ID, "PREPARACIÓN", "BAJO"))
+    _emitir_partida()
+    _emitir_marcador()
+    return _estado_partida()
 
 
 # ---------- endpoints ----------
@@ -343,23 +427,33 @@ def _marcador():
 
 
 def _partida_cerrada():
-    """Tras POST /api/partida/finalizar, las acciones de Rojo/Azul se rechazan con 409."""
-    if RESULTADO_FINAL:
+    """Las acciones de Rojo/Azul (correo, reportar, contener, PDF, misión manual) solo valen con la partida en curso:
+    antes de iniciarla o tras finalizarla -> 409."""
+    if PARTIDA.fase == "preparacion":
+        return _prohibido("La partida aún no ha empezado: el árbitro debe iniciarla.", 409)
+    if PARTIDA.fase == "finalizada":
         return _prohibido("La partida ya finalizó: los puntajes están congelados.", 409)
     return None
 
 
 @app.post("/api/partida/finalizar")
 async def finalizar_partida():
-    """Solo General (SOLO_EQUIPO): congela los puntajes de Rojo y Azul, declara ganador o empate y lo difunde."""
+    """Solo General (SOLO_EQUIPO): termina la partida antes de tiempo (congela puntajes y declara ganador)."""
+    try:
+        return _cerrar_partida("arbitro")
+    except pt.ErrorSesion as e:
+        return _prohibido(e.mensaje, e.status)
+
+
+def _cerrar_partida(motivo):
+    """Congela los puntajes de Rojo y Azul, declara ganador o empate y lo difunde. motivo: "arbitro" | "tiempo"."""
     global RESULTADO_FINAL
-    if cerrada := _partida_cerrada():
-        return cerrada
+    PARTIDA.finalizar(motivo)  # ErrorSesion si no está en curso
     m = _marcador()
     rojo, azul = m["puntos_rojo"], m["puntos_azul"]
     ganador = "rojo" if rojo > azul else "azul" if azul > rojo else "empate"
     RESULTADO_FINAL = {"partida": PARTIDA_ID, "puntos_rojo": rojo, "puntos_azul": azul, "ganador": ganador,
-                       "ts": datetime.now().astimezone().isoformat(timespec="seconds"), "marcador": m}
+                       "ts": datetime.now().astimezone().isoformat(timespec="seconds"), "motivo": motivo, "marcador": m}
     repositorio.por_defecto().registrar(None, "PARTIDA_FINALIZADA", PARTIDA_ID,
                                         f"ROJO {rojo} - AZUL {azul} · {ganador.upper()}", "BAJO")
     ms.emitir("auditoria", ms.aud("SYSTEM", "PARTIDA_FINALIZADA", PARTIDA_ID,
@@ -367,6 +461,7 @@ async def finalizar_partida():
     final = _marcador()
     ms.emitir("marcador_partida", final)
     ms.emitir("partida_finalizada", final["final"] | {"marcador": final})
+    _emitir_partida()
     return final["final"]
 
 
@@ -375,8 +470,10 @@ def _emitir_marcador():
 
 
 async def _hook_marcador():
-    """Al conectar el SSE (también un espectador sin token) llega el marcador actual."""
-    return "event: marcador_partida\ndata: " + json.dumps(_marcador(), ensure_ascii=False) + "\n\n"
+    """Al conectar el SSE (también un espectador sin token) llegan el estado de la partida y el marcador actual."""
+    _vencer_si_toca()
+    return ("event: partida_estado\ndata: " + json.dumps(_estado_partida(), ensure_ascii=False) + "\n\n"
+            "event: marcador_partida\ndata: " + json.dumps(_marcador(), ensure_ascii=False) + "\n\n")
 
 
 ms.ON_CONEXION.insert(0, _hook_marcador)  # primero: el de Ollama puede tardar segundos si Ollama no responde
@@ -505,9 +602,11 @@ _CABECERAS_ENLACE = {"Content-Security-Policy": "default-src 'none'; style-src '
 async def abrir_enlace(enlace_id: str):
     """Enlace de un correo de entrenamiento: registra el clic en auditoría y muestra una página FIJA (no refleja
     nada de la petición). Solo existen los enlaces que generó el servidor."""
-    if RESULTADO_FINAL:  # partida cerrada: el clic ya no tiene consecuencia ni se registra
+    _vencer_si_toca()
+    if PARTIDA.fase != "en_curso":  # fuera de la partida el clic no tiene consecuencia ni se registra
         return HTMLResponse(_PAGINA_ENLACE.format(
-            titulo="La partida terminó", texto="Este enlace de entrenamiento pertenecía a una partida ya finalizada."),
+            titulo="La partida no está en curso",
+            texto="Este enlace de entrenamiento solo cuenta mientras la partida está en curso."),
             status_code=409, headers=_CABECERAS_ENLACE)
     clic = None
     if 8 <= len(enlace_id) <= 32 and all(ch.isalnum() or ch in "-_" for ch in enlace_id):
@@ -1010,4 +1109,5 @@ ms.montar_ui(app)
 
 if __name__ == "__main__":
     ms.anunciar(ms.puerto())
+    print(f"Código de árbitro (vista General): {CODIGO_ARBITRO}", flush=True)
     uvicorn.run(app, host="0.0.0.0", port=ms.puerto())

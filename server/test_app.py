@@ -1,4 +1,5 @@
-"""Pruebas del servidor sin Ollama (tokens de equipo y buzón), con BD en memoria. Ejecutar: python server/test_app.py"""
+"""Pruebas del servidor sin Ollama (sesiones, partida, buzón, misiones, marcador), con BD en memoria.
+Ejecutar: python server/test_app.py"""
 import sys
 from pathlib import Path
 
@@ -20,29 +21,67 @@ def chk(nombre, cond):
 def main():
     repositorio._DEFECTO = repositorio.abrir(":memory:")  # nunca toca data/lab.db
     c = TestClient(srv.app)
+    c.__enter__()  # un solo bucle de eventos para toda la prueba (la tarea del temporizador vive en él)
     H = lambda t: {"X-Equipo-Token": t}  # noqa: E731
+    unirse = lambda equipo, nombre, **extra: c.post("/api/sesion", json={"nombre": nombre, "equipo": equipo, **extra})  # noqa: E731
+    mensaje = lambda r: r.json().get("mensaje", "")  # noqa: E731
 
-    # --- espectador (sin token) ---
+    # --- espectador (sin sesión) ---
     chk("espectador lee estado", c.get("/api/estado").status_code == 200)
     chk("espectador no lee usuarios", c.get("/api/usuarios").status_code == 403)
     chk("espectador no detiene", c.post("/api/detener", json={}).status_code == 403)
     chk("token falso rechazado", c.post("/api/detener", json={}, headers=H("falso")).status_code == 403)
-    chk("espectador no reclama token", c.post("/api/equipo/reclamar", json={"equipo": "espectador"}).status_code == 422)
+    chk("no se puede unir a un equipo inventado", unirse("morado", "Nadie").status_code == 422)
+
+    # --- sesiones por participante (nombre visible + equipo) ---
+    tr = unirse("rojo", "Rita").json()["token"]
+    chk("árbitro sin código -> 403", unirse("general", "Juez").status_code == 403)
+    chk("árbitro con código erróneo -> 403", unirse("general", "Juez", codigo="no-es").status_code == 403)
+    tg = unirse("general", "Juez", codigo=srv.CODIGO_ARBITRO).json()["token"]
+    chk("nombre repetido (sin distinguir mayúsculas) -> 409", unirse("azul", "rita").status_code == 409)
+    chk("nombre inválido -> 400", unirse("rojo", "<b>").status_code == 400)
+    yo = c.get("/api/sesion", headers=H(tr)).json()["participante"]
+    chk("reconexión: GET /api/sesion devuelve al participante",
+        (yo["nombre"], yo["equipo"], yo["rol"]) == ("Rita", "rojo", "jugador") and "token" not in yo)
+    chk("un token desconocido no reconecta", c.get("/api/sesion", headers=H("falso")).status_code == 403)
+    te = unirse("espectador", "Público").json()["token"]
+    chk("una sesión de espectador no puede modificar la partida",
+        c.post("/api/detener", json={}, headers=H(te)).status_code == 403
+        and c.post("/api/correo", json={"plantilla": "paqueteria"}, headers=H(te)).status_code == 403)
+
+    # --- partida en preparación: nada cuenta hasta que el árbitro la inicia ---
+    p = c.get("/api/partida", headers=H(te)).json()
+    chk("la partida empieza en preparación", p["fase"] == "preparacion" and p["restante_s"] is None)
+    r = c.post("/api/correo", json={"plantilla": "paqueteria"}, headers=H(tr))
+    chk("antes de iniciar, Rojo no envía correos (409)", r.status_code == 409 and "no ha empezado" in mensaje(r))
+    chk("finalizar antes de iniciar -> 409", c.post("/api/partida/finalizar", headers=H(tg)).status_code == 409)
+    chk("Rojo no inicia la partida", c.post("/api/partida/iniciar", json={"duracion_min": 5}, headers=H(tr)).status_code == 403)
+    chk("duración no permitida -> 400", c.post("/api/partida/iniciar", json={"duracion_min": 7}, headers=H(tg)).status_code == 400)
+    chk("no hay partida nueva sin terminar la actual",
+        c.post("/api/partida/nueva", headers=H(tg)).status_code == 409)
+    r = c.post("/api/partida/iniciar", json={"duracion_min": 10}, headers=H(tg))
+    chk("el árbitro inicia la partida de 10 min", r.status_code == 200 and r.json()["fase"] == "en_curso"
+        and 598 <= r.json()["restante_s"] <= 600)
+    chk("iniciar dos veces -> 409", c.post("/api/partida/iniciar", json={"duracion_min": 5}, headers=H(tg)).status_code == 409)
 
     # --- correo antes de que azul entre ---
-    tr = c.post("/api/equipo/reclamar", json={"equipo": "rojo"}).json()["token"]
     chk("correo sin azul en la partida -> 409",
         c.post("/api/correo", json={"plantilla": "paqueteria"}, headers=H(tr)).status_code == 409)
 
-    # --- reclamar ---
-    chk("azul con usuario inexistente -> 400",
-        c.post("/api/equipo/reclamar", json={"equipo": "azul", "usuario": "nadie"}).status_code == 400)
-    r = c.post("/api/equipo/reclamar", json={"equipo": "azul", "usuario": "luis.gomez"}).json()
+    # --- Azul: varios participantes, un buzón de equipo ---
+    chk("azul con usuario inexistente -> 400", unirse("azul", "Beto", usuario="nadie").status_code == 400)
+    r = unirse("azul", "Beto", usuario="luis.gomez").json()
     ta = r["token"]
-    chk("azul juega con el usuario semilla elegido", r["usuario"] == "luis.gomez")
-    tg = c.post("/api/equipo/reclamar", json={"equipo": "general"}).json()["token"]
-    chk("segundo reclamo de un equipo -> 409", c.post("/api/equipo/reclamar", json={"equipo": "rojo"}).status_code == 409)
-    chk("tokens distintos por equipo", len({tr, ta, tg}) == 3)
+    chk("azul juega con el usuario semilla elegido", r["usuario_azul"] == "luis.gomez")
+    r = unirse("azul", "Bea", usuario="ana.perez").json()
+    ta2 = r["token"]
+    chk("un segundo participante azul se une sin cambiar el usuario del buzón", r["usuario_azul"] == "luis.gomez")
+    chk("tokens distintos por participante", len({tr, ta, ta2, tg, te}) == 5)
+    parts = c.get("/api/partida", headers=H(te)).json()["participantes"]
+    chk("la partida lista a los participantes (sin tokens)",
+        {(x["nombre"], x["equipo"]) for x in parts} == {("Rita", "rojo"), ("Juez", "general"), ("Público", "espectador"),
+                                                         ("Beto", "azul"), ("Bea", "azul")}
+        and all("token" not in x for x in parts))
 
     # --- el rol lo fija el token, no el cuerpo ---
     chk("rojo declarando azul -> 403",
@@ -193,6 +232,7 @@ def main():
         == (2, 1, 1, 1, 1))  # 2 clics = el real + el CLIC_ENLACE aplicado a mano antes de reportar el PDF
     import asyncio, json  # noqa: E401
     sse = asyncio.run(srv._hook_marcador())
+    sse = sse[sse.index("event: marcador_partida\n"):]  # el mismo hook envía antes el estado de la partida
     chk("el SSE entrega el marcador al conectar (también a espectadores)",
         sse.startswith("event: marcador_partida\n") and json.loads(sse.split("data: ", 1)[1])["puntos_azul"] == 40)
     eventos = []
@@ -241,6 +281,31 @@ def main():
     chk("el marcador queda congelado con el resultado", mk["puntos_rojo"] == 15 and mk["final"]["ganador"] == "azul")
     chk("la finalización queda en auditoría", repositorio.por_defecto().auditoria(500)[0]["accion"] == "PARTIDA_FINALIZADA")
     chk("la vista de Azul sigue pudiendo leer su buzón", c.get("/api/buzon", headers=H(ta)).status_code == 200)
+    p = c.get("/api/partida", headers=H(te)).json()
+    chk("la partida queda finalizada por el árbitro", p["fase"] == "finalizada" and p["motivo_fin"] == "arbitro"
+        and p["restante_s"] == 0)
+
+    # --- partida nueva (sin reiniciar el servidor) y fin por tiempo ---
+    chk("Rojo no empieza una partida nueva", c.post("/api/partida/nueva", headers=H(tr)).status_code == 403)
+    anterior = srv.PARTIDA_ID
+    r = c.post("/api/partida/nueva", headers=H(tg))
+    chk("el árbitro empieza una partida nueva en preparación", r.status_code == 200 and r.json()["fase"] == "preparacion"
+        and r.json()["id"] != anterior and srv.PARTIDA_ID == r.json()["id"])
+    chk("las sesiones se conservan", c.get("/api/sesion", headers=H(ta)).status_code == 200)
+    chk("buzón, marcador y riesgo empiezan de cero",
+        c.get("/api/buzon", headers=H(ta)).json()["correos"] == [] and srv._marcador()["puntos_azul"] == 0
+        and srv._marcador()["final"] is None and srv.ESTADO_PARTIDA.riesgo_acumulado == 0)
+    c.post("/api/partida/iniciar", json={"duracion_min": 5}, headers=H(tg))
+    chk("en la nueva partida Rojo vuelve a poder enviar",
+        c.post("/api/correo", json={"plantilla": "paqueteria"}, headers=H(tr)).status_code == 200)
+    srv.PARTIDA._reloj = lambda: 10 ** 12  # el reloj del servidor llega al final de los 5 min
+    r = c.post("/api/correo", json={"plantilla": "paqueteria"}, headers=H(tr))
+    chk("al agotarse el tiempo la partida se cierra sola y las acciones dan 409",
+        r.status_code == 409 and "finalizó" in mensaje(r))
+    p = c.get("/api/partida", headers=H(te)).json()
+    chk("fin por tiempo, con resultado congelado", p["fase"] == "finalizada" and p["motivo_fin"] == "tiempo"
+        and srv._marcador()["final"]["motivo"] == "tiempo")
+    c.__exit__(None, None, None)
 
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)
