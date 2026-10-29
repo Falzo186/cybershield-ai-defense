@@ -152,7 +152,7 @@ Tablas `misiones(id, titulo, condicion_evento, puntos)` y `progreso_mision(parti
 ### PDFs benignos como eventos (añadido)
 PDFs fijos de solo texto en `data/pdf/` (catálogo `src/lab/documentos.py`; nunca se suben desde la UI). Plantillas con adjunto fijo: `recursos_humanos` (recibo_nomina), `paqueteria` (comprobante_envio) y la nueva `comunicado_interno` (politica_escritorio_limpio). Tabla `correos` + columna `adjunto`.
 - `GET /api/buzon`: cada correo trae `adjunto:{id, archivo, titulo}|null`, `pdf_abierto` y `pdf_reportado` (0/1).
-- `POST /api/evento` (solo token `azul`) `{tipo:"pdf_abierto"|"pdf_reportado", recurso:"correo:<id>"}` -> `{ok, documento, regla, descarga:"/pdf/<id>"|null}`. Escribe `PDF_ABIERTO`/`PDF_REPORTADO` en `auditoria`. 404 si el correo no es suyo, 409 si no trae PDF o el PDF ya se reportó.
+- `POST /api/evento` (solo token `azul`) `{tipo:"pdf_abierto"|"pdf_reportado", recurso:"correo:<id>"}` -> `{ok, documento, regla, vista}`. Escribe `PDF_ABIERTO`/`PDF_REPORTADO` en `auditoria`. 404 si el correo no es suyo, 409 si no trae PDF, si el PDF ya se reportó o si el adjunto está aislado. **Desde la Fase D** `pdf_abierto` ya no devuelve `descarga`, sino `vista` para el visor seguro (ver «Aplicación de correo»).
 - `GET /pdf/{id}` (público, solo ids del catálogo): `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`.
 - Reglas: `pdf_abierto` -> riesgo 0 y completa «Revisar un documento recibido» (misión 4, 10 pts); `pdf_reportado` -> riesgo −10.
 
@@ -191,3 +191,16 @@ Sesión por **participante** y partida con fases; lógica en `server/partida.py`
 - Las acciones de Rojo/Azul (correo, reportar, contener, `/api/evento`, misión manual, clic en `/l/{id}`) solo valen **en curso**: en preparación -> 409 «La partida aún no ha empezado», tras finalizar -> 409.
 - SSE `partida_estado` (= `GET /api/partida`): al conectar, en cada cambio (unirse, iniciar, finalizar, nueva) y cada 15 s en curso, para que los relojes de las vistas se resincronicen con el del servidor.
 - Auditoría: `PARTICIPANTE_UNIDO`, `PARTIDA_INICIADA` (también en la tabla), `PARTIDA_FINALIZADA` (con `motivo`), `PARTIDA_NUEVA`.
+
+### Aplicación de correo y visor seguro (Fase D)
+Todo lo valida el servidor: sesión `azul`, partida **en curso** (409 si no) y correo del buzón del usuario azul en esta partida (404 si no). Cada acción aplica su regla de `sesion.REGLAS_EVENTO`, y cada regla trae `explicacion` (qué acción, qué control y cómo se evita).
+- `GET /api/buzon` añade `enviados` (respuestas de Azul, carpeta «Enviados») y, por correo, `leido`, `leido_por` (participantes, en orden de lectura), `prioridad` (`alta|normal|baja`), `texto_enlace` (lo que el correo dice que enlaza), `archivado`, `aislado`, `respuestas` y `carpeta`: `archivados` > `sospechosos` (reportado) > `entrada`.
+- `POST /api/correo/{id}/leer` -> `{leido, nuevo, regla}`: primera lectura de ESE participante -> `CORREO_ABIERTO`, regla `correo_abierto` (riesgo 0: **abrir no compromete nada**). Repetir no duplica el evento.
+- `POST /api/correo/{id}/archivar` `{archivar: bool}` -> `{archivado, cambio, regla}` (`CORREO_ARCHIVADO`).
+- `POST /api/correo/{id}/verificar` -> `{de, dominio, oficial, parecido, detalle, indicadores, regla}` (`REMITENTE_VERIFICADO`). El dominio se compara con el oficial `cybershield.invalid`; `parecido` se calcula normalizando homoglifos (I/1→l, 0→o, rn→m), no lo declara la plantilla.
+- `POST /api/correo/{id}/inspeccionar` -> `{texto_mostrado, destino_real, coincide, explicacion, regla}` (`ENLACE_INSPECCIONADO`). **No cuenta como clic.**
+- `POST /api/correo/{id}/responder` `{texto: 1..1000}` -> `{id, ts, a_phishing, regla}` (`RESPUESTA_ENVIADA`). La respuesta no sale del laboratorio: queda en la tabla `respuestas`. Contestar a un remitente que no es el oficial aplica `respuesta_a_phishing` (riesgo +10); si no, `respuesta_enviada` (0).
+- `POST /api/correo/{id}/aislar` -> `{aislado, regla}` (`ARCHIVO_AISLADO`, regla −5). 409 si no hay adjunto o ya estaba aislado. Un adjunto aislado ya no se puede previsualizar y no da puntos a Rojo.
+- `GET /api/correo/enviados` (solo `rojo`) -> `{enviados:[{id, para_usuario, asunto, plantilla_id, ts, con_adjunto, clicado, adjunto_abierto}]}`: lo que una campaña real podría medir. **No** expone si se leyó ni si se reportó.
+- **Visor seguro** (`vista` de `pdf_abierto`): `{id, archivo, titulo, riesgo, tipo:"PDF (solo texto)", tamano_bytes, sha256, procedencia, indicadores, analisis, texto:[líneas]}`. El texto se extrae del flujo del propio PDF en el servidor; la UI lo pinta con `textContent` (nunca como HTML) y no descarga nada. `GET /pdf/{id}` se mantiene para quien quiera el archivo, con las mismas cabeceras.
+- Tablas nuevas: `lecturas`, `archivados`, `respuestas` (CHECK 1..1000), `aislamientos`. SIEM (`data/eventos.jsonl`): `correo_recibido`, `correo_abierto`, `remitente_verificado`, `enlace_inspeccionado`, `correo_archivado`, `respuesta_enviada`, `archivo_aislado`.

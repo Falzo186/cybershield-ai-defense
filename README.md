@@ -197,8 +197,20 @@ agotarse, la partida se cierra sola. Correos, clics, reportes y misiones solo cu
 ### Documentos (PDFs benignos)
 
 Algunas plantillas traen un **PDF fijo** de `data/pdf/` (solo texto: sin JavaScript, enlaces ni adjuntos). Azul
-puede **abrirlo** (se registra el evento `pdf_abierto` y se descarga con `Content-Disposition: attachment` y
-`nosniff`) o **reportarlo** (`pdf_reportado`). Nada se sube desde la UI y nada se ejecuta.
+puede **previsualizarlo** en el **visor seguro** de la app (texto extraído en el servidor, tamaño, SHA-256,
+procedencia, indicadores y análisis; nada se descarga ni se ejecuta), **aislarlo** o **reportarlo**.
+Nada se sube desde la UI.
+
+### Aplicación de correo (Fase D)
+
+- Carpetas **Entrada** (no leídos en negrita, prioridad visible), **Sospechosos** (reportados), **Archivados** y
+  **Enviados** (respuestas de Azul, que nunca salen del laboratorio).
+- Herramientas por correo: **Verificar remitente** (detecta dominios que imitan al oficial, p. ej. `cybershieId`),
+  **Inspeccionar enlace** (texto visible frente a destino real, sin contar como clic), **Responder**, **Archivar**.
+- Abrir un correo solo lo marca como leído por ese participante: **no compromete nada**. Las consecuencias vienen
+  de acciones concretas (clic, PDF abierto sin reportar, responder a un remitente falso), y el aviso explica qué
+  control falló y cómo se evita.
+- Rojo ve en **Enviados · seguimiento** sus correos con clics y adjuntos abiertos, no si se leyeron o reportaron.
 
 ### Misiones del Equipo Azul
 

@@ -172,6 +172,11 @@
       R.setPlantillas(p.plantillas || []);
       R.setDestinatarios(u.usuarios || []);
     } catch (e) { R.toast(e.message); }
+    cargarEnviadosRojo();
+  }
+
+  async function cargarEnviadosRojo() {
+    try { R.setEnviadosRojo((await API.enviadosRojo()).enviados || []); } catch (e) { /* p. ej. partida sin iniciar */ }
   }
 
   async function enviarCorreo() {
@@ -183,6 +188,7 @@
       R.toast("✓ Correo enviado a " + c.para_usuario + ": «" + c.asunto + "»");
     } catch (e) { R.toast(e.message); }
     $("btn-correo").disabled = false;
+    cargarEnviadosRojo();
   }
 
   // Tras refrescar, el correo abierto sigue abierto (con sus botones al día).
@@ -190,16 +196,64 @@
     try {
       const b = await API.buzon();
       const correos = b.correos || [];
+      estado.correos = correos;
+      estado.enviados = b.enviados || [];
       const abierto = correos.find((c) => c.id === estado.correoAbierto);
-      R.setBuzon(b.usuario, correos, abrirCorreo, abierto && abierto.id);
-      if (abierto) abrirCorreo(abierto); else { estado.correoAbierto = null; R.mostrarCorreo(null); }
+      pintarBuzon(b.usuario, abierto && abierto.id);
+      if (abierto) abrirCorreo(abierto, false); else { estado.correoAbierto = null; R.mostrarCorreo(null); }
     } catch (e) { if (R.buzonAbierto()) R.toast(e.message); }
   }
 
-  function abrirCorreo(c) {
+  function pintarBuzon(usuario, seleccionado) {
+    estado.usuarioBuzon = usuario || estado.usuarioBuzon;
+    R.setBuzon(estado.usuarioBuzon, estado.correos || [], abrirCorreo, seleccionado, estado.carpeta, estado.enviados,
+      (carpeta) => { estado.carpeta = carpeta; pintarBuzon(null, estado.correoAbierto); });
+  }
+
+  // leer=true: al abrirlo por primera vez ESTE participante, se marca como leído (evento correo_abierto, riesgo 0).
+  function abrirCorreo(c, leer = true) {
     estado.correoAbierto = c.id;
-    R.mostrarCorreo(c, { reportar: () => accionCorreo("reportar", c.id), contener: () => accionCorreo("contener", c.id),
-      abrirPdf: () => accionPdf("pdf_abierto", c.id), reportarPdf: () => accionPdf("pdf_reportado", c.id) });
+    R.mostrarCorreo(c, {
+      reportar: () => accionCorreo("reportar", c.id), contener: () => accionCorreo("contener", c.id),
+      abrirPdf: () => accionPdf("pdf_abierto", c.id), reportarPdf: () => accionPdf("pdf_reportado", c.id),
+      aislar: () => accionSimple(() => API.aislarAdjunto(c.id), "🧪 Adjunto aislado"),
+      archivar: (si) => accionSimple(() => API.archivarCorreo(c.id, si), si ? "🗄 Correo archivado" : "📥 De vuelta en la entrada"),
+      responder: (texto) => accionSimple(() => API.responderCorreo(c.id, texto), "↩ Respuesta registrada (no sale del laboratorio)"),
+      verificar: async () => {
+        try {
+          const v = await API.verificarRemitente(c.id);
+          R.mostrarResultadoCorreo(v.oficial ? "✓ Remitente de la organización" : v.parecido ? "⚠ El remitente IMITA al dominio oficial"
+            : "⚠ Remitente externo", [v.detalle].concat(v.indicadores.length ? ["Indicadores: " + v.indicadores.join(" · ")] : []), v.oficial);
+        } catch (e) { R.toast(e.message); }
+      },
+      inspeccionar: async () => {
+        try {
+          const i = await API.inspeccionarEnlace(c.id);
+          R.mostrarResultadoCorreo(i.coincide ? "✓ El enlace va a donde dice" : "⚠ El enlace NO va a donde dice",
+            ["Texto visible: " + i.texto_mostrado, "Destino real: " + i.destino_real, i.explicacion], i.coincide);
+        } catch (e) { R.toast(e.message); }
+      },
+    });
+    const yo = estado.participante && estado.participante.nombre;
+    const yaLeido = (c.leido_por || "").split(", ").includes(yo);
+    if (leer && !yaLeido && API.tieneToken()) {
+      API.leerCorreo(c.id).then(() => {
+        c.leido = true;
+        c.leido_por = c.leido_por ? c.leido_por + ", " + yo : yo;
+        R.marcarLeido(c.id);
+      }).catch(() => { /* p. ej. partida no iniciada: el servidor lo rechaza y se ve al actuar */ });
+    }
+  }
+
+  // Acción con aviso + regla explicada y recarga del buzón (el estado lo calcula el servidor).
+  async function accionSimple(llamada, aviso) {
+    try {
+      const r = await llamada();
+      const g = r.regla || {};  // una consecuencia negativa explica qué control falló
+      R.toast((g.riesgo > 0 ? "⚠ " : "✓ ") + aviso + textoRegla(g) + (g.riesgo > 0 && g.explicacion ? " — " + g.explicacion : ""));
+    } catch (e) { R.toast(e.message); }
+    cargarBuzon();
+    cargarMisiones();
   }
 
   // Texto del aviso tras una regla: el cambio de la regla Y el riesgo resultante de la partida (que no baja de 0,
@@ -221,19 +275,13 @@
     cargarMisiones();
   }
 
-  // Abrir/reportar el PDF adjunto: primero el evento (auditoría + regla) y, si es abrir, la descarga del PDF fijo.
+  // Previsualizar/reportar el PDF adjunto: el evento (auditoría + regla) y, si es previsualizar, el VISOR SEGURO con el
+  // texto del propio archivo y su análisis. Ya no se descarga nada al equipo del participante.
   async function accionPdf(tipo, id) {
     try {
       const r = await API.eventoPdf(tipo, id);
-      R.toast((tipo === "pdf_abierto" ? "📎 PDF abierto (evento registrado)" : "✓ PDF reportado") + textoRegla(r.regla || {}));
-      if (r.descarga && /^\/pdf\/[a-z_]{1,40}$/.test(r.descarga)) {
-        const a = document.createElement("a");
-        a.href = r.descarga;
-        a.download = "";
-        document.body.append(a);
-        a.click();
-        a.remove();
-      }
+      R.toast((tipo === "pdf_abierto" ? "📎 PDF previsualizado (evento registrado)" : "✓ PDF reportado") + textoRegla(r.regla || {}));
+      if (r.vista) R.mostrarVisor(r.vista);
     } catch (e) { R.toast(e.message); }
     cargarBuzon();
     cargarMisiones();
@@ -379,9 +427,13 @@
     },
     auditoria(d) {
       R.addAuditoria(d);
-      // Correo nuevo o clic en un enlace: el equipo azul refresca su buzón (contador y botón «Contener» al día).
+      // Correo nuevo o clic en un enlace: el equipo azul refresca su buzón (contador y botón «Contener» al día);
+      // Rojo, el seguimiento de su campaña (clics y adjuntos abiertos).
       if ((d.accion === "CORREO_ENVIADO" || d.accion === "CLIC_ENLACE") && estado.rol === "azul" && API.tieneToken()) {
         cargarBuzon();
+      }
+      if (["CLIC_ENLACE", "PDF_ABIERTO", "CORREO_ENVIADO"].includes(d.accion) && estado.rol === "rojo" && API.tieneToken()) {
+        cargarEnviadosRojo();
       }
     },
     metricas(d) { aplicarMetricas(d); },
@@ -743,6 +795,10 @@
     $("buzon-cerrar").addEventListener("click", () => R.mostrarBuzon(false));
     $("buzon-modal").addEventListener("click", (ev) => { if (ev.target === $("buzon-modal")) R.mostrarBuzon(false); });
     $("btn-buzon-refrescar").addEventListener("click", cargarBuzon);
+    $("btn-enviados-refrescar").addEventListener("click", cargarEnviadosRojo);
+    $("visor-cerrar").addEventListener("click", R.cerrarVisor);
+    $("visor-modal").addEventListener("click", (ev) => { if (ev.target === $("visor-modal")) R.cerrarVisor(); });
+    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && R.visorAbierto()) R.cerrarVisor(); });
     $("btn-misiones-refrescar").addEventListener("click", cargarMisiones);
     document.querySelectorAll("[data-azul]").forEach((t) => t.addEventListener("click", () => {
       R.setVistaAzul(t.dataset.azul);

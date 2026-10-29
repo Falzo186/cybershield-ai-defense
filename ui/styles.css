@@ -602,3 +602,33 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .unirse-campo { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; font-size: 13px; color: var(--texto-sec); }
 .unirse-campo input { font-size: 15px; padding: 8px 10px; }
 .unirse-error { color: var(--bad); font-size: 13px; margin: 6px 0 0; }
+
+/* ---------- Fase D: aplicación de correo y visor seguro ---------- */
+.carpetas { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+.carpeta { font: 600 12px var(--sans); padding: 5px 10px; border-radius: 6px; border: 1px solid var(--borde); background: transparent; color: var(--texto-sec); cursor: pointer; }
+.carpeta[aria-selected="true"] { background: var(--panel2); color: var(--texto); border-color: var(--def); }
+.carpeta b { font-family: var(--mono); color: var(--def); margin-left: 4px; }
+.buzon-item.no-leido { border-left-color: var(--warn); }
+.buzon-item.no-leido > b { font-weight: 800; }
+.marca-nuevo { color: var(--warn); } .marca-prioridad { color: var(--bad); } .marca-gris { color: var(--texto-sec); }
+.buzon-herramientas { margin: 0 0 8px; }
+.buzon-responder { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.buzon-responder textarea { width: 100%; resize: vertical; font: 13px var(--sans); padding: 6px 8px; }
+.buzon-responder button { align-self: flex-start; }
+.buzon-resultado:empty { display: none; }
+.buzon-resultado { border: 1px solid var(--borde); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; font-size: 13px; }
+.buzon-resultado ul { margin: 4px 0 0; padding-left: 18px; }
+.buzon-resultado.res-ok { border-color: var(--ok); } .buzon-resultado.res-ok b { color: var(--ok); }
+.buzon-resultado.res-mal { border-color: var(--bad); } .buzon-resultado.res-mal b { color: var(--bad); }
+.buzon-enviado { list-style: none; background: var(--panel2); border: 1px solid var(--borde); border-left: 3px solid var(--texto-sec); border-radius: 6px; padding: 8px 10px; display: grid; gap: 2px; }
+.buzon-enviado .fecha, .buzon-enviado .de { color: var(--texto-sec); font: 12px var(--mono); }
+.texto-respuesta { margin: 4px 0 0; white-space: pre-wrap; font-size: 13px; }
+.rojo-enviados { margin-top: 10px; }
+.rojo-enviados h3 { margin: 0; }
+#rojo-enviados-lista:empty::before { content: attr(data-vacio); color: var(--texto-sec); font: italic 12px var(--sans); }
+.visor-card { width: min(760px, 100%); }
+.visor-meta { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; font-size: 13px; margin: 0 0 10px; }
+.visor-meta dt { color: var(--texto-sec); }
+.visor-meta dd { margin: 0; overflow-wrap: anywhere; }
+.visor-lista { margin: 0 0 10px; padding-left: 18px; color: var(--warn); font-size: 13px; }
+.visor-texto { background: #f4f1ea; color: #1b1b1b; border-radius: 6px; padding: 14px 16px; font-size: 13px; white-space: pre-wrap; max-height: 40vh; overflow: auto; }

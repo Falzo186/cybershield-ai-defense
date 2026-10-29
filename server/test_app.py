@@ -199,11 +199,12 @@ def main():
     chk("recurso libre rechazado", ev("pdf_abierto", "../../data/lab.db").status_code == 422)
     chk("correo sin PDF -> 409", ev("pdf_abierto", f"correo:{cid}").status_code == 409)
     r = ev("pdf_abierto", f"correo:{pdf_id}")
-    chk("abrir PDF -> descarga + misión «Revisar un documento recibido»",
-        r.status_code == 200 and r.json()["descarga"] == "/pdf/recibo_nomina"
+    chk("abrir PDF -> vista previa del visor seguro + misión «Revisar un documento recibido»",
+        r.status_code == 200 and r.json()["vista"]["id"] == "recibo_nomina" and r.json()["vista"]["texto"]
+        and len(r.json()["vista"]["sha256"]) == 64 and "descarga" not in r.json()
         and [m["id"] for m in r.json()["regla"]["misiones_completadas"]] == [4]
         and repositorio.por_defecto().auditoria(5)[1]["accion"] == "PDF_ABIERTO")
-    d = c.get(r.json()["descarga"])
+    d = c.get("/pdf/recibo_nomina")  # la UI ya no lo descarga; la ruta sigue sirviéndolo solo como adjunto
     chk("el PDF se sirve solo como descarga con nosniff",
         d.status_code == 200 and d.headers["content-type"] == "application/pdf"
         and d.headers["content-disposition"].startswith("attachment") and d.headers["x-content-type-options"] == "nosniff"
@@ -251,6 +252,55 @@ def main():
     c.get(x["enlace"])
     ev("pdf_abierto", f"correo:{nuevo}")
     chk("Rojo suma 15 (enlace sin contener + PDF sin reportar)", srv._marcador()["puntos_rojo"] == 15)
+
+    # --- aplicación de correo (Fase D) ---
+    sop_id = c.post("/api/correo", json={"plantilla": "soporte_tecnico"}, headers=H(tr)).json()["id"]
+    com_id = c.post("/api/correo", json={"plantilla": "comunicado_interno"}, headers=H(tr)).json()["id"]
+    P = lambda ruta, tok, **j: c.post(ruta, json=j or {}, headers=H(tok))  # noqa: E731
+    chk("Rojo no gestiona el buzón de Azul (leer/verificar/responder/aislar -> 403)",
+        all(P(f"/api/correo/{sop_id}/{a}", tr, **({"texto": "x"} if a == "responder" else {})).status_code == 403
+            for a in ("leer", "verificar", "inspeccionar", "responder", "archivar", "aislar")))
+    chk("el espectador tampoco", P(f"/api/correo/{sop_id}/leer", te).status_code == 403)
+    r = P(f"/api/correo/{sop_id}/leer", ta)
+    chk("Beto abre el correo: primera lectura con regla de riesgo 0", r.status_code == 200 and r.json()["nuevo"]
+        and r.json()["regla"]["riesgo"] == 0 and r.json()["regla"]["explicacion"])
+    chk("volver a abrirlo no repite la regla", P(f"/api/correo/{sop_id}/leer", ta).json()["regla"] is None)
+    P(f"/api/correo/{sop_id}/leer", ta2)
+    x = [y for y in c.get("/api/buzon", headers=H(ta)).json()["correos"] if y["id"] == sop_id][0]
+    chk("el buzón dice quién lo leyó (cada participante con su nombre)", x["leido"] and x["leido_por"] == "Beto, Bea"
+        and x["prioridad"] == "alta" and x["carpeta"] == "entrada")
+    v = P(f"/api/correo/{sop_id}/verificar", ta).json()
+    chk("verificar remitente: imitación del dominio oficial", not v["oficial"] and v["parecido"] and v["indicadores"])
+    chk("verificar el comunicado interno: oficial", P(f"/api/correo/{com_id}/verificar", ta).json()["oficial"])
+    i = P(f"/api/correo/{sop_id}/inspeccionar", ta).json()
+    chk("inspeccionar: el destino real es la ruta local, distinto del texto visible",
+        not i["coincide"] and i["destino_real"].startswith("/l/") and i["texto_mostrado"].startswith("https://"))
+    riesgo0 = srv.ESTADO_PARTIDA.riesgo_acumulado
+    r = P(f"/api/correo/{sop_id}/responder", ta, texto="¿Es real?")
+    chk("responder al phishing: respuesta_a_phishing, riesgo +10 y explicación",
+        r.status_code == 200 and r.json()["a_phishing"] and r.json()["regla"]["evento"] == "respuesta_a_phishing"
+        and srv.ESTADO_PARTIDA.riesgo_acumulado == min(100, riesgo0 + 10) and "verificar el remitente" in r.json()["regla"]["explicacion"])
+    r = P(f"/api/correo/{com_id}/responder", ta2, texto="Recibido.")
+    chk("responder al comunicado interno: respuesta normal", r.json()["regla"]["evento"] == "respuesta_enviada")
+    chk("respuesta vacía -> 422", P(f"/api/correo/{com_id}/responder", ta, texto="").status_code == 422)
+    env = c.get("/api/buzon", headers=H(ta)).json()["enviados"]
+    chk("las respuestas aparecen en «Enviados» con quién respondió", {(e["participante"], e["correo_id"]) for e in env}
+        >= {("Beto", sop_id), ("Bea", com_id)})
+    chk("archivar el comunicado", P(f"/api/correo/{com_id}/archivar", ta).json()["cambio"] is True and
+        [y for y in c.get("/api/buzon", headers=H(ta)).json()["correos"] if y["id"] == com_id][0]["carpeta"] == "archivados")
+    chk("desarchivarlo", P(f"/api/correo/{com_id}/archivar", ta, archivar=False).json()["cambio"] is True)
+    chk("un correo ajeno -> 404", P(f"/api/correo/{ajeno}/verificar", ta).status_code == 404)
+    chk("aislar sin adjunto -> 409", P(f"/api/correo/{sop_id}/aislar", ta).status_code == 409)
+    r = P(f"/api/correo/{com_id}/aislar", ta)
+    chk("aislar el adjunto: regla archivo_aislado", r.status_code == 200 and r.json()["regla"]["evento"] == "archivo_aislado")
+    chk("el adjunto aislado ya no se previsualiza (409)", ev("pdf_abierto", f"correo:{com_id}").status_code == 409)
+    e = {y["id"]: y for y in c.get("/api/correo/enviados", headers=H(tr)).json()["enviados"]}
+    chk("Rojo ve su campaña (clic y adjunto abierto), no si se leyó o reportó", sop_id in e and "leido" not in e[sop_id]
+        and "reportado" not in e[sop_id])
+    chk("Azul no ve los envíos de Rojo", c.get("/api/correo/enviados", headers=H(ta)).status_code == 403)
+    acc = {f["accion"] for f in repositorio.por_defecto().auditoria(500)}
+    chk("todas las acciones del correo quedan en la auditoría", {"CORREO_RECIBIDO", "CORREO_ABIERTO", "REMITENTE_VERIFICADO",
+        "ENLACE_INSPECCIONADO", "RESPUESTA_ENVIADA", "CORREO_ARCHIVADO", "ARCHIVO_AISLADO"} <= acc)
 
     # --- finalizar la partida ---
     chk("rojo no finaliza", c.post("/api/partida/finalizar", headers=H(tr)).status_code == 403)

@@ -61,7 +61,7 @@ RUTA_SESION = "/api/sesion"
 # Rojo envía correos de entrenamiento y Azul los lee en su buzón.
 SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul",
                "/api/evento": "azul", "/api/partida/finalizar": "general", "/api/partida/iniciar": "general",
-               "/api/partida/nueva": "general"}
+               "/api/partida/nueva": "general", "/api/correo/enviados": "rojo"}
 # Partida con fases (preparación -> en curso -> finalizada) y temporizador en el servidor. Los correos, misiones y
 # eventos se guardan con PARTIDA_ID; «nueva partida» empieza otra sin reiniciar el proceso.
 PARTIDA = pt.Partida()
@@ -380,7 +380,15 @@ async def enviar_correo(body: CorreoIn):
 async def buzon():
     """Solo Azul (SOLO_EQUIPO): correos de esta partida dirigidos a su usuario."""
     usuario = USUARIO_EQUIPO.get("azul")
-    return {"usuario": usuario, "correos": repositorio.por_defecto().buzon(PARTIDA_ID, usuario) if usuario else []}
+    repo = repositorio.por_defecto()
+    return {"usuario": usuario, "correos": repo.buzon(PARTIDA_ID, usuario) if usuario else [],
+            "enviados": repo.respuestas(PARTIDA_ID, usuario) if usuario else []}  # carpeta «Enviados» de Azul
+
+
+@app.get("/api/correo/enviados")
+async def enviados_rojo():
+    """Solo Rojo (SOLO_EQUIPO): sus correos y lo que una campaña real podría medir (clic, apertura del adjunto)."""
+    return {"enviados": repositorio.por_defecto().enviados_rojo(PARTIDA_ID)}
 
 
 def _aplicar_regla(evento, usuario):
@@ -525,13 +533,14 @@ class EventoIn(BaseModel):
 
 _EVENTO_ERROR = {"sin_adjunto": ("Ese correo no trae ningún PDF adjunto.", 409),
                  "ya_reportado": ("Ese PDF ya fue reportado.", 409),
+                 "aislado": ("El adjunto está aislado: ya no se puede abrir.", 409),
                  None: ("Ese correo no está en su buzón de esta partida.", 404)}
 
 
 @app.post("/api/evento")
 async def registrar_evento(body: EventoIn):
-    """Solo Azul (SOLO_EQUIPO). Escribe el evento en auditoría y aplica su regla fija; si es pdf_abierto devuelve
-    la ruta de descarga del PDF (catálogo fijo)."""
+    """Solo Azul (SOLO_EQUIPO). Escribe el evento en auditoría y aplica su regla fija; si es pdf_abierto devuelve la
+    VISTA PREVIA para el visor seguro (texto del propio archivo y análisis). Nada se descarga ni se ejecuta."""
     if cerrada := _partida_cerrada():
         return cerrada
     usuario = USUARIO_EQUIPO.get("azul")
@@ -542,8 +551,108 @@ async def registrar_evento(body: EventoIn):
     doc = r["doc"]
     ms.emitir("auditoria", ms.aud("DEFENDER", body.tipo.upper(), f"{doc['archivo']} · correo {correo_id} · {usuario}",
                                   "OK", "BAJO"))
-    return {"ok": True, "documento": doc, "regla": _aplicar_regla(body.tipo, usuario),
-            "descarga": "/pdf/" + doc["id"] if body.tipo == "pdf_abierto" else None}
+    return {"ok": True, "documento": doc, "regla": _aplicar_regla(body.tipo, usuario), "vista": r.get("vista")}
+
+
+# ---------- aplicación de correo de Azul (Fase D): todas exigen sesión azul, partida en curso y correo propio ----------
+def _accion_azul(request):
+    if request.state.equipo != "azul":
+        return _prohibido("Solo el equipo azul puede gestionar su buzón.")
+    return _partida_cerrada()
+
+
+_NO_ES_SUYO = ("Ese correo no está en su buzón de esta partida.", 404)
+
+
+@app.post("/api/correo/{correo_id}/leer")
+async def leer_correo(correo_id: int, request: Request):
+    """Marca el correo como leído por ESTE participante. Abrir no compromete nada (regla correo_abierto, riesgo 0)."""
+    if err := _accion_azul(request):
+        return err
+    usuario, quien = USUARIO_EQUIPO.get("azul"), request.state.participante.nombre
+    r = repositorio.por_defecto().marcar_leido(PARTIDA_ID, usuario, correo_id, quien)
+    if r is None:
+        return _prohibido(*_NO_ES_SUYO)
+    regla = _aplicar_regla("correo_abierto", usuario) if r == "nuevo" else None
+    return {"leido": True, "nuevo": r == "nuevo", "regla": regla}
+
+
+class ArchivarIn(BaseModel):
+    archivar: bool = True
+
+
+@app.post("/api/correo/{correo_id}/archivar")
+async def archivar_correo(correo_id: int, body: ArchivarIn, request: Request):
+    if err := _accion_azul(request):
+        return err
+    usuario = USUARIO_EQUIPO.get("azul")
+    r = repositorio.por_defecto().archivar(PARTIDA_ID, usuario, correo_id, request.state.participante.nombre, body.archivar)
+    if r is None:
+        return _prohibido(*_NO_ES_SUYO)
+    regla = _aplicar_regla("correo_archivado", usuario) if r and body.archivar else None
+    return {"archivado": body.archivar, "cambio": r, "regla": regla}
+
+
+@app.post("/api/correo/{correo_id}/verificar")
+async def verificar_remitente(correo_id: int, request: Request):
+    """Comprueba el dominio del remitente contra el oficial (calculado, no declarado por la plantilla)."""
+    if err := _accion_azul(request):
+        return err
+    usuario = USUARIO_EQUIPO.get("azul")
+    r = repositorio.por_defecto().verificar_remitente(PARTIDA_ID, usuario, correo_id)
+    if r is None:
+        return _prohibido(*_NO_ES_SUYO)
+    return {**r, "regla": _aplicar_regla("remitente_verificado", usuario)}
+
+
+@app.post("/api/correo/{correo_id}/inspeccionar")
+async def inspeccionar_enlace(correo_id: int, request: Request):
+    """Muestra a dónde lleva de verdad el enlace, sin abrirlo (no cuenta como clic)."""
+    if err := _accion_azul(request):
+        return err
+    usuario = USUARIO_EQUIPO.get("azul")
+    r = repositorio.por_defecto().inspeccionar_enlace(PARTIDA_ID, usuario, correo_id)
+    if r is None:
+        return _prohibido(*_NO_ES_SUYO)
+    return {**r, "regla": _aplicar_regla("enlace_inspeccionado", usuario)}
+
+
+class RespuestaIn(BaseModel):
+    texto: str = Field(..., min_length=1, max_length=1000)
+
+
+@app.post("/api/correo/{correo_id}/responder")
+async def responder_correo(correo_id: int, body: RespuestaIn, request: Request):
+    """Respuesta que nunca sale del laboratorio. Contestar a un remitente que no es el oficial es una consecuencia
+    explícita (regla respuesta_a_phishing, riesgo +10)."""
+    if err := _accion_azul(request):
+        return err
+    usuario = USUARIO_EQUIPO.get("azul")
+    try:
+        r = repositorio.por_defecto().responder(PARTIDA_ID, usuario, correo_id, request.state.participante.nombre,
+                                                body.texto)
+    except ValueError as e:
+        return _error400(str(e))
+    if r is None:
+        return _prohibido(*_NO_ES_SUYO)
+    return {**r, "regla": _aplicar_regla("respuesta_a_phishing" if r["a_phishing"] else "respuesta_enviada", usuario)}
+
+
+_AISLAR_ERROR = {"sin_adjunto": ("Ese correo no trae ningún adjunto que aislar.", 409),
+                 "ya_aislado": ("Ese adjunto ya estaba aislado.", 409), None: _NO_ES_SUYO}
+
+
+@app.post("/api/correo/{correo_id}/aislar")
+async def aislar_adjunto(correo_id: int, request: Request):
+    """Aísla el adjunto: ya no se puede previsualizar y Rojo pierde sus puntos por él."""
+    if err := _accion_azul(request):
+        return err
+    usuario = USUARIO_EQUIPO.get("azul")
+    r = repositorio.por_defecto().aislar_adjunto(PARTIDA_ID, usuario, correo_id, request.state.participante.nombre)
+    if r != "aislado":
+        return _prohibido(*_AISLAR_ERROR[r])
+    ms.emitir("auditoria", ms.aud("DEFENDER", "ARCHIVO_AISLADO", f"correo {correo_id} · {usuario}", "OK", "BAJO"))
+    return {"aislado": True, "regla": _aplicar_regla("archivo_aislado", usuario)}
 
 
 @app.get("/pdf/{doc_id}")

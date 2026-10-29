@@ -239,3 +239,48 @@ servidor. Propuesta:
   - **11:** el temporizador y el resultado los da el servidor, y las 4 vistas mostraron el mismo reloj;
   - **13:** todas las pruebas pasan.
 - **Avance global estimado: ~43 %.** El bloque identidad y partida (peso 20) pasa de ~15 % a ~55 %.
+
+## 12. Informe de la Fase D — correo y documentos (rama `feature/fase-d-correo`)
+
+- **Objetivo:** que el buzón sea una aplicación de correo creíble y que los PDF se vean en un visor seguro, con
+  consecuencias que salgan de acciones concretas y se expliquen.
+- **Estado inicial:** lista única de correos con «Reportar» y «Contener»; «Abrir PDF» descargaba el archivo; no había
+  lectura, carpetas, verificación de remitente, inspección de enlaces, respuestas ni aislamiento.
+- **Archivos:**
+  - `src/lab/correos.py` (dominio oficial, prioridad, texto visible del enlace, indicadores, `verificar_remitente`);
+  - `src/lab/documentos.py` (extracción de texto del PDF y `vista_previa` con SHA-256 y análisis);
+  - `src/lab/schema.py` (tablas `lecturas`, `archivados`, `respuestas`, `aislamientos`);
+  - `src/lab/sesion.py` (reglas nuevas, todas con `explicacion`), `src/lab/repositorio.py` (acciones y eventos SIEM);
+  - `server/app.py` (`/api/correo/{id}/leer|archivar|verificar|inspeccionar|responder|aislar`, `/api/correo/enviados`);
+  - `ui/index.html`, `render.js`, `app.js`, `api.js`, `styles.css`;
+  - pruebas: `src/lab/test_correo_app.py` (nuevo), `test_eventos.py`, `server/test_app.py`, `e2e/demo_partida.py`;
+  - `docs/CONTRATO_API.md`, `README.md`, `docs/GUION_DEMO.md`.
+- **Cambios:**
+  - **Carpetas** Entrada / Sospechosos / Archivados / Enviados, calculadas en el servidor; no leídos en negrita y
+    prioridad visible; contador del botón = no leídos de la entrada.
+  - **Lectura por participante:** abrir un correo lo marca como leído por esa persona (`CORREO_ABIERTO`, riesgo 0).
+  - **Verificar remitente:** dominio comparado con `cybershield.invalid`, detectando homoglifos (`cybershieId`).
+  - **Inspeccionar enlace:** texto visible frente a destino real; no cuenta como clic.
+  - **Responder:** queda en la partida, no sale; responder a un remitente no oficial es `respuesta_a_phishing` (+10).
+  - **Aislar adjunto** (−5): impide previsualizarlo y anula los puntos de Rojo por él.
+  - **Visor seguro:** texto extraído del propio PDF en el servidor, tamaño, SHA-256, procedencia, indicadores y análisis;
+    se pinta con `textContent`, se cierra con Esc y **ya no se descarga nada**.
+  - **Rojo:** «Enviados · seguimiento» con clic y adjunto abierto (por SSE), sin saber si se leyó o reportó.
+  - Avisos: cuando una acción sube el riesgo, el aviso incluye la explicación de la regla.
+- **Pruebas (resultados reales, batería completa en verde):**
+  - `test_correo_app` 39/39 (nuevo); `test_eventos` 13/13 (añade `correo_recibido`);
+  - `server/test_app.py` 133/133: antes 112; la comprobación del PDF pasa de `descarga` a `vista`;
+  - `e2e/demo_partida.py` 52/52 en Chromium real (Playwright): antes 42; añade verificar, inspeccionar sin clic, visor
+    con texto y SHA-256 reales, Esc, ninguna descarga, carpeta Sospechosos, aislar y seguimiento de Rojo;
+  - `e2e/capturas_vistas.py`: sin scroll interno en las 4 vistas a 1366×768 y 1920×1080;
+  - el resto de suites, sin cambios. No se hizo una prueba manual aparte de las automatizadas en navegador.
+- **Cambio de contrato:** `POST /api/evento` con `pdf_abierto` devuelve `vista` en lugar de `descarga`.
+- **Decisión para revisar:** previsualizar el PDF sigue dando **+5 a Rojo** mientras no se reporte ni aísle (la regla
+  que se pidió antes). Choca con «abrir no equivale a comprometer»: si se prefiere, puede pasar a 0 y dejar los +5
+  para una acción explícita (p. ej. «habilitar contenido»).
+- **Pendiente:** misiones por participante y de las nuevas acciones (verificar, inspeccionar, aislar) → E; las
+  respuestas no tienen límite de cantidad por correo; el servidor ya en marcha (pestaña c2) debe reiniciarse para
+  cargar el esquema nuevo.
+- **Riesgos de regresión:** bajos-medios. El esquema solo añade tablas; el cambio visible es el visor en vez de la
+  descarga.
+- **Avance estimado:** ~52 % del plan (A, C y D hechas; B parcial; E, F, G y H pendientes).

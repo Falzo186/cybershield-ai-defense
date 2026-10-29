@@ -42,7 +42,8 @@ def main():
 
     tipos = [e["tipo"] for e in lineas]
     chk("se escriben solo los eventos relevantes, en orden",
-        tipos == ["autorizacion_denegada", "clic_enlace", "enlace_contenido", "clic_bloqueado", "correo_reportado",
+        tipos == ["autorizacion_denegada", "correo_recibido", "clic_enlace", "enlace_contenido", "clic_bloqueado",
+                  "correo_reportado",
                   "pdf_abierto", "pdf_reportado", "mision_completada"])
     chk("cada línea trae todos los campos", all(set(e) == CAMPOS for e in lineas))
     chk("timestamp ISO 8601 con zona", all(datetime.fromisoformat(e["timestamp"]).tzinfo is not None for e in lineas))

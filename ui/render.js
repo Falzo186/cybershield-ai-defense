@@ -651,23 +651,50 @@ const R = (() => {
     });
   }
 
+  // n = correos sin leer de la bandeja de entrada (o null antes de cargar).
   function setBotonBuzon(n) {
     $("btn-buzon").textContent = typeof n === "number" ? "✉ BUZÓN (" + n + ")" : "✉ CORREOS";
   }
 
-  // seleccionado = id del correo abierto (se conserva el resaltado al refrescar la lista).
-  function setBuzon(usuario, correos, onAbrir, seleccionado) {
+  // Carpetas: entrada · sospechosos (reportados) · archivados · enviados (respuestas de Azul). La carpeta la calcula el
+  // servidor; aquí solo se filtra. seleccionado = id del correo abierto (se conserva el resaltado al refrescar).
+  const VACIO_CARPETA = { entrada: "No hay correos en la bandeja de entrada.", sospechosos: "Ningún correo reportado.",
+    archivados: "No hay correos archivados.", enviados: "Aún no has respondido a ningún correo." };
+  function setBuzon(usuario, correos, onAbrir, seleccionado, carpeta, enviados, onCarpeta) {
+    carpeta = carpeta || "entrada";
     $("buzon-usuario").textContent = usuario ? "Buzón de " + usuario : "Sin usuario asignado";
+    const cuenta = { entrada: correos.filter((c) => c.carpeta === "entrada" && !c.leido).length,
+      sospechosos: correos.filter((c) => c.carpeta === "sospechosos").length,
+      archivados: correos.filter((c) => c.carpeta === "archivados").length, enviados: (enviados || []).length };
+    document.querySelectorAll("[data-carpeta]").forEach((b) => {
+      b.setAttribute("aria-selected", String(b.dataset.carpeta === carpeta));
+      b.onclick = () => onCarpeta && onCarpeta(b.dataset.carpeta);
+    });
+    document.querySelectorAll("[data-cuenta]").forEach((n) => { n.textContent = cuenta[n.dataset.cuenta] || ""; });
     const ul = $("buzon-lista");
     ul.replaceChildren();
-    if (!correos.length) ul.append(el("li", "buzon-vacio", "No hay correos en esta partida."));
-    correos.forEach((c) => {
-      const b = el("button", "buzon-item");
+    if (carpeta === "enviados") {
+      (enviados || []).forEach((r) => {
+        const li = el("li", "buzon-enviado");
+        li.append(el("b", null, "Re: " + r.asunto), el("span", "fecha", fechaCorta(r.ts)),
+          el("span", "de", "Para: " + r.para + " · de " + r.participante), el("p", "texto-respuesta", r.texto));
+        ul.append(li);
+      });
+      if (!(enviados || []).length) ul.append(el("li", "buzon-vacio", VACIO_CARPETA.enviados));
+      setBotonBuzon(cuenta.entrada);
+      return;
+    }
+    const lista = correos.filter((c) => c.carpeta === carpeta);
+    if (!lista.length) ul.append(el("li", "buzon-vacio", correos.length ? VACIO_CARPETA[carpeta] : "No hay correos en esta partida."));
+    lista.forEach((c) => {
+      const b = el("button", "buzon-item" + (c.leido ? "" : " no-leido"));
       b.type = "button";
+      b.dataset.correo = c.id;
       b.append(el("b", null, c.asunto), el("span", "fecha", fechaCorta(c.ts)), el("span", "de", c.de));
-      const marcas = [[c.adjunto, "marca-pdf", "📎 PDF"], [c.clicado && !c.contenido, "marca-clic", "ENLACE CLICADO"],
+      const marcas = [[c.prioridad === "alta", "marca-prioridad", "PRIORIDAD ALTA"], [!c.leido, "marca-nuevo", "SIN LEER"],
+        [c.adjunto, "marca-pdf", "📎 PDF"], [c.clicado && !c.contenido, "marca-clic", "ENLACE CLICADO"],
         [c.contenido, "marca-contenido", "CONTENIDO"], [c.reportado, "marca-reportado", "REPORTADO"],
-        [c.pdf_reportado, "marca-reportado", "PDF REPORTADO"]]
+        [c.pdf_reportado, "marca-reportado", "PDF REPORTADO"], [c.aislado, "marca-contenido", "ADJUNTO AISLADO"]]
         .filter(([si]) => si);
       if (marcas.length) {
         const m = el("span", "buzon-marcas");
@@ -684,7 +711,20 @@ const R = (() => {
       li.append(b);
       ul.append(li);
     });
-    setBotonBuzon(correos.length);
+    setBotonBuzon(cuenta.entrada);
+  }
+
+  // Tras abrirlo, el correo deja de estar «sin leer» SIN redibujar el detalle (que el usuario puede estar usando).
+  function marcarLeido(id) {
+    const b = document.querySelector('.buzon-item[data-correo="' + Number(id) + '"]');
+    if (!b) return;
+    b.classList.remove("no-leido");
+    const m = b.querySelector(".marca-nuevo");
+    if (m) m.remove();
+    const n = document.querySelector('[data-cuenta="entrada"]');
+    const queda = document.querySelectorAll(".buzon-item.no-leido").length;
+    if (n) n.textContent = queda || "";
+    setBotonBuzon(queda);
   }
 
   function botonAccion(texto, cls, hecho, textoHecho, onClick) {
@@ -695,27 +735,57 @@ const R = (() => {
     return b;
   }
 
-  // acciones = {reportar(), contener()}: Reportar siempre (deshabilitado si ya se reportó); Contener solo si el
-  // enlace ya tuvo un clic (deshabilitado si ya se contuvo).
+  // Detalle del correo. acciones = {verificar, inspeccionar, responder(texto), archivar(bool), reportar, contener,
+  // abrirPdf, aislar, reportarPdf}. Cada acción se valida en el servidor; aquí solo se ofrecen las que tienen sentido.
   function mostrarCorreo(c, acciones) {
     const d = $("buzon-detalle");
     d.replaceChildren();
     d.hidden = !c;
     if (!c) return;
-    d.append(el("h3", null, c.asunto), el("div", "meta", "De: " + c.de + " · " + fechaCorta(c.ts)),
-      el("pre", null, c.cuerpo));
+    const meta = "De: " + c.de + " · " + fechaCorta(c.ts) +
+      " · Prioridad " + (c.prioridad || "normal") + (c.leido_por ? " · Leído por " + c.leido_por : "");
+    d.append(el("h3", null, c.asunto), el("div", "meta", meta));
+    if (acciones) {
+      const t = el("div", "buzon-acciones buzon-herramientas");
+      t.append(botonAccion("🔎 Verificar remitente", "", false, "", acciones.verificar),
+        botonAccion("🔗 Inspeccionar enlace", "", false, "", acciones.inspeccionar));
+      const resp = el("button", "btn btn-mini", "↩ Responder");
+      resp.type = "button";
+      resp.addEventListener("click", () => { form.hidden = !form.hidden; if (!form.hidden) area.focus(); });
+      t.append(resp, botonAccion(c.archivado ? "📥 Devolver a la entrada" : "🗄 Archivar", "", false, "",
+        () => acciones.archivar(!c.archivado)));
+      d.append(t);
+      var form = el("form", "buzon-responder");
+      form.hidden = true;
+      var area = el("textarea", "sel");
+      area.maxLength = 1000;
+      area.rows = 3;
+      area.setAttribute("aria-label", "Texto de la respuesta");
+      area.placeholder = "La respuesta no sale del laboratorio: queda registrada en la partida.";
+      const enviar = el("button", "btn btn-mini btn-primary", "Enviar respuesta");
+      enviar.type = "submit";
+      form.append(area, enviar);
+      form.addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        if (area.value.trim()) { enviar.disabled = true; acciones.responder(area.value.trim()); }
+      });
+      d.append(form);
+    }
+    d.append(el("div", "buzon-resultado"), el("pre", null, c.cuerpo));
     if (RUTA_ENLACE.test(c.enlace || "")) {
       const a = el("a", null, "Abrir enlace de entrenamiento (" + c.enlace + ")");
       a.href = c.enlace;
       a.target = "_blank";
       a.rel = "noopener noreferrer";
+      a.title = "Pulsarlo cuenta como clic del empleado (es lo que el atacante quiere)";
       d.append(a);
     }
-    if (c.adjunto) { // PDF benigno del catálogo fijo: abrir/reportar son eventos (no se ejecuta nada)
+    if (c.adjunto) { // PDF benigno del catálogo fijo: se ve en el visor seguro; aislar/reportar son eventos
       const adj = el("div", "buzon-adjunto");
-      adj.append(el("span", null, "📎 " + c.adjunto.titulo + " · " + c.adjunto.archivo));
+      adj.append(el("span", null, "📎 " + c.adjunto.titulo + " · " + c.adjunto.archivo + " · riesgo " + c.adjunto.riesgo));
       if (acciones) {
-        adj.append(botonAccion("Abrir PDF", "", false, "", acciones.abrirPdf),
+        adj.append(botonAccion("👁 Previsualizar", "", c.aislado, "Aislado", acciones.abrirPdf),
+          botonAccion("🧪 Aislar", "", c.aislado, "✓ Aislado", acciones.aislar),
           botonAccion("⚑ Reportar PDF", "", c.pdf_reportado, "✓ PDF reportado", acciones.reportarPdf));
       }
       d.append(adj);
@@ -725,6 +795,68 @@ const R = (() => {
     f.append(botonAccion("⚑ Reportar", "", c.reportado, "✓ Reportado", acciones.reportar));
     if (c.clicado) f.append(botonAccion("⛔ Contener", "btn-danger", c.contenido, "✓ Contenido", acciones.contener));
     d.append(f);
+  }
+
+  // Resultado de verificar / inspeccionar dentro del detalle (sin ventana extra). ok: true verde, false rojo, null neutro.
+  function mostrarResultadoCorreo(titulo, lineas, ok) {
+    const r = document.querySelector("#buzon-detalle .buzon-resultado");
+    if (!r) return;
+    r.replaceChildren(el("b", null, titulo));
+    r.className = "buzon-resultado " + (ok === true ? "res-ok" : ok === false ? "res-mal" : "");
+    const ul = el("ul");
+    lineas.filter(Boolean).forEach((l) => ul.append(el("li", null, l)));
+    r.append(ul);
+  }
+
+  // ---------- visor seguro de documentos: solo texto + metadatos (nunca se ejecuta ni descarga nada) ----------
+  let focoVisor = null;
+  function mostrarVisor(v) {
+    focoVisor = document.activeElement;
+    $("visor-t").textContent = "👁 VISOR SEGURO · " + v.titulo;
+    const dl = $("visor-meta");
+    dl.replaceChildren();
+    [["Archivo", v.archivo], ["Tipo", v.tipo], ["Tamaño", v.tamano_bytes + " bytes"], ["SHA-256", v.sha256],
+      ["Procedencia", v.procedencia], ["Riesgo del contexto", v.riesgo], ["Análisis", v.analisis]].forEach(([k, val]) => {
+      dl.append(el("dt", null, k), el("dd", k === "SHA-256" ? "mono" : null, val));
+    });
+    const ind = $("visor-indicadores");
+    ind.replaceChildren();
+    if ((v.indicadores || []).length) {
+      ind.append(el("h3", null, "INDICADORES SOSPECHOSOS"));
+      const ul = el("ul", "visor-lista");
+      v.indicadores.forEach((i) => ul.append(el("li", null, i)));
+      ind.append(ul);
+    } else {
+      ind.append(el("p", "muted", "Sin indicadores sospechosos en el contexto de este documento."));
+    }
+    $("visor-texto").textContent = (v.texto || []).join("\n");
+    $("visor-modal").hidden = false;
+    $("visor-cerrar").focus();
+  }
+  function cerrarVisor() {
+    if ($("visor-modal").hidden) return;
+    $("visor-modal").hidden = true;
+    if (focoVisor && focoVisor.focus) focoVisor.focus();
+  }
+  const visorAbierto = () => !$("visor-modal").hidden;
+
+  // ---------- Rojo: seguimiento de su campaña ----------
+  function setEnviadosRojo(lista) {
+    $("rojo-enviados").hidden = false;
+    const ul = $("rojo-enviados-lista");
+    ul.replaceChildren();
+    lista.forEach((c) => {
+      const li = el("li", "buzon-enviado");
+      li.append(el("b", null, c.asunto), el("span", "fecha", fechaCorta(c.ts)), el("span", "de", "Para: " + c.para_usuario));
+      const m = el("span", "buzon-marcas");
+      m.append(el("span", "marca " + (c.clicado ? "marca-clic" : "marca-gris"), c.clicado ? "🔗 ENLACE CLICADO" : "🔗 sin clic"));
+      if (c.con_adjunto) {
+        m.append(el("span", "marca " + (c.adjunto_abierto ? "marca-pdf" : "marca-gris"),
+          c.adjunto_abierto ? "📎 ADJUNTO ABIERTO" : "📎 sin abrir"));
+      }
+      li.append(m);
+      ul.append(li);
+    });
   }
 
   // ---------- marcador de la partida Rojo/Azul (vista general y espectador, solo lectura) ----------
@@ -854,6 +986,7 @@ const R = (() => {
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
     mostrarBuzon, buzonAbierto, buzonEsModal, alojarBuzon, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
-    setVistaAzul, setMisiones, setMarcadorPartida, setOllamaComprobando, mostrarResultado, cerrarResultado, resultadoAbierto,
+    setVistaAzul, setMisiones, setMarcadorPartida, marcarLeido, mostrarResultadoCorreo, mostrarVisor, cerrarVisor,
+    visorAbierto, setEnviadosRojo, setOllamaComprobando, mostrarResultado, cerrarResultado, resultadoAbierto,
   };
 })();
