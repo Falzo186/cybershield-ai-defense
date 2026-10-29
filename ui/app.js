@@ -166,7 +166,7 @@
   // ---------- buzón de correos de entrenamiento ----------
   async function abrirBuzon() {
     R.mostrarBuzon(true, estado.rol);
-    if (estado.rol === "azul") { cargarBuzon(); cargarMisiones(); return; }
+    if (estado.rol === "azul") { cargarBuzon(); cargarMisiones(); cargarIncidentes(); return; }
     try {
       const [p, u] = await Promise.all([API.plantillasCorreo(), API.usuarios()]);
       R.setPlantillas(p.plantillas || []);
@@ -215,6 +215,7 @@
     estado.correoAbierto = c.id;
     R.mostrarCorreo(c, {
       reportar: () => accionCorreo("reportar", c.id), contener: () => accionCorreo("contener", c.id),
+      incidente: () => incidenteDesdeCorreo(c),
       abrirPdf: () => accionPdf("pdf_abierto", c.id), reportarPdf: () => accionPdf("pdf_reportado", c.id),
       aislar: () => accionSimple(() => API.aislarAdjunto(c.id), "🧪 Adjunto aislado"),
       archivar: (si) => accionSimple(() => API.archivarCorreo(c.id, si), si ? "🗄 Correo archivado" : "📥 De vuelta en la entrada"),
@@ -261,8 +262,11 @@
   function textoRegla(g) {
     const riesgo = g.riesgo ? " · regla " + (g.riesgo > 0 ? "+" : "") + g.riesgo +
       (typeof g.riesgo_acumulado === "number" ? " → riesgo de la partida " + Math.round(g.riesgo_acumulado) + "/100" : "") : "";
-    const misiones = (g.misiones_completadas || []).map((m) => "«" + m.titulo + "» +" + m.puntos + " pts");
-    return riesgo + (misiones.length ? " · misión completada: " + misiones.join(", ") : "");
+    const misiones = (g.misiones_completadas || []).map((m) => "«" + m.titulo + "» +" + m.puntos + " pts" +
+      (m.a_tiempo === false ? " (fuera de plazo)" : ""));
+    const bloqueadas = (g.misiones_bloqueadas || []).map((m) => "«" + m.titulo + "» (requiere " + m.requiere.join(", ") + ")");
+    return riesgo + (misiones.length ? " · misión completada: " + misiones.join(", ") : "") +
+      (bloqueadas.length ? " · misión bloqueada: " + bloqueadas.join(", ") : "");
   }
 
   // Reportar / contener: el servidor aplica la regla fija y avisa qué cambió (riesgo y misiones completadas).
@@ -288,7 +292,59 @@
   }
 
   async function cargarMisiones() {
-    try { R.setMisiones(await API.misiones(), completarMision); } catch (e) { if (R.buzonAbierto()) R.toast(e.message); }
+    try {
+      R.setMisiones(await API.misiones(), { completar: completarMision, asumir: asumirMision,
+        yo: estado.participante && estado.participante.nombre });
+    } catch (e) { if (R.buzonAbierto()) R.toast(e.message); }
+  }
+
+  async function asumirMision(id) {
+    try { await API.asumirMision(id); R.toast("✓ Ahora eres responsable de esa misión"); } catch (e) { R.toast(e.message); }
+    cargarMisiones();
+  }
+
+  // ---------- incidentes y credencial ficticia (Fase E) ----------
+  async function cargarIncidentes() {
+    try {
+      const [i, c] = await Promise.all([API.incidentes(), API.credenciales()]);
+      R.setIncidentes(i.incidentes || [], {
+        investigar: (id) => accionIncidente(() => API.estadoIncidente(id, "en_investigacion"), "🔎 Incidente en investigación"),
+        resolver: (id, texto) => accionIncidente(() => API.estadoIncidente(id, "resuelto", texto), "✓ Incidente resuelto"),
+      });
+      R.setCredencial(c, () => accionIncidente(() => API.revocarCredencial(), "✓ Credencial revocada"));
+      R.setCorreosIncidente(estado.correos || []);
+    } catch (e) { /* p. ej. sin sesión azul */ }
+  }
+
+  async function accionIncidente(llamada, aviso) {
+    try {
+      const r = await llamada();
+      R.toast(aviso + textoRegla(r.regla || {}));
+    } catch (e) { R.toast(e.message); }
+    cargarIncidentes();
+    cargarMisiones();
+  }
+
+  async function abrirIncidente() {
+    const titulo = $("inc-titulo").value.trim();
+    const correo = $("inc-correo").value;
+    try {
+      const r = await API.abrirIncidente(titulo, $("inc-severidad").value, correo ? Number(correo) : null);
+      $("inc-titulo").value = "";
+      R.toast("🚨 Incidente #" + r.incidente.id + " abierto" + textoRegla(r.regla || {}));
+    } catch (e) { R.toast(e.message); }
+    cargarIncidentes();
+    cargarMisiones();
+  }
+
+  // Desde un correo: pestaña de incidentes con ese correo ya elegido y un título propuesto.
+  function incidenteDesdeCorreo(c) {
+    R.setVistaAzul("incidentes");
+    cargarIncidentes().then(() => {
+      R.setCorreosIncidente(estado.correos || [], c.id);
+      if (!$("inc-titulo").value) $("inc-titulo").value = ("Correo sospechoso: " + c.asunto).slice(0, 80);
+      $("inc-titulo").focus();
+    });
   }
 
   async function completarMision(id) {
@@ -432,9 +488,18 @@
       if ((d.accion === "CORREO_ENVIADO" || d.accion === "CLIC_ENLACE") && estado.rol === "azul" && API.tieneToken()) {
         cargarBuzon();
       }
-      if (["CLIC_ENLACE", "PDF_ABIERTO", "CORREO_ENVIADO"].includes(d.accion) && estado.rol === "rojo" && API.tieneToken()) {
+      if (["CLIC_ENLACE", "PDF_ABIERTO", "CORREO_ENVIADO", "CREDENCIAL_COMPROMETIDA"].includes(d.accion) &&
+          estado.rol === "rojo" && API.tieneToken()) {
         cargarEnviadosRojo();
       }
+    },
+    // Fase E: cambios que afectan a todo el equipo azul (otro participante asumió, abrió o revocó algo).
+    misiones_cambio() { if (estado.rol === "azul" && API.tieneToken()) cargarMisiones(); },
+    incidentes_cambio() { if (estado.rol === "azul" && API.tieneToken()) { cargarIncidentes(); cargarMisiones(); } },
+    credenciales_cambio(d) {
+      if (estado.rol !== "azul" || !API.tieneToken()) return;
+      if (d.estado === "comprometida") R.toast("⚠ La credencial de " + d.usuario + " está COMPROMETIDA: revócala en Incidentes");
+      cargarIncidentes();
     },
     metricas(d) { aplicarMetricas(d); },
     fin(d) {
@@ -803,7 +868,9 @@
     document.querySelectorAll("[data-azul]").forEach((t) => t.addEventListener("click", () => {
       R.setVistaAzul(t.dataset.azul);
       if (t.dataset.azul === "misiones") cargarMisiones();
+      if (t.dataset.azul === "incidentes") cargarIncidentes();
     }));
+    $("incidente-form").addEventListener("submit", (ev) => { ev.preventDefault(); abrirIncidente(); });
     $("correo-form").addEventListener("submit", (ev) => { ev.preventDefault(); enviarCorreo(); });
     // Esc cierra el buzón solo cuando es un modal; como ventana del escritorio se cierra con su ✕.
     document.addEventListener("keydown", (ev) => {

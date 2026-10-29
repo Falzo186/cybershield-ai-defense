@@ -31,6 +31,13 @@ NOMBRES = {"general": "Juez Demo", "rojo": "Rita Rojo", "azul": "Beto Azul"}
 
 pasos = []       # [{titulo, notas, checks: [(ok, nombre, esperado, observado)], capturas: [archivo]}]
 errores_js = []  # (paso, vista, texto) de los errores de consola
+provocados = set()  # (paso, vista) donde la prueba provoca a propósito un 409 (acción que el servidor debe rechazar)
+
+
+def esperado(n, r, e):
+    """Error de consola esperado: 409 de Rojo en el primer y el último paso (enviar antes de iniciar / tras finalizar)
+    o un 409 provocado a propósito en ese paso y vista."""
+    return "409" in e and ((n in (1, len(pasos)) and r == "rojo") or (n, r) in provocados)
 
 
 def paso(titulo):
@@ -281,7 +288,7 @@ def main(ver=False):
             chk("no se descargó nada al equipo", 0, len(descargas))
             v = esperar(lambda: valores(general)["pdf"] == 1 and valores(general)) or valores(general)
             chk("Rojo gana +5 (PDF abierto sin reportar)", 5, v["rojo"])
-            chk("Azul suma 10 (misión del documento) = 35", 35, v["azul"])
+            chk("Azul: +5 por verificar el remitente y +10 por el documento = 40", 40, v["azul"])
             captura(general, "general_pdf_abierto")
             azul.wait_for_timeout(500)
             abrir_correo(azul, "nómina")
@@ -311,7 +318,7 @@ def main(ver=False):
             chk("tras aislarlo, el adjunto ya no se puede previsualizar", True,
                 bool(ok) and azul.locator(".buzon-adjunto button", has_text="Aislado").first.is_disabled())
             v = valores(general)
-            chk("aislar no cambia el marcador (Rojo 0, Azul 35)", (0, 35), (v["rojo"], v["azul"]))
+            chk("aislar no cambia el marcador (Rojo 0, Azul 40)", (0, 40), (v["rojo"], v["azul"]))
             rojo.click('[data-icono="correo"]')  # Rojo vuelve a abrir su aplicación de correo
             ok = esperar(lambda: rojo.locator("#rojo-enviados-lista .marca", has_text="ENLACE CLICADO").count() == 1
                          and rojo.locator("#rojo-enviados-lista .marca", has_text="ADJUNTO ABIERTO").count() == 1)
@@ -320,13 +327,88 @@ def main(ver=False):
             captura(rojo, "rojo_seguimiento_campana")
 
             # ---------------------------------------------------------------------------------------------
+            paso("3g. Credencial robada: el empleado entrega su contraseña en la página falsa de soporte")
+            abrir_correo(azul, "Acción requerida", "sospechosos")
+            with azul.context.expect_page() as nueva:
+                azul.locator("#buzon-detalle a[href^='/l/']").click()
+            pagina = nueva.value
+            pagina.wait_for_load_state()
+            chk("la página imita un inicio de sesión sin campos para escribir", (True, 0),
+                ("Iniciar sesión" in pagina.content(), pagina.locator("input").count()))
+            pagina.locator("button", has_text="Iniciar sesión").click()
+            pagina.wait_for_load_state()
+            chk("la página explica que la credencial queda comprometida", True, "COMPROMETIDA" in pagina.content())
+            captura(pagina, "pagina_falsa_credencial")
+            pagina.close()
+            v = esperar(lambda: valores(general)["rojo"] == 25 and valores(general)) or valores(general)
+            chk("Rojo: +10 por el nuevo clic y +15 por la credencial = 25", 25, v["rojo"])
+            chk("riesgo: +15 (clic) +20 (credencial) = 35", 35, v["riesgo"])
+            ok = esperar(lambda: "COMPROMETIDA" in toast(azul))
+            chk("Azul recibe el aviso de credencial comprometida", True, bool(ok))
+
+            paso("3h. Azul abre un incidente desde el correo, revoca la credencial y lo resuelve")
+            abrir_correo(azul, "Acción requerida", "sospechosos")
+            azul.locator("#buzon-detalle button", has_text="Abrir incidente").click()
+            esperar(lambda: azul.locator("#azul-incidentes").is_visible())
+            esperar(lambda: azul.locator("#inc-correo").input_value() != "")
+            chk("el formulario trae el correo ya elegido", True,
+                azul.locator("#inc-correo").input_value() != ""
+                and "Acción requerida" in azul.locator("#inc-titulo").input_value())
+            azul.select_option("#inc-severidad", "critica")
+            azul.locator("#incidente-form button[type=submit]").click()
+            t = esperar(lambda: "Incidente #" in toast(azul) and toast(azul)) or toast(azul)
+            nota("Aviso: " + t)
+            chk("abrir el incidente completa su misión", True, "Abrir un incidente de seguridad" in t)
+            esperar(lambda: azul.locator("#credencial button", has_text="Revocar").count() == 1)
+            chk("la credencial aparece COMPROMETIDA con botón para revocarla", True,
+                "COMPROMETIDA" in azul.locator("#credencial").inner_text())
+            captura(azul, "azul_incidente_credencial")
+            azul.locator("#credencial button", has_text="Revocar").click()
+            t = esperar(lambda: "revocada" in toast(azul) and toast(azul)) or toast(azul)
+            nota("Aviso: " + t)
+            chk("revocar completa su misión (desbloqueada por el incidente)", True, "Revocar una credencial" in t)
+            v = esperar(lambda: valores(general)["rojo"] == 10 and valores(general)) or valores(general)
+            chk("Rojo pierde los 15 de la credencial (le quedan los 10 del clic)", 10, v["rojo"])
+            esperar(lambda: azul.locator("#incidentes-lista button", has_text="Investigar").count() == 1)
+            azul.locator("#incidentes-lista button", has_text="Investigar").click()
+            esperar(lambda: azul.locator("#incidentes-lista textarea").count() == 1)
+            azul.fill("#incidentes-lista textarea", "Credencial revocada; enlace de soporte contenido.")
+            provocados.add((len(pasos), "azul"))  # resolver con la amenaza activa: el servidor debe rechazarlo (409)
+            azul.locator("#incidentes-lista button", has_text="Resolver").click()
+            t = esperar(lambda: "Aún no se puede resolver" in toast(azul) and toast(azul)) or toast(azul)
+            nota("Aviso: " + t)
+            chk("no deja resolver con el enlace clicado sin contener, y explica por qué", True, "contenido" in t)
+            azul.locator('[data-azul="correos"]').click()
+            abrir_correo(azul, "Acción requerida", "sospechosos")
+            azul.locator("#buzon-detalle button", has_text="Contener").click()
+            # No basta con buscar «contenido» en el aviso: el aviso anterior («…aún no está contenido») sigue visible.
+            ok = esperar(lambda: valores(general)["contenciones"] == 2)
+            chk("el enlace de soporte queda contenido", True, bool(ok))
+            azul.locator('[data-azul="incidentes"]').click()
+            ok = esperar(lambda: "Para resolverlo falta" not in azul.locator("#incidentes-lista").inner_text())
+            chk("la lista ya no muestra nada pendiente para resolver", True, bool(ok))
+            chk("el texto de resolución escrito antes se conserva al redibujar", "Credencial revocada; enlace de soporte contenido.",
+                azul.locator("#incidentes-lista textarea").input_value())
+            azul.locator("#incidentes-lista button", has_text="Resolver").click()
+            t = esperar(lambda: "Incidente resuelto" in toast(azul) and toast(azul)) or toast(azul)
+            nota("Aviso: " + t)
+            chk("resolver el incidente completa su misión", True, "Resolver el incidente" in t)
+            v = esperar(lambda: valores(general)["azul"] == 85 and valores(general)) or valores(general)
+            chk("marcador: Rojo 0, Azul 85 (40 + 10 incidente + 20 revocar + 15 resolver), riesgo 0",
+                (0, 85, 0), (v["rojo"], v["azul"], v["riesgo"]))
+            captura(azul, "azul_incidente_resuelto")
+
+            # ---------------------------------------------------------------------------------------------
             paso("4. Verificación: misiones, marcador en General y Espectador")
             azul.click('[data-azul="misiones"]')
-            esperar(lambda: azul.locator(".mision.completada").count() == 3)
-            estados = azul.evaluate("""() => [...document.querySelectorAll('.mision')].map(m =>
+            esperar(lambda: azul.locator("#misiones-lista .mision.completada").count() == 7)
+            estados = azul.evaluate("""() => [...document.querySelectorAll('#misiones-lista .mision')].map(m =>
                 [m.querySelector('b').textContent, m.classList.contains('completada')])""")
-            chk("misiones completadas: reportar, contener y documento; la manual pendiente",
-                [True, True, False, True], [e for _, e in estados])
+            chk("misiones completadas: todas salvo la manual", [True, True, False, True, True, True, True, True],
+                [e for _, e in estados])
+            evid = azul.locator('#misiones-lista [data-mision="7"] .mision-evidencia').inner_text()
+            nota("Evidencia de «Revocar»: " + evid)
+            chk("cada misión dice quién la completó y con qué evidencia", True, "por " in evid and "credencial:" in evid)
             captura(azul, "azul_misiones")
             vg, ve = valores(general), valores(espectador)
             chk("General y Espectador ven el mismo marcador", vg, ve)
@@ -347,7 +429,7 @@ def main(ver=False):
             ok = esperar(lambda: general.locator("#final-modal").is_visible())
             chk("General ve la pantalla de resultado", True, bool(ok))
             chk("ganador", "GANA EL EQUIPO AZUL", general.inner_text("#final-ganador"))
-            chk("puntajes finales (Rojo — Azul)", ("0", "35"),
+            chk("puntajes finales (Rojo — Azul)", ("0", "85"),
                 (general.inner_text("#final-rojo"), general.inner_text("#final-azul")))
             captura(general, "general_resultado")
             ok = esperar(lambda: espectador.locator("#final-modal").is_visible())
@@ -357,7 +439,7 @@ def main(ver=False):
             t = esperar(lambda: "finalizó" in toast(rojo) and toast(rojo)) or toast(rojo)
             chk("tras finalizar, Rojo ya no puede enviar (409)", True, "finalizó" in t)
             captura(rojo, "rojo_tras_finalizar")
-            inesperados = [f"{r}: {e}" for n, r, e in errores_js if not (n in (1, len(pasos)) and r == "rojo" and "409" in e)]
+            inesperados = [f"{r}: {e}" for n, r, e in errores_js if not esperado(n, r, e)]
             chk("sin errores de consola inesperados en ninguna vista", [], inesperados)
 
             nav.close()
@@ -395,10 +477,8 @@ def escribir_resumen(duracion, eventos):
     lineas += ["", "## Comportamientos inesperados", ""]
     fallos = [(p["titulo"], nombre, esp, obs) for p in pasos for ok, nombre, esp, obs in p["checks"] if not ok]
     lineas += [f"- ❌ {t} — {n}: esperado `{e}`, observado `{o}`" for t, n, e, o in fallos]
-    # Los 409 de Rojo en el primer y el último paso son intentos deliberados de enviar antes de iniciar / tras finalizar.
-    esperado = lambda n, r, e: n in (1, len(pasos)) and r == "rojo" and "409" in e  # noqa: E731
     lineas += [f"- Error de consola ({r}, paso {n}): `{e}`" for n, r, e in errores_js if not esperado(n, r, e)]
-    lineas += [f"- (esperado) Error de consola ({r}, paso {n}): `{e}` — es un envío rechazado a propósito (antes de iniciar o tras finalizar)"
+    lineas += [f"- (esperado) Error de consola ({r}, paso {n}): `{e}` — es una acción rechazada a propósito (enviar antes de iniciar o tras finalizar, resolver un incidente con la amenaza activa)"
                for n, r, e in errores_js if esperado(n, r, e)]
     if not fallos and not [x for x in errores_js if not esperado(*x)]:
         lineas.append("- Ninguno: todas las comprobaciones pasaron y no hubo errores de consola inesperados.")

@@ -632,3 +632,29 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .visor-meta dd { margin: 0; overflow-wrap: anywhere; }
 .visor-lista { margin: 0 0 10px; padding-left: 18px; color: var(--warn); font-size: 13px; }
 .visor-texto { background: #f4f1ea; color: #1b1b1b; border-radius: 6px; padding: 14px 16px; font-size: 13px; white-space: pre-wrap; max-height: 40vh; overflow: auto; }
+
+/* ---------- Fase E: misiones con estado, incidentes y credencial ---------- */
+.mision.mision-bloqueada { border-left-color: var(--texto-sec); opacity: .8; }
+.mision.mision-vencida { border-left-color: var(--warn); }
+.mision .estado-bloqueada { color: var(--texto-sec); } .mision .estado-vencida { color: var(--warn); }
+.mision-desc, .mision-evidencia { grid-column: 1 / -1; margin: 2px 0 0; font-size: 12px; color: var(--texto-sec); }
+.mision-evidencia { font-family: var(--mono); }
+.mision .requiere, .incidente .requiere { color: var(--warn); }
+.incidente .requiere { grid-column: 1 / -1; margin: 2px 0 0; font-size: 12px; }
+.mision .responsable { color: var(--def); }
+.mision-botones { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; margin-top: 4px; }
+.mision-botones textarea { flex: 1 1 220px; resize: vertical; font: 13px var(--sans); padding: 4px 6px; }
+.marca-prio-alta, .marca-sev-alta, .marca-sev-critica { color: var(--bad); }
+.marca-prio-media, .marca-sev-media { color: var(--warn); } .marca-prio-baja, .marca-sev-baja { color: var(--texto-sec); }
+.incidente.inc-resuelto { border-left-color: var(--ok); } .incidente.inc-abierto, .incidente.inc-en_investigacion { border-left-color: var(--warn); }
+.incidente .estado-resuelto { color: var(--ok); } .incidente .estado-abierto, .incidente .estado-en_investigacion { color: var(--warn); }
+.credencial { border: 1px solid var(--borde); border-left: 3px solid var(--ok); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.credencial p { flex-basis: 100%; margin: 0; font-size: 13px; }
+.credencial .cred-estado { font: 700 12px var(--mono); }
+.credencial.cred-segura .cred-estado, .credencial.cred-revocada .cred-estado { color: var(--ok); }
+.credencial.cred-comprometida { border-left-color: var(--bad); } .credencial.cred-comprometida .cred-estado { color: var(--bad); }
+.incidente-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px 10px; align-items: end; margin-bottom: 10px; }
+.incidente-form h3 { grid-column: 1 / -1; margin: 0; }
+.incidente-form label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--texto-sec); }
+.incidente-form button { justify-self: start; }
+#incidentes-cuenta { color: var(--warn); font-family: var(--mono); }

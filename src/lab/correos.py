@@ -26,6 +26,9 @@ PLANTILLAS = {
                    "Para evitar el bloqueo, confirma tus datos en las próximas 24 horas:\n{enlace}\n\n"
                    "Equipo de Soporte TI"),
         "adjunto": None,
+        # La página del enlace imita un inicio de sesión: si el empleado «envía» su contraseña (simulado, sin campos
+        # de texto) la credencial ficticia de su cuenta queda comprometida hasta que Azul la revoque.
+        "pide_credenciales": True,
     },
     "recursos_humanos": {
         "nombre": "Recursos humanos",

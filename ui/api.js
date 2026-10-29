@@ -24,7 +24,7 @@ const API = (() => {
 
   const TIPOS = ["ronda_inicio", "ataque", "etapa", "decision", "auditoria", "metricas", "fin", "error",
     "ollama_estado", "ronda_error", "reto_enviado", "reto_respondido", "reto_cancelado", "partida_fin", "marcador_partida", "partida_finalizada",
-    "partida_estado"];
+    "partida_estado", "misiones_cambio", "incidentes_cambio", "credenciales_cambio"];
 
   // handlers: {tipo: fn(data)}; onEstado("conectado"|"reconectando")
   function conectar(handlers, onEstado) {
@@ -96,6 +96,15 @@ const API = (() => {
     responderCorreo: (id, texto) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/responder", { texto }),
     aislarAdjunto: (id) => req("POST", "/api/correo/" + encodeURIComponent(id) + "/aislar", {}),
     enviadosRojo: () => req("GET", "/api/correo/enviados"),
+    // Fase E: misiones con responsable, incidentes y credencial ficticia (Azul)
+    asumirMision: (id) => req("POST", "/api/misiones/" + encodeURIComponent(id) + "/asumir", {}),
+    incidentes: () => req("GET", "/api/incidentes"),
+    abrirIncidente: (titulo, severidad, correoId) => req("POST", "/api/incidentes",
+      { titulo, severidad, correo_id: correoId == null ? null : correoId }),
+    estadoIncidente: (id, estado, resolucion) => req("POST", "/api/incidentes/" + encodeURIComponent(id) + "/estado",
+      { estado, resolucion: resolucion || null }),
+    credenciales: () => req("GET", "/api/credenciales"),
+    revocarCredencial: () => req("POST", "/api/credenciales/revocar", {}),
     finalizarPartida: () => req("POST", "/api/partida/finalizar", {}), // solo token general
     // tipo "pdf_abierto" | "pdf_reportado" sobre el PDF adjunto del correo id -> {documento, regla, descarga|null}
     eventoPdf: (tipo, correoId) => req("POST", "/api/evento", { tipo, recurso: "correo:" + correoId }),

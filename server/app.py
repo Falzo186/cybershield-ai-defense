@@ -391,18 +391,28 @@ async def enviados_rojo():
     return {"enviados": repositorio.por_defecto().enviados_rojo(PARTIDA_ID)}
 
 
-def _aplicar_regla(evento, usuario):
-    """Evento -> consecuencia fija (sesion.REGLAS_EVENTO) sobre el riesgo de la partida. Se difunde por SSE."""
+def _participante(request):
+    p = getattr(request.state, "participante", None) if request is not None else None
+    return p.nombre if p else None
+
+
+def _aplicar_regla(evento, usuario, request=None, evidencia=None):
+    """Evento -> consecuencia fija (sesion.REGLAS_EVENTO) sobre el riesgo de la partida. Se difunde por SSE.
+    request: el participante que actuó (queda como quien completó la misión); evidencia: el recurso (correo:<id>…)."""
     r = ESTADO_PARTIDA.aplicar_evento(evento)
     if r is None:
         return None
-    r["misiones_completadas"] = []
+    r["misiones_completadas"], r["misiones_bloqueadas"] = [], []
     if r["mision"] and usuario:
-        r["misiones_completadas"] = [{"id": m["id"], "titulo": m["titulo"], "puntos": m["puntos"]}
-                                     for m in repositorio.por_defecto().completar_misiones_evento(PARTIDA_ID, usuario, evento)]
+        repo = repositorio.por_defecto()
+        r["misiones_completadas"] = [
+            {"id": m["id"], "titulo": m["titulo"], "puntos": m["puntos_obtenidos"], "a_tiempo": m["a_tiempo"]}
+            for m in repo.completar_misiones_evento(PARTIDA_ID, usuario, evento, _participante(request), evidencia,
+                                                    PARTIDA.transcurrido_s())]
+        r["misiones_bloqueadas"] = repo.misiones_bloqueadas(PARTIDA_ID, usuario, evento)
         for m in r["misiones_completadas"]:
             ms.emitir("auditoria", ms.aud("DEFENDER", "MISION_COMPLETADA", f"{m['titulo']} · {usuario}",
-                                          f"+{m['puntos']} pts", "BAJO"))
+                                          f"+{m['puntos']} pts" + ("" if m["a_tiempo"] else " (fuera de plazo)"), "BAJO"))
     ms.emitir("regla_evento", {**r, "usuario": usuario})
     ms.emitir("auditoria", ms.aud("SYSTEM", "REGLA", f"{evento} → riesgo {r['riesgo']:+d}",
                                   f"riesgo partida {int(r['riesgo_acumulado'])}/100", "BAJO"))
@@ -413,7 +423,8 @@ def _aplicar_regla(evento, usuario):
 # ---------- marcador de la partida (vista general y espectadores; solo lectura, por SSE) ----------
 # Conteos de eventos clave = veces que se aplicó su regla en esta partida (sesion.EstadoSesion.eventos_vistos).
 CONTEOS_MARCADOR = {"clics": "CLIC_ENLACE", "contenciones": "enlace_contenido", "correos_reportados": "correo_reportado",
-                    "pdf_abiertos": "pdf_abierto", "pdf_reportados": "pdf_reportado"}
+                    "pdf_abiertos": "pdf_abierto", "pdf_reportados": "pdf_reportado",
+                    "credenciales_comprometidas": "credencial_comprometida", "credenciales_revocadas": "credencial_revocada"}
 
 
 def _marcador():
@@ -421,13 +432,18 @@ def _marcador():
     if RESULTADO_FINAL:
         return {**RESULTADO_FINAL["marcador"], "final": {k: v for k, v in RESULTADO_FINAL.items() if k != "marcador"}}
     usuario = USUARIO_EQUIPO.get("azul")
-    lista = repositorio.por_defecto().misiones(PARTIDA_ID, usuario)  # sin usuario azul: todas pendientes
+    repo = repositorio.por_defecto()
+    lista = repo.misiones(PARTIDA_ID, usuario)  # sin usuario azul: todas pendientes
     hechas = [m for m in lista if m["estado"] == "completada"]
     vistos = ESTADO_PARTIDA.eventos_vistos
-    rojo = repositorio.por_defecto().logros_rojo(PARTIDA_ID)
-    return {"usuario_azul": usuario, "puntos_azul": sum(m["puntos"] for m in hechas),
-            "puntos_rojo": sesion.puntaje_rojo(rojo["enlaces_sin_contener"], rojo["pdfs_sin_reportar"]),
+    rojo = repo.logros_rojo(PARTIDA_ID)
+    incidentes = repo.incidentes(PARTIDA_ID)
+    return {"usuario_azul": usuario, "puntos_azul": sum(m["puntos_obtenidos"] or 0 for m in hechas),
+            "puntos_rojo": sesion.puntaje_rojo(**rojo),
             "rojo_enlaces_sin_contener": rojo["enlaces_sin_contener"], "rojo_pdfs_sin_reportar": rojo["pdfs_sin_reportar"],
+            "rojo_credenciales_sin_revocar": rojo["credenciales_sin_revocar"],
+            "incidentes_abiertos": sum(i["estado"] != "resuelto" for i in incidentes),
+            "incidentes_resueltos": sum(i["estado"] == "resuelto" for i in incidentes),
             "misiones_completadas": len(hechas), "misiones_total": len(lista),
             "riesgo": ESTADO_PARTIDA.riesgo_acumulado,
             "denegaciones_rojo": repositorio.por_defecto().denegaciones(PARTIDA_ID, "rojo"),
@@ -501,7 +517,7 @@ async def reportar_correo(correo_id: int, request: Request):
     if not nuevo:
         return _prohibido("Ese correo ya fue reportado.", 409)
     ms.emitir("auditoria", ms.aud("DEFENDER", "CORREO_REPORTADO", f"correo {correo_id} · {usuario}", "OK", "BAJO"))
-    return {"reportado": True, "regla": _aplicar_regla("correo_reportado", usuario)}
+    return {"reportado": True, "regla": _aplicar_regla("correo_reportado", usuario, request, f"correo:{correo_id}")}
 
 
 _CONTENER_ERROR = {"sin_clic": ("Ese enlace no se ha clicado: no hay nada que contener.", 409),
@@ -522,7 +538,7 @@ async def contener_enlace(correo_id: int, request: Request):
     if r != "contenido":
         return _prohibido(*_CONTENER_ERROR[r])
     ms.emitir("auditoria", ms.aud("DEFENDER", "ENLACE_CONTENIDO", f"correo {correo_id} · {usuario}", "OK", "BAJO"))
-    return {"contenido": True, "regla": _aplicar_regla("enlace_contenido", usuario)}
+    return {"contenido": True, "regla": _aplicar_regla("enlace_contenido", usuario, request, f"correo:{correo_id}")}
 
 
 # ---------- PDFs benignos adjuntos: abrir / reportar son EVENTOS (no se ejecuta nada) ----------
@@ -538,7 +554,7 @@ _EVENTO_ERROR = {"sin_adjunto": ("Ese correo no trae ningún PDF adjunto.", 409)
 
 
 @app.post("/api/evento")
-async def registrar_evento(body: EventoIn):
+async def registrar_evento(body: EventoIn, request: Request):
     """Solo Azul (SOLO_EQUIPO). Escribe el evento en auditoría y aplica su regla fija; si es pdf_abierto devuelve la
     VISTA PREVIA para el visor seguro (texto del propio archivo y análisis). Nada se descarga ni se ejecuta."""
     if cerrada := _partida_cerrada():
@@ -551,7 +567,7 @@ async def registrar_evento(body: EventoIn):
     doc = r["doc"]
     ms.emitir("auditoria", ms.aud("DEFENDER", body.tipo.upper(), f"{doc['archivo']} · correo {correo_id} · {usuario}",
                                   "OK", "BAJO"))
-    return {"ok": True, "documento": doc, "regla": _aplicar_regla(body.tipo, usuario), "vista": r.get("vista")}
+    return {"ok": True, "documento": doc, "regla": _aplicar_regla(body.tipo, usuario, request, body.recurso), "vista": r.get("vista")}
 
 
 # ---------- aplicación de correo de Azul (Fase D): todas exigen sesión azul, partida en curso y correo propio ----------
@@ -573,7 +589,7 @@ async def leer_correo(correo_id: int, request: Request):
     r = repositorio.por_defecto().marcar_leido(PARTIDA_ID, usuario, correo_id, quien)
     if r is None:
         return _prohibido(*_NO_ES_SUYO)
-    regla = _aplicar_regla("correo_abierto", usuario) if r == "nuevo" else None
+    regla = _aplicar_regla("correo_abierto", usuario, request, f"correo:{correo_id}") if r == "nuevo" else None
     return {"leido": True, "nuevo": r == "nuevo", "regla": regla}
 
 
@@ -589,7 +605,7 @@ async def archivar_correo(correo_id: int, body: ArchivarIn, request: Request):
     r = repositorio.por_defecto().archivar(PARTIDA_ID, usuario, correo_id, request.state.participante.nombre, body.archivar)
     if r is None:
         return _prohibido(*_NO_ES_SUYO)
-    regla = _aplicar_regla("correo_archivado", usuario) if r and body.archivar else None
+    regla = _aplicar_regla("correo_archivado", usuario, request, f"correo:{correo_id}") if r and body.archivar else None
     return {"archivado": body.archivar, "cambio": r, "regla": regla}
 
 
@@ -602,7 +618,7 @@ async def verificar_remitente(correo_id: int, request: Request):
     r = repositorio.por_defecto().verificar_remitente(PARTIDA_ID, usuario, correo_id)
     if r is None:
         return _prohibido(*_NO_ES_SUYO)
-    return {**r, "regla": _aplicar_regla("remitente_verificado", usuario)}
+    return {**r, "regla": _aplicar_regla("remitente_verificado", usuario, request, f"correo:{correo_id}")}
 
 
 @app.post("/api/correo/{correo_id}/inspeccionar")
@@ -614,7 +630,7 @@ async def inspeccionar_enlace(correo_id: int, request: Request):
     r = repositorio.por_defecto().inspeccionar_enlace(PARTIDA_ID, usuario, correo_id)
     if r is None:
         return _prohibido(*_NO_ES_SUYO)
-    return {**r, "regla": _aplicar_regla("enlace_inspeccionado", usuario)}
+    return {**r, "regla": _aplicar_regla("enlace_inspeccionado", usuario, request, f"correo:{correo_id}")}
 
 
 class RespuestaIn(BaseModel):
@@ -635,7 +651,8 @@ async def responder_correo(correo_id: int, body: RespuestaIn, request: Request):
         return _error400(str(e))
     if r is None:
         return _prohibido(*_NO_ES_SUYO)
-    return {**r, "regla": _aplicar_regla("respuesta_a_phishing" if r["a_phishing"] else "respuesta_enviada", usuario)}
+    return {**r, "regla": _aplicar_regla("respuesta_a_phishing" if r["a_phishing"] else "respuesta_enviada", usuario, request,
+                                f"correo:{correo_id}")}
 
 
 _AISLAR_ERROR = {"sin_adjunto": ("Ese correo no trae ningún adjunto que aislar.", 409),
@@ -652,7 +669,7 @@ async def aislar_adjunto(correo_id: int, request: Request):
     if r != "aislado":
         return _prohibido(*_AISLAR_ERROR[r])
     ms.emitir("auditoria", ms.aud("DEFENDER", "ARCHIVO_AISLADO", f"correo {correo_id} · {usuario}", "OK", "BAJO"))
-    return {"aislado": True, "regla": _aplicar_regla("archivo_aislado", usuario)}
+    return {"aislado": True, "regla": _aplicar_regla("archivo_aislado", usuario, request, f"correo:{correo_id}")}
 
 
 @app.get("/pdf/{doc_id}")
@@ -672,9 +689,9 @@ async def descargar_pdf(doc_id: str):
 async def misiones():
     """Solo Azul (SOLO_EQUIPO): progreso de su usuario en las misiones fijas y riesgo actual de la partida."""
     usuario = USUARIO_EQUIPO.get("azul")
-    lista = repositorio.por_defecto().misiones(PARTIDA_ID, usuario) if usuario else []
-    return {"usuario": usuario, "misiones": lista,
-            "puntos": sum(m["puntos"] for m in lista if m["estado"] == "completada"),
+    lista = repositorio.por_defecto().misiones(PARTIDA_ID, usuario, PARTIDA.transcurrido_s()) if usuario else []
+    return {"usuario": usuario, "misiones": lista, "transcurrido_s": PARTIDA.transcurrido_s(),
+            "puntos": sum(m["puntos_obtenidos"] or 0 for m in lista if m["estado"] == "completada"),
             "riesgo_partida": ESTADO_PARTIDA.riesgo_acumulado}
 
 
@@ -686,15 +703,118 @@ async def completar_mision(mision_id: int, request: Request):
     if cerrada := _partida_cerrada():
         return cerrada
     usuario = USUARIO_EQUIPO.get("azul")
-    r = repositorio.por_defecto().completar_mision_manual(PARTIDA_ID, usuario, mision_id)
+    r = repositorio.por_defecto().completar_mision_manual(PARTIDA_ID, usuario, mision_id, _participante(request),
+                                                          PARTIDA.transcurrido_s())
     if r is None:
         return _prohibido("Esa misión no existe o se completa sola con su evento.", 409)
+    if r == "bloqueada":
+        return _prohibido("Esa misión depende de otra que aún no está completada.", 409)
     if not r:
         return _prohibido("Esa misión ya estaba completada.", 409)
     ms.emitir("auditoria", ms.aud("DEFENDER", "MISION_COMPLETADA", f"misión {mision_id} (manual) · {usuario}",
-                                  "OK", "BAJO"))
+                                  f"+{r['puntos_obtenidos']} pts", "BAJO"))
     _emitir_marcador()
-    return {"completada": True, "mision_id": mision_id}
+    return {"completada": True, "mision_id": mision_id, "puntos": r["puntos_obtenidos"], "a_tiempo": r["a_tiempo"]}
+
+
+@app.post("/api/misiones/{mision_id}/asumir")
+async def asumir_mision(mision_id: int, request: Request):
+    """Solo Azul: el participante se hace responsable de la misión (visible para todo su equipo)."""
+    if err := _accion_azul(request):
+        return err
+    usuario = USUARIO_EQUIPO.get("azul")
+    r = repositorio.por_defecto().asumir_mision(PARTIDA_ID, usuario, mision_id, _participante(request))
+    if r is None:
+        return _prohibido("Esa misión no existe.", 404)
+    if r == "completada":
+        return _prohibido("Esa misión ya está completada.", 409)
+    ms.emitir("auditoria", ms.aud("DEFENDER", "MISION_ASUMIDA", f"misión {mision_id} · {_participante(request)}",
+                                  "OK", "BAJO"))
+    ms.emitir("misiones_cambio", {"mision_id": mision_id})
+    return {"asumida": True, "mision_id": mision_id, "responsable": _participante(request)}
+
+
+# ---------- incidentes de la partida y credenciales ficticias (Fase E) ----------
+@app.get("/api/incidentes")
+async def listar_incidentes(request: Request):
+    """Azul (los gestiona) y General (los supervisa)."""
+    if request.state.equipo not in ("azul", "general"):
+        return _prohibido("Solo el equipo azul y el árbitro ven los incidentes.")
+    repo = repositorio.por_defecto()
+    return {"incidentes": [{**i, "pendiente": repo.pendiente_para_resolver(PARTIDA_ID, i) if i["estado"] != "resuelto"
+                            else []} for i in repo.incidentes(PARTIDA_ID)]}
+
+
+class IncidenteIn(BaseModel):
+    titulo: str = Field(..., min_length=3, max_length=80)
+    severidad: str = Field(..., pattern="^(baja|media|alta|critica)$")
+    correo_id: int | None = None
+
+
+@app.post("/api/incidentes")
+async def abrir_incidente(body: IncidenteIn, request: Request):
+    if err := _accion_azul(request):
+        return err
+    usuario = USUARIO_EQUIPO.get("azul")
+    try:
+        inc = repositorio.por_defecto().abrir_incidente(PARTIDA_ID, usuario, _participante(request), body.titulo,
+                                                        body.severidad, body.correo_id)
+    except ValueError as e:
+        return _error400(str(e))
+    if inc is None:
+        return _prohibido(*_NO_ES_SUYO)
+    ms.emitir("auditoria", ms.aud("DEFENDER", "INCIDENTE_ABIERTO", f"#{inc['id']} {inc['titulo']} · {inc['severidad']}",
+                                  "OK", "MEDIO"))
+    ms.emitir("incidentes_cambio", {"id": inc["id"]})
+    return {"incidente": inc, "regla": _aplicar_regla("incidente_abierto", usuario, request, f"incidente:{inc['id']}")}
+
+
+class EstadoIncidenteIn(BaseModel):
+    estado: str = Field(..., pattern="^(en_investigacion|resuelto)$")
+    resolucion: str | None = Field(None, max_length=500)
+
+
+@app.post("/api/incidentes/{inc_id}/estado")
+async def avanzar_incidente(inc_id: int, body: EstadoIncidenteIn, request: Request):
+    """abierto -> en_investigacion -> resuelto. Resolver exige resolución y la amenaza del correo contenida."""
+    if err := _accion_azul(request):
+        return err
+    usuario = USUARIO_EQUIPO.get("azul")
+    try:
+        inc = repositorio.por_defecto().avanzar_incidente(PARTIDA_ID, usuario, inc_id, _participante(request),
+                                                          body.estado, body.resolucion)
+    except ValueError as e:
+        return _prohibido(str(e), 409)
+    if inc is None:
+        return _prohibido("Ese incidente no existe en esta partida.", 404)
+    ms.emitir("auditoria", ms.aud("DEFENDER", "INCIDENTE_RESUELTO" if body.estado == "resuelto" else "INCIDENTE_ACTUALIZADO",
+                                  f"#{inc_id} → {body.estado}", "OK", "BAJO"))
+    ms.emitir("incidentes_cambio", {"id": inc_id})
+    regla = _aplicar_regla("incidente_resuelto", usuario, request, f"incidente:{inc_id}") \
+        if body.estado == "resuelto" else None
+    return {"incidente": inc, "regla": regla}
+
+
+@app.get("/api/credenciales")
+async def ver_credenciales(request: Request):
+    """Azul: estado de la credencial ficticia de su usuario (segura · comprometida · revocada) e historial."""
+    if request.state.equipo != "azul":
+        return _prohibido("Solo el equipo azul gestiona sus credenciales.")
+    usuario = USUARIO_EQUIPO.get("azul")
+    return repositorio.por_defecto().credenciales(PARTIDA_ID, usuario) if usuario else {"estado": "segura", "historial": []}
+
+
+@app.post("/api/credenciales/revocar")
+async def revocar_credencial(request: Request):
+    if err := _accion_azul(request):
+        return err
+    usuario = USUARIO_EQUIPO.get("azul")
+    if repositorio.por_defecto().revocar_credencial(PARTIDA_ID, usuario, _participante(request)) != "revocada":
+        return _prohibido("No hay ninguna credencial comprometida que revocar.", 409)
+    ms.emitir("auditoria", ms.aud("DEFENDER", "CREDENCIAL_REVOCADA", f"{usuario} · {_participante(request)}",
+                                  "OK", "BAJO"))
+    ms.emitir("credenciales_cambio", {"usuario": usuario, "estado": "revocada"})
+    return {"revocada": True, "regla": _aplicar_regla("credencial_revocada", usuario, request, f"credencial:{usuario}")}
 
 
 _PAGINA_ENLACE = """<!doctype html><html lang="es"><head><meta charset="utf-8">
@@ -702,8 +822,15 @@ _PAGINA_ENLACE = """<!doctype html><html lang="es"><head><meta charset="utf-8">
 <style>body{{font-family:system-ui,sans-serif;background:#0f1720;color:#e6edf3;display:grid;place-items:center;
 min-height:100vh;margin:0;padding:16px}}main{{max-width:520px;border:1px solid #3b4a5a;border-radius:10px;
 padding:28px}}h1{{font-size:22px;margin:0 0 12px}}p{{line-height:1.5;color:#b6c2cf}}</style></head>
-<body><main><h1>{titulo}</h1><p>{texto}</p></main></body></html>"""
-_CABECERAS_ENLACE = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+<body><main><h1>{titulo}</h1><p>{texto}</p>{extra}</main></body></html>"""
+# Formulario de la página «de inicio de sesión» falsa: SIN campos de texto. Nadie escribe una contraseña; el botón
+# simula que el empleado la entrega, y eso compromete la credencial ficticia de su cuenta.
+_FORM_CREDENCIALES = """<form method="post" action="/l/{enlace}/credenciales" style="margin-top:18px;border-top:1px solid
+#3b4a5a;padding-top:16px"><p><b>Portal de verificación de cuenta</b> (imitación)</p><p>Simulación: aquí un atacante
+pediría tu usuario y contraseña. No escribas nada: el botón representa enviarlos.</p><button type="submit"
+style="padding:8px 14px;border-radius:6px;border:0;background:#c0392b;color:#fff;font-weight:600">Iniciar sesión
+(simulado: entregar mi contraseña)</button></form>"""
+_CABECERAS_ENLACE = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'",
                      "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
 
 
@@ -715,14 +842,14 @@ async def abrir_enlace(enlace_id: str):
     if PARTIDA.fase != "en_curso":  # fuera de la partida el clic no tiene consecuencia ni se registra
         return HTMLResponse(_PAGINA_ENLACE.format(
             titulo="La partida no está en curso",
-            texto="Este enlace de entrenamiento solo cuenta mientras la partida está en curso."),
+            texto="Este enlace de entrenamiento solo cuenta mientras la partida está en curso.", extra=""),
             status_code=409, headers=_CABECERAS_ENLACE)
     clic = None
     if 8 <= len(enlace_id) <= 32 and all(ch.isalnum() or ch in "-_" for ch in enlace_id):
         clic = repositorio.por_defecto().registrar_clic(enlace_id)
     if clic is None:
         return HTMLResponse(_PAGINA_ENLACE.format(titulo="Enlace no válido",
-                                                  texto="Este enlace no pertenece al laboratorio."),
+                                                  texto="Este enlace no pertenece al laboratorio.", extra=""),
                             status_code=404, headers=_CABECERAS_ENLACE)
     if clic["contenido"]:  # Azul ya lo contuvo: el clic no tiene consecuencia
         ms.emitir("auditoria", ms.aud("SYSTEM", "CLIC_BLOQUEADO",
@@ -730,15 +857,52 @@ async def abrir_enlace(enlace_id: str):
         return HTMLResponse(_PAGINA_ENLACE.format(
             titulo="Enlace bloqueado por el Equipo Azul",
             texto="Este enlace de entrenamiento fue contenido después de un clic, así que ya no tiene efecto. "
-                  "El intento quedó registrado."), headers=_CABECERAS_ENLACE)
+                  "El intento quedó registrado.", extra=""), headers=_CABECERAS_ENLACE)
     ms.emitir("auditoria", ms.aud("SYSTEM", "CLIC_ENLACE", f"correo {clic['correo_id']} · {clic['para_usuario']}",
                                   "CLIC", "ALTO"))
     _aplicar_regla("CLIC_ENLACE", clic["para_usuario"])
+    pide = repositorio.por_defecto().pide_credenciales(clic["correo_id"])
     return HTMLResponse(_PAGINA_ENLACE.format(
         titulo="Este fue un enlace de prueba del laboratorio",
         texto="Has abierto un enlace de un correo de entrenamiento. No ha ocurrido nada real, pero el clic quedó "
               "registrado. Antes de abrir un enlace, revisa el remitente, la urgencia del mensaje y a dónde "
-              "apunta realmente."), headers=_CABECERAS_ENLACE)
+              "apunta realmente.", extra=_FORM_CREDENCIALES.format(enlace=enlace_id) if pide else ""),
+        headers=_CABECERAS_ENLACE)
+
+
+_CREDENCIAL_PAGINA = {
+    "no_existe": (404, "Enlace no válido", "Este enlace no pertenece a la partida en curso."),
+    "no_pide": (404, "Nada que enviar", "Esta página no pide credenciales."),
+    "sin_clic": (409, "Abre primero el enlace", "Esta página solo se alcanza desde el enlace del correo."),
+    "contenido": (200, "Enlace bloqueado por el Equipo Azul", "El enlace fue contenido: el envío no tuvo efecto."),
+}
+
+
+@app.post("/l/{enlace_id}/credenciales")
+async def enviar_credenciales(enlace_id: str):
+    """El empleado «entrega» su contraseña en la página falsa (simulado: no hay campos, no se recibe ningún dato).
+    Compromete la credencial ficticia de su cuenta hasta que Azul la revoque (regla credencial_comprometida)."""
+    _vencer_si_toca()
+    if PARTIDA.fase != "en_curso":
+        return HTMLResponse(_PAGINA_ENLACE.format(titulo="La partida no está en curso", texto="El envío no cuenta.",
+                                                  extra=""), status_code=409, headers=_CABECERAS_ENLACE)
+    r = "no_existe"
+    if 8 <= len(enlace_id) <= 32 and all(ch.isalnum() or ch in "-_" for ch in enlace_id):
+        r = repositorio.por_defecto().comprometer_credencial(PARTIDA_ID, enlace_id)
+    if not isinstance(r, dict):
+        status, titulo, texto = _CREDENCIAL_PAGINA[r]
+        return HTMLResponse(_PAGINA_ENLACE.format(titulo=titulo, texto=texto, extra=""), status_code=status,
+                            headers=_CABECERAS_ENLACE)
+    if r["nuevo"]:
+        ms.emitir("auditoria", ms.aud("SYSTEM", "CREDENCIAL_COMPROMETIDA", f"correo {r['correo_id']} · {r['usuario']}",
+                                      "COMPROMETIDA", "CRITICO"))
+        ms.emitir("credenciales_cambio", {"usuario": r["usuario"], "estado": "comprometida"})
+        _aplicar_regla("credencial_comprometida", r["usuario"])
+    return HTMLResponse(_PAGINA_ENLACE.format(
+        titulo="Has entregado tu contraseña a una página falsa",
+        texto="En un ataque real, el atacante ya podría entrar en tu cuenta. En el laboratorio, la credencial ficticia "
+              "de tu cuenta queda COMPROMETIDA hasta que el Equipo Azul la revoque. Contener el enlace no basta.",
+        extra=""), headers=_CABECERAS_ENLACE)
 
 
 @app.post("/api/batalla/real/iniciar")
