@@ -272,7 +272,9 @@ servidor. Propuesta:
   - `server/test_app.py` 133/133: antes 112; la comprobación del PDF pasa de `descarga` a `vista`;
   - `e2e/demo_partida.py` 52/52 en Chromium real (Playwright): antes 42; añade verificar, inspeccionar sin clic, visor
     con texto y SHA-256 reales, Esc, ninguna descarga, carpeta Sospechosos, aislar y seguimiento de Rojo;
-  - `e2e/capturas_vistas.py`: sin scroll interno en las 4 vistas a 1366×768 y 1920×1080;
+  - `e2e/capturas_vistas.py`: sin scroll interno a 1920×1080. **Corrección (Fase E):** a 1366×768 sí hay scroll
+    interno en General (panel de control, +16 px) y Azul (control +33 px, defensor +27 px); al redactar este
+    informe solo se leyeron las últimas líneas de la salida. Comprobado que también ocurre en `main`;
   - el resto de suites, sin cambios. No se hizo una prueba manual aparte de las automatizadas en navegador.
 - **Cambio de contrato:** `POST /api/evento` con `pdf_abierto` devuelve `vista` en lugar de `descarga`.
 - **Decisión para revisar:** previsualizar el PDF sigue dando **+5 a Rojo** mientras no se reporte ni aísle (la regla
@@ -284,3 +286,58 @@ servidor. Propuesta:
 - **Riesgos de regresión:** bajos-medios. El esquema solo añade tablas; el cambio visible es el visor en vez de la
   descarga.
 - **Avance estimado:** ~52 % del plan (A, C y D hechas; B parcial; E, F, G y H pendientes).
+
+## 13. Informe de la Fase E — misiones, incidentes y credenciales (rama `feature/fase-e-misiones`)
+
+- **Objetivo:** misiones con responsable, prioridad, plazo, evidencia y dependencias; incidentes; credenciales
+  ficticias que se comprometen y se revocan, con consecuencias explicadas.
+- **Estado inicial:** 4 misiones fijas sin prioridad, plazo, dependencias ni autor; no había incidentes de partida
+  ni credenciales; el puntaje de Rojo solo contaba enlaces y PDF.
+- **Archivos:**
+  - `src/lab/seed.py` (8 misiones), `schema.py` (columnas nuevas con migración; tablas `asignaciones_mision`,
+    `incidentes_partida`, `compromisos_credencial`), `sesion.py` (reglas nuevas, `puntos_mision`, puntaje con
+    credenciales), `repositorio.py`, `correos.py` (`pide_credenciales`);
+  - `server/partida.py` (`transcurrido_s`), `server/app.py` (endpoints de misiones, incidentes y credenciales;
+    página falsa de inicio de sesión);
+  - `ui/index.html`, `render.js`, `app.js`, `api.js`, `styles.css` (pestaña Incidentes, misiones ampliadas);
+  - pruebas: `src/lab/test_incidentes.py` (nuevo), `test_misiones.py`, `test_puntaje.py`, `server/test_app.py`,
+    `server/test_partida.py`, `e2e/demo_partida.py`;
+  - `docs/CONTRATO_API.md`, `README.md`, `docs/GUION_DEMO.md`.
+- **Cambios:**
+  - **Misiones:** prioridad, plazo desde el inicio (fuera de plazo vale la mitad), dependencias (*bloqueada* hasta
+    cumplirlas, y el aviso dice cuál falta), responsable que cualquiera del equipo puede asumir, y autor, hora y
+    evidencia al completarse. Hay 4 misiones nuevas: verificar remitente, abrir incidente, revocar credencial y
+    resolver incidente.
+  - **Credencial ficticia:** la página del enlace de soporte imita un inicio de sesión **sin campos de texto**; el
+    botón simula entregar la contraseña. Riesgo +20 y Rojo +15 hasta que Azul revoque; contener el enlace no la
+    revoca, y el aviso lo explica.
+  - **Incidentes:** abrir (también desde el correo, con el correo ya elegido) → investigar → resolver. Resolver exige
+    explicar qué se hizo y que la amenaza del correo esté contenida; si no, el servidor dice qué falta.
+  - **Marcador:** credenciales sin revocar en Rojo, credenciales comprometidas e incidentes abiertos.
+- **Pruebas (resultados reales, batería completa en verde):**
+  - `test_incidentes` 42/42 (nuevo); `test_misiones` 17/17 y `test_puntaje` 9/9 (adaptados a 8 misiones y al
+    puntaje con credenciales, sin quitar comprobaciones);
+  - `server/test_app.py` 157/157 (antes 133): página sin campos y su CSP, compromiso, permisos, incidente con
+    autor y evidencia, bloqueo y desbloqueo, resolución rechazada con motivo, revocación y resolución;
+  - `server/test_partida.py` 30/30 (antes 29);
+  - `e2e/demo_partida.py` 69/69 en Chromium real (antes 52), 4 pasadas seguidas en verde: pasos 3g-3h de credencial
+    robada, incidente, revocar, resolución rechazada, contener y resolver; resultado **Rojo 0 — Azul 85**. El 409 de
+    la resolución rechazada se marca como provocado a propósito. Una pasada intermedia falló de forma intermitente y
+    destapó un fallo real de la UI: al redibujarse la lista de incidentes se perdía el texto de resolución que se
+    estaba escribiendo. Ahora se guarda un borrador por incidente y la E2E lo comprueba;
+  - migración probada sobre una **copia** de `data/lab.db`: el progreso anterior se conserva y suma sus puntos.
+- **Decisiones tomadas (reversibles; revísalas):**
+  - el plazo cuenta desde el inicio de la partida, no desde el evento que lo origina;
+  - fuera de plazo una misión vale la mitad, en vez de perderse;
+  - si se revoca **antes** de abrir el incidente, la misión de revocar no se completa (la dependencia es estricta).
+    Enseña el procedimiento, pero puede parecer dura;
+  - sigue pendiente la decisión de la Fase D: previsualizar un PDF da +5 a Rojo.
+- **Vistas:** `capturas_vistas.py` da el mismo resultado que `main`: sin scroll interno a 1920×1080; a 1366×768,
+  scroll interno en General (+16 px) y Azul (+27/+33 px), que ya existía (ver la corrección del §12). El marcador
+  solo añade «cred.» e «Incidentes» cuando hay alguno, para no alargarlo.
+- **Pendiente:** el scroll interno a 1366×768 de General y Azul (heredado); incidentes sin correo no comprueban nada al resolverse; las misiones siguen siendo del usuario azul
+  compartido (el responsable y el autor son por participante, el progreso es del equipo); General aún no tiene una
+  vista propia de incidentes (solo el contador del marcador y la API) → B/G.
+- **Riesgos de regresión:** medios. Cambian los puntos de Azul (más misiones) y la forma de `misiones()`; lo cubren
+  todas las suites. El servidor en marcha debe reiniciarse para migrar la BD.
+- **Avance estimado:** ~60 % del plan (A, C, D y E hechas; B parcial; F, G y H pendientes).

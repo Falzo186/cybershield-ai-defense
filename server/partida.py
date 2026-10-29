@@ -126,6 +126,12 @@ class Partida:
             return 0
         return max(0, int(round(self._fin_mono - self._reloj())))
 
+    def transcurrido_s(self):
+        """Segundos desde el inicio (None en preparación): base de los plazos de las misiones."""
+        if self.fase == "preparacion":
+            return None
+        return self.duracion_s - self.restante_s()
+
     def vencida(self):
         return self.fase == "en_curso" and self._reloj() >= self._fin_mono
 

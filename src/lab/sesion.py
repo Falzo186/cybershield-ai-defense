@@ -28,7 +28,7 @@ REGLAS_EVENTO = {
     # Fase D: acciones del correo. Leer, verificar o inspeccionar no comprometen nada (riesgo 0) y quedan registradas.
     "correo_abierto": {"riesgo": 0, "mision": False, "explicacion": (
         "Abrir y leer un correo no compromete la cuenta: lo que importa es lo que se hace después.")},
-    "remitente_verificado": {"riesgo": 0, "mision": False, "explicacion": (
+    "remitente_verificado": {"riesgo": 0, "mision": True, "explicacion": (
         "Comprobar el dominio del remitente es el primer control frente al phishing.")},
     "enlace_inspeccionado": {"riesgo": 0, "mision": False, "explicacion": (
         "Inspeccionar el enlace sin abrirlo revela que el texto visible y el destino real no coinciden.")},
@@ -41,17 +41,36 @@ REGLAS_EVENTO = {
         "verificar el remitente antes de responder.")},
     "archivo_aislado": {"riesgo": -5, "mision": False, "explicacion": (
         "Aislar el adjunto impide que nadie más lo abra; Rojo pierde sus puntos por ese PDF.")},
+    # Fase E: credenciales ficticias e incidentes
+    "credencial_comprometida": {"riesgo": +20, "mision": False, "explicacion": (
+        "El empleado envió su contraseña a una página que imitaba el portal de la empresa. Control que falló: "
+        "comprobar la dirección real antes de iniciar sesión. Contener el enlace NO basta: hay que revocar la "
+        "credencial.")},
+    "credencial_revocada": {"riesgo": -15, "mision": True, "explicacion": (
+        "Revocar la credencial invalida la contraseña robada: Rojo pierde el acceso y sus puntos por ella.")},
+    "incidente_abierto": {"riesgo": 0, "mision": True, "explicacion": (
+        "Abrir un incidente deja constancia de qué pasó y coordina la respuesta del equipo.")},
+    "incidente_resuelto": {"riesgo": -5, "mision": True, "explicacion": (
+        "El incidente se cerró con la amenaza contenida y su resolución documentada.")},
 }
 
 # Puntaje de Rojo (determinista). Se CALCULA del estado de la partida en cada momento, no se otorga y se quita:
-# un enlace clicado vale +10 mientras Azul no lo contenga; un PDF abierto vale +5 mientras Azul no lo reporte. Al
-# finalizar la partida se congela lo que valga en ese instante.
-PUNTOS_ROJO = {"enlace_sin_contener": 10, "pdf_abierto_sin_reportar": 5}
+# un enlace clicado vale +10 mientras Azul no lo contenga; un PDF abierto vale +5 mientras Azul no lo reporte; una
+# credencial comprometida vale +15 mientras Azul no la revoque. Al finalizar se congela lo que valga en ese instante.
+PUNTOS_ROJO = {"enlace_sin_contener": 10, "pdf_abierto_sin_reportar": 5, "credencial_sin_revocar": 15}
 
 
-def puntaje_rojo(enlaces_sin_contener, pdfs_sin_reportar):
+def puntaje_rojo(enlaces_sin_contener, pdfs_sin_reportar, credenciales_sin_revocar=0):
     return (enlaces_sin_contener * PUNTOS_ROJO["enlace_sin_contener"]
-            + pdfs_sin_reportar * PUNTOS_ROJO["pdf_abierto_sin_reportar"])
+            + pdfs_sin_reportar * PUNTOS_ROJO["pdf_abierto_sin_reportar"]
+            + credenciales_sin_revocar * PUNTOS_ROJO["credencial_sin_revocar"])
+
+
+def puntos_mision(puntos, plazo_s, transcurrido_s):
+    """Puntos de una misión al completarla: completos dentro de plazo (o sin plazo / sin reloj), la mitad fuera.
+    -> (puntos_obtenidos, a_tiempo)"""
+    a_tiempo = plazo_s is None or transcurrido_s is None or transcurrido_s <= plazo_s
+    return (puntos if a_tiempo else puntos // 2), a_tiempo
 
 
 class EstadoSesion:

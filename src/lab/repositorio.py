@@ -11,7 +11,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from . import correos, documentos, permisos, schema, seed
+from . import correos, documentos, permisos, schema, seed, sesion
 from .permisos import Identidad
 
 # CS_LAB_DB permite usar otra BD (p. ej. la prueba de extremo a extremo usa una temporal y no toca data/lab.db).
@@ -32,7 +32,14 @@ EVENTOS_SIEM = {
     "REMITENTE_VERIFICADO": ("remitente_verificado", "azul"), "ENLACE_INSPECCIONADO": ("enlace_inspeccionado", "azul"),
     "CORREO_ARCHIVADO": ("correo_archivado", "azul"), "RESPUESTA_ENVIADA": ("respuesta_enviada", "azul"),
     "ARCHIVO_AISLADO": ("archivo_aislado", "azul"),
+    # Fase E: credenciales, incidentes y misiones
+    "CREDENCIAL_COMPROMETIDA": ("credencial_comprometida", "azul"), "CREDENCIAL_REVOCADA": ("credencial_revocada", "azul"),
+    "INCIDENTE_ABIERTO": ("incidente_abierto", "azul"), "INCIDENTE_ACTUALIZADO": ("incidente_actualizado", "azul"),
+    "INCIDENTE_RESUELTO": ("incidente_resuelto", "azul"), "MISION_ASUMIDA": ("mision_asumida", "azul"),
 }
+SEVERIDADES = ("baja", "media", "alta", "critica")
+# Estados del incidente y transiciones permitidas (no se puede reabrir ni saltar a resuelto sin investigar).
+TRANSICIONES_INCIDENTE = {"abierto": ("en_investigacion",), "en_investigacion": ("resuelto",), "resuelto": ()}
 _CANDADO_EVENTOS = threading.Lock()
 LIMITE_FILAS = 50
 NIVEL_RIESGO = {"PUBLICA": "BAJO", "INTERNA": "MEDIO", "CONFIDENCIAL": "ALTO", "CRITICA": "CRITICO"}
@@ -313,12 +320,14 @@ class Repositorio:
 
     def enviados_rojo(self, partida):
         """Carpeta «Enviados» de Rojo: sus correos y lo que una campaña de phishing real podría medir (clic en el
-        enlace, apertura del adjunto). No revela si se leyó ni si se reportó."""
+        enlace, apertura del adjunto, credencial enviada a su página). No revela si se leyó ni si se reportó."""
         filas = self.conn.execute(
             "SELECT c.id, c.para_usuario, c.asunto, c.plantilla_id, c.ts, c.adjunto IS NOT NULL AS con_adjunto, "
             "EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'CLIC_ENLACE' AND a.recurso = 'correo:' || c.id) AS clicado, "
             "EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'PDF_ABIERTO' AND a.recurso = 'correo:' || c.id) "
-            "AS adjunto_abierto FROM correos c WHERE c.partida = ? ORDER BY c.id DESC", (partida,)).fetchall()
+            "AS adjunto_abierto, "
+            "EXISTS(SELECT 1 FROM compromisos_credencial q WHERE q.correo_id = c.id) AS credencial_obtenida "
+            "FROM correos c WHERE c.partida = ? ORDER BY c.id DESC", (partida,)).fetchall()
         return [dict(f) for f in filas]
 
     def registrar_clic(self, enlace_id):
@@ -392,8 +401,9 @@ class Repositorio:
         return r
 
     def logros_rojo(self, partida):
-        """Lo que cuenta para el puntaje de Rojo en la partida: correos con enlace clicado y NO contenido, y correos
-        con PDF abierto y NO reportado ni aislado. -> {enlaces_sin_contener, pdfs_sin_reportar}"""
+        """Lo que cuenta para el puntaje de Rojo en la partida: correos con enlace clicado y NO contenido, correos
+        con PDF abierto y NO reportado ni aislado, y credenciales comprometidas sin revocar.
+        -> {enlaces_sin_contener, pdfs_sin_reportar, credenciales_sin_revocar}"""
         fila = self.conn.execute(
             "SELECT COALESCE(SUM(clicado AND NOT contenido), 0) AS enlaces, "
             "COALESCE(SUM(pdf_abierto AND NOT pdf_reportado AND NOT aislado), 0) AS pdfs FROM ("
@@ -406,46 +416,227 @@ class Repositorio:
             "         AS pdf_reportado,"
             "         EXISTS(SELECT 1 FROM aislamientos s WHERE s.correo_id = c.id) AS aislado"
             "  FROM correos c WHERE c.partida = ?)", (partida,)).fetchone()
-        return {"enlaces_sin_contener": fila["enlaces"], "pdfs_sin_reportar": fila["pdfs"]}
+        cred = self.conn.execute("SELECT COUNT(*) FROM compromisos_credencial WHERE partida=? AND revocada_ts IS NULL",
+                                 (partida,)).fetchone()[0]
+        return {"enlaces_sin_contener": fila["enlaces"], "pdfs_sin_reportar": fila["pdfs"], "credenciales_sin_revocar": cred}
 
-    # ---------- misiones del Equipo Azul ----------
-    def misiones(self, partida, usuario):
-        """Todas las misiones con el progreso de ese usuario EN ESA PARTIDA ('pendiente' si aún no hay fila):
-        una partida nueva (servidor reiniciado) arranca con todas pendientes."""
-        filas = self.conn.execute(
-            "SELECT m.id, m.titulo, m.condicion_evento, m.puntos, COALESCE(p.estado, 'pendiente') AS estado, p.ts "
-            "FROM misiones m LEFT JOIN progreso_mision p "
-            "ON p.mision_id = m.id AND p.partida = ? AND p.usuario = ? ORDER BY m.id",
-            (partida, usuario)).fetchall()
-        return [dict(f) for f in filas]
-
-    def _completar(self, partida, usuario, mision):
-        """Marca completada si no lo estaba. -> True si es una completación nueva."""
+    # ---------- credenciales ficticias (Fase E) ----------
+    # Cada usuario semilla tiene UNA credencial ficticia: la de su cuenta de correo. No hay contraseñas guardadas:
+    # «comprometida» es un estado de la partida, no un secreto.
+    def comprometer_credencial(self, partida, enlace_id):
+        """El empleado «envía» su contraseña en la página de un enlace de phishing. Exige que el enlace sea de esta
+        partida, que su plantilla pida credenciales, que se haya clicado y que no esté contenido.
+        -> {usuario, correo_id, nuevo} · "no_existe" · "no_pide" · "sin_clic" · "contenido"."""
+        fila = self.conn.execute(
+            "SELECT c.id, c.para_usuario, c.plantilla_id, "
+            "EXISTS(SELECT 1 FROM contenciones k WHERE k.correo_id = c.id) AS contenido, "
+            "EXISTS(SELECT 1 FROM auditoria a WHERE a.accion = 'CLIC_ENLACE' AND a.recurso = 'correo:' || c.id) AS clicado "
+            "FROM enlaces e JOIN correos c ON c.id = e.correo_id WHERE e.id = ? AND c.partida = ?",
+            (enlace_id, partida)).fetchone()
+        if fila is None:
+            return "no_existe"
+        if not correos.PLANTILLAS.get(fila["plantilla_id"], {}).get("pide_credenciales"):
+            return "no_pide"
+        if fila["contenido"]:
+            return "contenido"
+        if not fila["clicado"]:
+            return "sin_clic"
         with self.conn:
             cur = self.conn.execute(
-                "INSERT INTO progreso_mision(partida,usuario,mision_id,estado,ts) VALUES(?,?,?,'completada',?) "
-                "ON CONFLICT(partida, usuario, mision_id) DO UPDATE SET estado='completada', ts=excluded.ts "
-                "WHERE progreso_mision.estado <> 'completada'",
-                (partida, usuario, mision["id"], datetime.now().astimezone().isoformat(timespec="seconds")))
-        if not cur.rowcount:
-            return False
-        self.registrar(self.identidad(usuario), "MISION_COMPLETADA", f"mision:{mision['id']}", "COMPLETADA", "BAJO")
-        return True
+                "INSERT OR IGNORE INTO compromisos_credencial(partida,usuario,correo_id,ts) VALUES(?,?,?,?)",
+                (partida, fila["para_usuario"], fila["id"], _ahora()))
+        nuevo = bool(cur.rowcount)  # ya comprometida (sin revocar): no se duplica
+        if nuevo:
+            self.registrar(self.identidad(fila["para_usuario"]), "CREDENCIAL_COMPROMETIDA", f"correo:{fila['id']}",
+                           "COMPROMETIDA", "CRITICO")
+        return {"usuario": fila["para_usuario"], "correo_id": fila["id"], "nuevo": nuevo}
 
-    def completar_misiones_evento(self, partida, usuario, evento):
-        """Completa las misiones cuya condición es ese evento. 'manual' nunca se completa por evento.
-        -> misiones completadas AHORA (las ya completadas no se repiten)."""
+    def pide_credenciales(self, correo_id):
+        f = self.conn.execute("SELECT plantilla_id FROM correos WHERE id=?", (correo_id,)).fetchone()
+        return bool(f and correos.PLANTILLAS.get(f["plantilla_id"], {}).get("pide_credenciales"))
+
+    def credenciales(self, partida, usuario):
+        """Estado de la credencial ficticia del usuario en la partida: historial de compromisos (el más reciente primero)."""
+        filas = self.conn.execute(
+            "SELECT q.id, q.correo_id, c.asunto, q.ts, q.revocada_ts, q.revocada_por FROM compromisos_credencial q "
+            "JOIN correos c ON c.id = q.correo_id WHERE q.partida = ? AND q.usuario = ? ORDER BY q.id DESC",
+            (partida, usuario)).fetchall()
+        hist = [dict(f) for f in filas]
+        return {"usuario": usuario, "cuenta": f"Cuenta de correo de {usuario} (credencial ficticia)",
+                "estado": "comprometida" if any(h["revocada_ts"] is None for h in hist) else
+                          "revocada" if hist else "segura", "historial": hist}
+
+    def revocar_credencial(self, partida, usuario, participante):
+        """-> "revocada" · "sin_compromiso" (no hay compromiso activo que revocar)."""
+        with self.conn:
+            cur = self.conn.execute(
+                "UPDATE compromisos_credencial SET revocada_ts=?, revocada_por=? "
+                "WHERE partida=? AND usuario=? AND revocada_ts IS NULL", (_ahora(), participante, partida, usuario))
+        if not cur.rowcount:
+            return "sin_compromiso"
+        self.registrar(self.identidad(usuario), "CREDENCIAL_REVOCADA", f"credencial:{usuario}", participante, "BAJO")
+        return "revocada"
+
+    # ---------- incidentes de la partida (Fase E) ----------
+    def abrir_incidente(self, partida, usuario, participante, titulo, severidad, correo_id=None):
+        """ValueError si título/severidad no valen; None si correo_id no es del buzón del usuario. -> incidente"""
+        titulo = (titulo or "").strip()
+        if not 3 <= len(titulo) <= 80:
+            raise ValueError("El título debe tener entre 3 y 80 caracteres.")
+        if severidad not in SEVERIDADES:
+            raise ValueError("Severidad no válida (baja, media, alta o critica).")
+        if correo_id is not None and self._correo(partida, usuario, correo_id) is None:
+            return None
+        with self.conn:
+            cur = self.conn.execute(
+                "INSERT INTO incidentes_partida(partida,titulo,severidad,estado,correo_id,abierto_por,ts_apertura) "
+                "VALUES(?,?,?,'abierto',?,?,?)", (partida, titulo, severidad, correo_id, participante, _ahora()))
+        self.registrar(self.identidad(usuario), "INCIDENTE_ABIERTO", f"incidente:{cur.lastrowid}",
+                       f"{severidad} · {participante}", "MEDIO")
+        return self._incidente(partida, cur.lastrowid)
+
+    def _incidente(self, partida, inc_id):
+        f = self.conn.execute("SELECT * FROM incidentes_partida WHERE id=? AND partida=?", (inc_id, partida)).fetchone()
+        return dict(f) if f else None
+
+    def incidentes(self, partida):
+        return [dict(f) for f in self.conn.execute(
+            "SELECT * FROM incidentes_partida WHERE partida=? ORDER BY id DESC", (partida,)).fetchall()]
+
+    def pendiente_para_resolver(self, partida, inc):
+        """Lo que impide cerrar el incidente: si tiene correo, su enlace clicado debe estar contenido y la credencial
+        que se comprometió por él, revocada. -> lista de motivos (vacía = se puede resolver)."""
+        if inc["correo_id"] is None:
+            return []
+        f = self.conn.execute(
+            "SELECT EXISTS(SELECT 1 FROM auditoria a WHERE a.accion='CLIC_ENLACE' AND a.recurso='correo:' || c.id) AS clic, "
+            "EXISTS(SELECT 1 FROM contenciones k WHERE k.correo_id = c.id) AS contenido, "
+            "EXISTS(SELECT 1 FROM compromisos_credencial q WHERE q.correo_id = c.id AND q.revocada_ts IS NULL) AS cred "
+            "FROM correos c WHERE c.id = ? AND c.partida = ?", (inc["correo_id"], partida)).fetchone()
+        motivos = []
+        if f and f["clic"] and not f["contenido"]:
+            motivos.append("el enlace del correo se clicó y aún no está contenido")
+        if f and f["cred"]:
+            motivos.append("la credencial comprometida por ese correo aún no está revocada")
+        return motivos
+
+    def avanzar_incidente(self, partida, usuario, inc_id, participante, estado, resolucion=None):
+        """abierto -> en_investigacion -> resuelto. -> incidente · None (no existe) · ValueError (transición o
+        resolución no válida, o amenaza sin contener: el mensaje dice qué falta)."""
+        inc = self._incidente(partida, inc_id)
+        if inc is None:
+            return None
+        if estado not in TRANSICIONES_INCIDENTE[inc["estado"]]:
+            raise ValueError(f"No se puede pasar de «{inc['estado']}» a «{estado}».")
+        if estado == "resuelto":
+            resolucion = (resolucion or "").strip()
+            if not 10 <= len(resolucion) <= 500:
+                raise ValueError("La resolución debe explicar en 10-500 caracteres qué se hizo.")
+            if motivos := self.pendiente_para_resolver(partida, inc):
+                raise ValueError("Aún no se puede resolver: " + " y ".join(motivos) + ".")
+            with self.conn:
+                self.conn.execute("UPDATE incidentes_partida SET estado='resuelto', resolucion=?, resuelto_por=?, "
+                                  "ts_resolucion=? WHERE id=?", (resolucion, participante, _ahora(), inc_id))
+            self.registrar(self.identidad(usuario), "INCIDENTE_RESUELTO", f"incidente:{inc_id}", participante, "BAJO")
+        else:
+            with self.conn:
+                self.conn.execute("UPDATE incidentes_partida SET estado=? WHERE id=?", (estado, inc_id))
+            self.registrar(self.identidad(usuario), "INCIDENTE_ACTUALIZADO", f"incidente:{inc_id}",
+                           f"{estado} · {participante}", "BAJO")
+        return self._incidente(partida, inc_id)
+
+    # ---------- misiones del Equipo Azul ----------
+    def misiones(self, partida, usuario, transcurrido_s=None):
+        """Todas las misiones con el progreso de ese usuario EN ESA PARTIDA. estado: completada · bloqueada (falta
+        alguna de depende_de) · vencida (pendiente y pasado su plazo: aún vale la mitad) · pendiente.
+        transcurrido_s = segundos desde el inicio de la partida (None = sin reloj: nada vence)."""
+        filas = self.conn.execute(
+            "SELECT m.id, m.titulo, m.condicion_evento, m.puntos, m.prioridad, m.plazo_s, m.depende_de, m.descripcion, "
+            "COALESCE(p.estado, 'pendiente') AS estado, p.ts, p.completada_por, p.evidencia, "
+            "COALESCE(p.puntos_obtenidos, CASE WHEN p.estado = 'completada' THEN m.puntos END) AS puntos_obtenidos, "
+            "p.a_tiempo, s.participante AS responsable "
+            "FROM misiones m LEFT JOIN progreso_mision p ON p.mision_id = m.id AND p.partida = ? AND p.usuario = ? "
+            "LEFT JOIN asignaciones_mision s ON s.mision_id = m.id AND s.partida = ? ORDER BY m.id",
+            (partida, usuario, partida)).fetchall()
+        lista = [dict(f) for f in filas]
+        hechas = {m["id"] for m in lista if m["estado"] == "completada"}
+        titulos = {m["id"]: m["titulo"] for m in lista}
+        for m in lista:
+            m["depende_de"] = [int(x) for x in m["depende_de"].split(",") if x.strip()]
+            m["requiere"] = [titulos[d] for d in m["depende_de"] if d not in hechas and d in titulos]
+            if m["estado"] != "completada":
+                if m["requiere"]:
+                    m["estado"] = "bloqueada"
+                elif m["plazo_s"] is not None and transcurrido_s is not None and transcurrido_s > m["plazo_s"]:
+                    m["estado"] = "vencida"
+            m["a_tiempo"] = None if m["a_tiempo"] is None else bool(m["a_tiempo"])
+        return lista
+
+    def _completar(self, partida, usuario, mision, participante=None, evidencia=None, transcurrido_s=None):
+        """Marca completada si no lo estaba, con quién, la evidencia y los puntos (mitad fuera de plazo).
+        -> dict de la misión completada AHORA, o None si ya lo estaba."""
+        puntos, a_tiempo = sesion.puntos_mision(mision["puntos"], mision["plazo_s"], transcurrido_s)
+        with self.conn:
+            cur = self.conn.execute(
+                "INSERT INTO progreso_mision(partida,usuario,mision_id,estado,ts,completada_por,evidencia,puntos_obtenidos,"
+                "a_tiempo) VALUES(?,?,?,'completada',?,?,?,?,?) "
+                "ON CONFLICT(partida, usuario, mision_id) DO UPDATE SET estado='completada', ts=excluded.ts, "
+                "completada_por=excluded.completada_por, evidencia=excluded.evidencia, "
+                "puntos_obtenidos=excluded.puntos_obtenidos, a_tiempo=excluded.a_tiempo "
+                "WHERE progreso_mision.estado <> 'completada'",
+                (partida, usuario, mision["id"], _ahora(), participante, evidencia, puntos, int(a_tiempo)))
+        if not cur.rowcount:
+            return None
+        self.registrar(self.identidad(usuario), "MISION_COMPLETADA", f"mision:{mision['id']}",
+                       f"COMPLETADA +{puntos}" + ("" if a_tiempo else " (fuera de plazo)"), "BAJO")
+        return {**mision, "estado": "completada", "completada_por": participante, "evidencia": evidencia,
+                "puntos_obtenidos": puntos, "a_tiempo": a_tiempo}
+
+    def completar_misiones_evento(self, partida, usuario, evento, participante=None, evidencia=None,
+                                  transcurrido_s=None):
+        """Completa las misiones cuya condición es ese evento y que no están bloqueadas por sus dependencias.
+        'manual' nunca se completa por evento. -> misiones completadas AHORA (las ya completadas no se repiten)."""
         if evento == "manual":
             return []
-        return [m for m in self.misiones(partida, usuario)
-                if m["condicion_evento"] == evento and self._completar(partida, usuario, m)]
+        hechas = []
+        for m in self.misiones(partida, usuario, transcurrido_s):
+            if m["condicion_evento"] == evento and m["estado"] in ("pendiente", "vencida"):
+                if r := self._completar(partida, usuario, m, participante, evidencia, transcurrido_s):
+                    hechas.append(r)
+        return hechas
 
-    def completar_mision_manual(self, partida, usuario, mision_id):
-        """Solo misiones con condición 'manual'. -> True (nueva) · False (ya completada) · None (no existe o no es manual)."""
-        m = next((m for m in self.misiones(partida, usuario) if m["id"] == mision_id), None)
+    def misiones_bloqueadas(self, partida, usuario, evento):
+        """Misiones de ese evento que NO se completaron por faltar una dependencia (para explicarlo en el aviso)."""
+        return [{"id": m["id"], "titulo": m["titulo"], "requiere": m["requiere"]}
+                for m in self.misiones(partida, usuario) if m["condicion_evento"] == evento and m["estado"] == "bloqueada"]
+
+    def completar_mision_manual(self, partida, usuario, mision_id, participante=None, transcurrido_s=None):
+        """Solo misiones con condición 'manual'. -> dict (nueva) · False (ya completada) · None (no existe o no es manual)
+        · "bloqueada"."""
+        m = next((m for m in self.misiones(partida, usuario, transcurrido_s) if m["id"] == mision_id), None)
         if m is None or m["condicion_evento"] != "manual":
             return None
-        return self._completar(partida, usuario, m)
+        if m["estado"] == "bloqueada":
+            return "bloqueada"
+        return self._completar(partida, usuario, m, participante, "manual", transcurrido_s) or False
+
+    def asumir_mision(self, partida, usuario, mision_id, participante):
+        """El participante se hace responsable de la misión (reemplaza al anterior). -> True · None (no existe) ·
+        "completada" (ya no tiene sentido asignarla)."""
+        m = next((m for m in self.misiones(partida, usuario) if m["id"] == mision_id), None)
+        if m is None:
+            return None
+        if m["estado"] == "completada":
+            return "completada"
+        with self.conn:
+            self.conn.execute("INSERT INTO asignaciones_mision(partida,mision_id,participante,ts) VALUES(?,?,?,?) "
+                              "ON CONFLICT(partida, mision_id) DO UPDATE SET participante=excluded.participante, "
+                              "ts=excluded.ts", (partida, mision_id, participante, _ahora()))
+        self.registrar(self.identidad(usuario), "MISION_ASUMIDA", f"mision:{mision_id}", participante, "BAJO")
+        return True
+
+    def puntos_azul(self, partida, usuario):
+        return sum(m["puntos_obtenidos"] or 0 for m in self.misiones(partida, usuario) if m["estado"] == "completada")
 
     def auditoria(self, limite=50):
         filas = self.conn.execute("SELECT * FROM auditoria ORDER BY id DESC LIMIT ?", (limite,)).fetchall()

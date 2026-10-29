@@ -794,6 +794,7 @@ const R = (() => {
     const f = el("div", "buzon-acciones");
     f.append(botonAccion("⚑ Reportar", "", c.reportado, "✓ Reportado", acciones.reportar));
     if (c.clicado) f.append(botonAccion("⛔ Contener", "btn-danger", c.contenido, "✓ Contenido", acciones.contener));
+    if (acciones.incidente) f.append(botonAccion("🚨 Abrir incidente", "", false, "", acciones.incidente));
     d.append(f);
   }
 
@@ -854,6 +855,7 @@ const R = (() => {
         m.append(el("span", "marca " + (c.adjunto_abierto ? "marca-pdf" : "marca-gris"),
           c.adjunto_abierto ? "📎 ADJUNTO ABIERTO" : "📎 sin abrir"));
       }
+      if (c.credencial_obtenida) m.append(el("span", "marca marca-contenido", "🔑 CREDENCIAL OBTENIDA"));
       li.append(m);
       ul.append(li);
     });
@@ -873,13 +875,14 @@ const R = (() => {
     };
     m.append(
       item("mp-rojo-eq", "🔴 Rojo", d.puntos_rojo + " pts · " + d.rojo_enlaces_sin_contener + " enlaces / " +
-        d.rojo_pdfs_sin_reportar + " PDF"),
+        d.rojo_pdfs_sin_reportar + " PDF" + (d.rojo_credenciales_sin_revocar ? " / " + d.rojo_credenciales_sin_revocar + " cred." : "")),
       item("mp-azul", "🔵 Azul" + (d.usuario_azul ? " (" + d.usuario_azul + ")" : ""),
         d.puntos_azul + " pts · " + d.misiones_completadas + "/" + d.misiones_total + " misiones"),
       item("mp-riesgo mp-" + zona, "Riesgo", r + "/100"),
       item(null, "Clics", d.clics), item(null, "Contenciones", d.contenciones),
       item(null, "Reportes", d.correos_reportados + d.pdf_reportados),
       item(null, "PDF abiertos", d.pdf_abiertos),
+      ...(d.incidentes_abiertos ? [item(null, "Incidentes", d.incidentes_abiertos)] : []),
       item(null, "Accesos de Rojo denegados", d.denegaciones_rojo));
     if (d.final) m.prepend(item("mp-final", "🏁 FINAL", d.final.ganador === "empate" ? "EMPATE" : "GANA " + d.final.ganador.toUpperCase()));
   }
@@ -915,27 +918,126 @@ const R = (() => {
     document.querySelectorAll("[data-azul]").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.azul === vista)));
     $("azul-correos").hidden = vista !== "correos";
     $("azul-misiones").hidden = vista !== "misiones";
+    $("azul-incidentes").hidden = vista !== "incidentes";
   }
 
   const CONDICION = { correo_reportado: "Se completa al reportar un correo", manual: "La marca el propio equipo",
-    enlace_contenido: "Se completa al contener un enlace clicado", pdf_abierto: "Se completa al abrir un PDF adjunto" };
+    enlace_contenido: "Se completa al contener un enlace clicado", pdf_abierto: "Se completa al previsualizar un PDF adjunto",
+    remitente_verificado: "Se completa al verificar un remitente", incidente_abierto: "Se completa al abrir un incidente",
+    credencial_revocada: "Se completa al revocar una credencial comprometida",
+    incidente_resuelto: "Se completa al resolver un incidente" };
 
-  function setMisiones(d, onCompletar) {
-    $("misiones-resumen").textContent = (d.usuario ? d.usuario + " · " : "") + d.puntos + " pts · riesgo de la partida " +
-      Math.round(d.riesgo_partida || 0) + "/100";
+  // acciones = {completar(id), asumir(id)}. Estado, plazo, dependencias y puntos los calcula el servidor.
+  const ETIQUETA_ESTADO = { completada: "✓ COMPLETADA", pendiente: "○ PENDIENTE", bloqueada: "🔒 BLOQUEADA",
+    vencida: "⌛ FUERA DE PLAZO (vale la mitad)" };
+  function setMisiones(d, acciones) {
+    const hechas = d.misiones.filter((m) => m.estado === "completada").length;
+    $("misiones-resumen").textContent = (d.usuario ? d.usuario + " · " : "") + d.puntos + " pts · " + hechas + "/" +
+      d.misiones.length + " misiones · riesgo de la partida " + Math.round(d.riesgo_partida || 0) + "/100";
+    const yo = acciones && acciones.yo;
     const ul = $("misiones-lista");
     ul.replaceChildren();
     if (!d.misiones.length) ul.append(el("li", "buzon-vacio", "Sin misiones."));
     d.misiones.forEach((m) => {
       const hecha = m.estado === "completada";
-      const li = el("li", "mision" + (hecha ? " completada" : ""));
+      const li = el("li", "mision mision-" + m.estado + " prioridad-" + m.prioridad + (hecha ? " completada" : ""));
+      li.dataset.mision = m.id;
       const det = el("span", "det");
-      det.append(el("span", "estado-" + m.estado, hecha ? "✓ COMPLETADA" : "○ PENDIENTE"),
-        el("span", null, CONDICION[m.condicion_evento] || m.condicion_evento));
-      if (hecha && m.ts) det.append(el("span", null, fechaCorta(m.ts)));
-      li.append(el("b", null, m.titulo), el("span", "pts", m.puntos + " pts"), det);
-      if (!hecha && m.condicion_evento === "manual") {
-        li.append(botonAccion("Marcar completada", "", false, "", () => onCompletar(m.id)));
+      det.append(el("span", "estado-" + m.estado, ETIQUETA_ESTADO[m.estado] || m.estado),
+        el("span", "marca marca-prio-" + m.prioridad, "PRIORIDAD " + m.prioridad.toUpperCase()));
+      if (m.plazo_s != null && !hecha) {
+        const queda = d.transcurrido_s == null ? m.plazo_s : m.plazo_s - d.transcurrido_s;
+        det.append(el("span", null, queda > 0 ? "⏱ plazo: quedan " + mmss(queda) : "⏱ plazo agotado"));
+      }
+      det.append(el("span", null, CONDICION[m.condicion_evento] || m.condicion_evento));
+      if (m.requiere && m.requiere.length) det.append(el("span", "requiere", "Requiere: " + m.requiere.join(", ")));
+      if (m.responsable && !hecha) det.append(el("span", "responsable", "👤 Responsable: " + m.responsable));
+      const pts = hecha ? "+" + m.puntos_obtenidos + " pts" + (m.a_tiempo === false ? " (fuera de plazo)" : "")
+        : m.puntos + " pts";
+      li.append(el("b", null, m.titulo), el("span", "pts", pts), det);
+      if (m.descripcion) li.append(el("p", "mision-desc", m.descripcion));
+      if (hecha) {
+        li.append(el("p", "mision-evidencia", "Completada" + (m.completada_por ? " por " + m.completada_por : "") +
+          (m.ts ? " · " + fechaCorta(m.ts) : "") + (m.evidencia ? " · evidencia: " + m.evidencia : "")));
+      } else if (acciones) {
+        const b = el("div", "mision-botones");
+        if (m.responsable !== yo) b.append(botonAccion("👤 Asumir", "", false, "", () => acciones.asumir(m.id)));
+        if (m.condicion_evento === "manual") {
+          b.append(botonAccion("Marcar completada", "", m.estado === "bloqueada", "Bloqueada", () => acciones.completar(m.id)));
+        }
+        if (b.childElementCount) li.append(b);
+      }
+      ul.append(li);
+    });
+  }
+
+  // ---------- incidentes y credencial ficticia (Fase E) ----------
+  const ESTADO_CRED = { segura: ["✓ SEGURA", "cred-segura"], comprometida: ["⚠ COMPROMETIDA", "cred-comprometida"],
+    revocada: ["✓ REVOCADA (contraseña cambiada)", "cred-revocada"] };
+  function setCredencial(c, onRevocar) {
+    const s = $("credencial");
+    s.replaceChildren();
+    const [txt, cls] = ESTADO_CRED[c.estado] || [c.estado, ""];
+    s.className = "credencial " + cls;
+    s.append(el("b", null, "🔑 " + (c.cuenta || "Credencial ficticia")), el("span", "cred-estado", txt));
+    const ult = (c.historial || [])[0];
+    if (c.estado === "comprometida" && ult) {
+      s.append(el("p", null, "Se entregó en la página falsa del correo «" + ult.asunto + "» (" + fechaCorta(ult.ts) +
+        "). Contener el enlace no basta: hay que revocarla."));
+      s.append(botonAccion("🔒 Revocar credencial", "btn-danger", false, "", onRevocar));
+    } else if (c.estado === "revocada" && ult) {
+      s.append(el("p", "muted", "Revocada por " + (ult.revocada_por || "—") + " · " + fechaCorta(ult.revocada_ts)));
+    }
+  }
+
+  function setCorreosIncidente(correos, seleccionado) {
+    const sel = $("inc-correo");
+    const actual = seleccionado != null ? String(seleccionado) : sel.value;
+    sel.replaceChildren(el("option", null, "— ninguno —"));
+    sel.firstChild.value = "";
+    correos.forEach((c) => {
+      const o = el("option", null, c.asunto + " · " + c.de);
+      o.value = String(c.id);
+      sel.append(o);
+    });
+    sel.value = [...sel.options].some((o) => o.value === actual) ? actual : "";
+  }
+
+  const ESTADO_INC = { abierto: "🟠 ABIERTO", en_investigacion: "🔎 EN INVESTIGACIÓN", resuelto: "✓ RESUELTO" };
+  // acciones = {investigar(id), resolver(id, texto)}. La lista se redibuja con cada cambio (SSE): el texto de
+  // resolución que se está escribiendo se guarda por incidente para no perderlo.
+  const borradores = {};
+  function setIncidentes(lista, acciones) {
+    const abiertos = lista.filter((i) => i.estado !== "resuelto").length;
+    $("incidentes-cuenta").textContent = abiertos ? "(" + abiertos + ")" : "";
+    const ul = $("incidentes-lista");
+    ul.replaceChildren();
+    if (!lista.length) ul.append(el("li", "buzon-vacio", "No hay incidentes en esta partida."));
+    lista.forEach((i) => {
+      const li = el("li", "mision incidente inc-" + i.estado + " sev-" + i.severidad);
+      li.dataset.incidente = i.id;
+      const det = el("span", "det");
+      det.append(el("span", "estado-" + i.estado, ESTADO_INC[i.estado]), el("span", "marca marca-sev-" + i.severidad,
+        "SEVERIDAD " + i.severidad.toUpperCase()), el("span", null, "Abierto por " + i.abierto_por + " · " + fechaCorta(i.ts_apertura)));
+      if (i.correo_id) det.append(el("span", null, "correo:" + i.correo_id));
+      li.append(el("b", null, "#" + i.id + " " + i.titulo), el("span"), det);
+      if (i.estado === "resuelto") {
+        li.append(el("p", "mision-evidencia", "Resuelto por " + i.resuelto_por + ": " + i.resolucion));
+      } else {
+        if ((i.pendiente || []).length) li.append(el("p", "requiere", "Para resolverlo falta: " + i.pendiente.join("; ") + "."));
+        const b = el("div", "mision-botones");
+        if (i.estado === "abierto") b.append(botonAccion("🔎 Investigar", "", false, "", () => acciones.investigar(i.id)));
+        if (i.estado === "en_investigacion") {
+          const t = el("textarea", "sel");
+          t.rows = 2;
+          t.maxLength = 500;
+          t.placeholder = "Resolución: qué se hizo (10-500 caracteres)";
+          t.setAttribute("aria-label", "Resolución del incidente #" + i.id);
+          t.value = borradores[i.id] || "";
+          t.addEventListener("input", () => { borradores[i.id] = t.value; });
+          b.append(t, botonAccion("✓ Resolver", "btn-primary", false, "", () => acciones.resolver(i.id, t.value.trim())));
+        }
+        li.append(b);
       }
       ul.append(li);
     });
@@ -987,6 +1089,6 @@ const R = (() => {
     mostrarModal, cerrarModal, modalAbierto,
     mostrarBuzon, buzonAbierto, buzonEsModal, alojarBuzon, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
     setVistaAzul, setMisiones, setMarcadorPartida, marcarLeido, mostrarResultadoCorreo, mostrarVisor, cerrarVisor,
-    visorAbierto, setEnviadosRojo, setOllamaComprobando, mostrarResultado, cerrarResultado, resultadoAbierto,
+    visorAbierto, setEnviadosRojo, setCredencial, setCorreosIncidente, setIncidentes, setOllamaComprobando, mostrarResultado, cerrarResultado, resultadoAbierto,
   };
 })();

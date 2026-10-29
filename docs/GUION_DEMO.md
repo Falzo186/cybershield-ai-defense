@@ -23,11 +23,13 @@
 | 7-9 | Azul | Abre *Soporte técnico* → **⚑ Reportar**; vuelve a *Paquetería* → **⛔ Contener**. | Riesgo baja y Rojo pierde sus 10 puntos; dos misiones completadas. |
 | 9-10 | Azul | *Recursos humanos* → **🔎 Verificar remitente** (imita `cybershield`) → **🔗 Inspeccionar enlace** → **👁 Previsualizar** (visor seguro) → **⚑ Reportar PDF** → **🧪 Aislar**; pestaña 🎯 Misiones. | Inspeccionar no es un clic; el visor no descarga ni ejecuta nada; reportar quita los +5 a Rojo. |
 | 10 | Rojo | 📬 Correo → **Enviados · seguimiento**. | Rojo ve el clic y el adjunto abierto, nunca si se reportó. |
-| 10-12 | General | Maximiza **Auditoría** (□) para enseñar el rastro; enseña `data/eventos.jsonl`. | Cada acción queda en una auditoría append-only y en JSON para Wazuh. |
+| 10-11 | Azul | Vuelve a *Soporte técnico* (Sospechosos) → pulsa el enlace → **Iniciar sesión (simulado)**. | La credencial queda comprometida: Rojo +15. Contener no basta. |
+| 11-12 | Azul | En el correo, **🚨 Abrir incidente** → pestaña Incidentes → **🔒 Revocar credencial** → **Investigar** → intenta **Resolver** (lo rechaza: falta contener) → **Contener** → **Resolver**. | Dependencias entre misiones; el servidor explica qué falta. |
+| 12 | General | Maximiza **Auditoría** (□) para enseñar el rastro; enseña `data/eventos.jsonl`. | Cada acción queda en una auditoría append-only y en JSON para Wazuh. |
 | 12-13 | General | 🏁 **Finalizar partida** → confirma. | Resultado congelado; tras cerrar, Rojo/Azul reciben 409. |
 | 13-15 | — | Preguntas. Opcional: *Batalla IA vs IA* con Ollama. | Con `qwen3:4b` cada llamada tarda 12-27 s en CPU: mejor solo 1-2 rondas. |
 
-Resultado esperado con este guion (medido en la prueba automatizada): **Rojo 0 — Azul 35**, riesgo final 0/100.
+Resultado esperado con este guion (medido en la prueba automatizada): **Rojo 0 — Azul 85**, riesgo final 0/100.
 Para que Rojo puntúe, deja un enlace clicado **sin contener** o un PDF abierto **sin reportar** antes de finalizar.
 
 ## Si algo sale mal

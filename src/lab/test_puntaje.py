@@ -35,7 +35,8 @@ def main():
     repo.evento_pdf("p2", "ana.perez", c["id"], "pdf_reportado")
     chk("reportar un PDF sin abrirlo no da puntos a Rojo", sesion.puntaje_rojo(**repo.logros_rojo("p2")) == 0)
     chk("el puntaje es por partida", pts() == 0 and repo.logros_rojo("otra") == {"enlaces_sin_contener": 0,
-                                                                               "pdfs_sin_reportar": 0})
+                                                                               "pdfs_sin_reportar": 0,
+                                                                               "credenciales_sin_revocar": 0})
 
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)

@@ -1,8 +1,8 @@
 # Prueba de extremo a extremo — partida Rojo vs Azul
 
-Generado por `e2e/demo_partida.py` el 2026-10-26T12:16:06-06:00 en 14 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
+Generado por `e2e/demo_partida.py` el 2026-10-29T11:02:06-06:00 en 17 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
 
-**Resultado: 52/52 comprobaciones correctas.**
+**Resultado: 69/69 comprobaciones correctas.**
 
 ## 1. Preparación: cada participante entra con su nombre, entra un espectador y el árbitro inicia la partida
 
@@ -25,7 +25,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-26T12:16:06-06:00 en 14 s, con un 
 
 ## 2. Rojo envía 3 correos (uno sin adjunto y dos con PDF)
 
-- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Actualización de tu recibo de nómina (26/10/2026)»
+- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Actualización de tu recibo de nómina (29/10/2026)» | ✓ Correo enviado a ana.perez: «Tu paquete no pudo ser entregado»
 - ✅ los 3 envíos se confirman: esperado `3`, observado `3`
 - ✅ el buzón de Azul se actualiza solo por SSE: esperado `3`, observado `3`
 
@@ -81,7 +81,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-26T12:16:06-06:00 en 14 s, con un 
 - ✅ Esc cierra el visor: esperado `False`, observado `False`
 - ✅ no se descargó nada al equipo: esperado `0`, observado `0`
 - ✅ Rojo gana +5 (PDF abierto sin reportar): esperado `5`, observado `5`
-- ✅ Azul suma 10 (misión del documento) = 35: esperado `35`, observado `35`
+- ✅ Azul: +5 por verificar el remitente y +10 por el documento = 40: esperado `40`, observado `40`
 - ✅ Rojo pierde los 5 del PDF: esperado `0`, observado `0`
 - ✅ riesgo sigue en 0 (no baja de 0): esperado `0`, observado `0`
 - ✅ el aviso dice el riesgo real de la partida, no solo el −10 de la regla: esperado `True`, observado `True`
@@ -96,46 +96,84 @@ Generado por `e2e/demo_partida.py` el 2026-10-26T12:16:06-06:00 en 14 s, con un 
 - Aviso: ✓ 🧪 Adjunto aislado · regla -5 → riesgo de la partida 0/100
 - ✅ el correo reportado está en «Sospechosos»: esperado `1`, observado `1`
 - ✅ tras aislarlo, el adjunto ya no se puede previsualizar: esperado `True`, observado `True`
-- ✅ aislar no cambia el marcador (Rojo 0, Azul 35): esperado `(0, 35)`, observado `(0, 35)`
+- ✅ aislar no cambia el marcador (Rojo 0, Azul 40): esperado `(0, 40)`, observado `(0, 40)`
 - ✅ Rojo ve en su campaña 1 clic y 1 adjunto abierto (sin saber si se leyó o reportó): esperado `True`, observado `True`
 
 ![13_rojo_seguimiento_campana.jpg](13_rojo_seguimiento_campana.jpg)
 
+## 3g. Credencial robada: el empleado entrega su contraseña en la página falsa de soporte
+
+- ✅ la página imita un inicio de sesión sin campos para escribir: esperado `(True, 0)`, observado `(True, 0)`
+- ✅ la página explica que la credencial queda comprometida: esperado `True`, observado `True`
+- ✅ Rojo: +10 por el nuevo clic y +15 por la credencial = 25: esperado `25`, observado `25`
+- ✅ riesgo: +15 (clic) +20 (credencial) = 35: esperado `35`, observado `35`
+- ✅ Azul recibe el aviso de credencial comprometida: esperado `True`, observado `True`
+
+![14_pagina_falsa_credencial.jpg](14_pagina_falsa_credencial.jpg)
+
+## 3h. Azul abre un incidente desde el correo, revoca la credencial y lo resuelve
+
+- Aviso: 🚨 Incidente #1 abierto · misión completada: «Abrir un incidente de seguridad» +10 pts
+- Aviso: ✓ Credencial revocada · regla -15 → riesgo de la partida 20/100 · misión completada: «Revocar una credencial comprometida» +20 pts
+- Aviso: Aún no se puede resolver: el enlace del correo se clicó y aún no está contenido.
+- Aviso: ✓ Incidente resuelto · regla -5 → riesgo de la partida 0/100 · misión completada: «Resolver el incidente» +15 pts
+- ✅ el formulario trae el correo ya elegido: esperado `True`, observado `True`
+- ✅ abrir el incidente completa su misión: esperado `True`, observado `True`
+- ✅ la credencial aparece COMPROMETIDA con botón para revocarla: esperado `True`, observado `True`
+- ✅ revocar completa su misión (desbloqueada por el incidente): esperado `True`, observado `True`
+- ✅ Rojo pierde los 15 de la credencial (le quedan los 10 del clic): esperado `10`, observado `10`
+- ✅ no deja resolver con el enlace clicado sin contener, y explica por qué: esperado `True`, observado `True`
+- ✅ el enlace de soporte queda contenido: esperado `True`, observado `True`
+- ✅ la lista ya no muestra nada pendiente para resolver: esperado `True`, observado `True`
+- ✅ el texto de resolución escrito antes se conserva al redibujar: esperado `Credencial revocada; enlace de soporte contenido.`, observado `Credencial revocada; enlace de soporte contenido.`
+- ✅ resolver el incidente completa su misión: esperado `True`, observado `True`
+- ✅ marcador: Rojo 0, Azul 85 (40 + 10 incidente + 20 revocar + 15 resolver), riesgo 0: esperado `(0, 85, 0)`, observado `(0, 85, 0)`
+
+![15_azul_incidente_credencial.jpg](15_azul_incidente_credencial.jpg)
+![16_azul_incidente_resuelto.jpg](16_azul_incidente_resuelto.jpg)
+
 ## 4. Verificación: misiones, marcador en General y Espectador
 
-- Marcador final antes de cerrar: {'riesgo': 0, 'rojo': 0, 'azul': 35, 'clics': 1, 'contenciones': 1, 'reportes': 2, 'pdf': 1}
-- Líneas de auditoría en General: 26
-- ✅ misiones completadas: reportar, contener y documento; la manual pendiente: esperado `[True, True, False, True]`, observado `[True, True, False, True]`
-- ✅ General y Espectador ven el mismo marcador: esperado `{'riesgo': 0, 'rojo': 0, 'azul': 35, 'clics': 1, 'contenciones': 1, 'reportes': 2, 'pdf': 1}`, observado `{'riesgo': 0, 'rojo': 0, 'azul': 35, 'clics': 1, 'contenciones': 1, 'reportes': 2, 'pdf': 1}`
+- Evidencia de «Revocar»: Completada por Beto Azul · 29/10/2026 11:02 · evidencia: credencial:ana.perez
+- Marcador final antes de cerrar: {'riesgo': 0, 'rojo': 0, 'azul': 85, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}
+- Líneas de auditoría en General: 43
+- ✅ misiones completadas: todas salvo la manual: esperado `[True, True, False, True, True, True, True, True]`, observado `[True, True, False, True, True, True, True, True]`
+- ✅ cada misión dice quién la completó y con qué evidencia: esperado `True`, observado `True`
+- ✅ General y Espectador ven el mismo marcador: esperado `{'riesgo': 0, 'rojo': 0, 'azul': 85, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}`, observado `{'riesgo': 0, 'rojo': 0, 'azul': 85, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}`
 - ✅ la auditoría de General registró la partida: esperado `True`, observado `True`
 
-![14_azul_misiones.jpg](14_azul_misiones.jpg)
-![15_espectador_marcador.jpg](15_espectador_marcador.jpg)
-![16_general_auditoria_maximizada.jpg](16_general_auditoria_maximizada.jpg)
+![17_azul_misiones.jpg](17_azul_misiones.jpg)
+![18_espectador_marcador.jpg](18_espectador_marcador.jpg)
+![19_general_auditoria_maximizada.jpg](19_general_auditoria_maximizada.jpg)
 
 ## 5. General finaliza la partida y se muestra el resultado
 
 - ✅ General ve la pantalla de resultado: esperado `True`, observado `True`
 - ✅ ganador: esperado `GANA EL EQUIPO AZUL`, observado `GANA EL EQUIPO AZUL`
-- ✅ puntajes finales (Rojo — Azul): esperado `('0', '35')`, observado `('0', '35')`
+- ✅ puntajes finales (Rojo — Azul): esperado `('0', '85')`, observado `('0', '85')`
 - ✅ el Espectador también ve el resultado: esperado `True`, observado `True`
 - ✅ tras finalizar, Rojo ya no puede enviar (409): esperado `True`, observado `True`
 - ✅ sin errores de consola inesperados en ninguna vista: esperado `[]`, observado `[]`
 
-![17_general_resultado.jpg](17_general_resultado.jpg)
-![18_espectador_resultado.jpg](18_espectador_resultado.jpg)
-![19_rojo_tras_finalizar.jpg](19_rojo_tras_finalizar.jpg)
+![20_general_resultado.jpg](20_general_resultado.jpg)
+![21_espectador_resultado.jpg](21_espectador_resultado.jpg)
+![22_rojo_tras_finalizar.jpg](22_rojo_tras_finalizar.jpg)
 
 ## Eventos escritos en eventos.jsonl (formato para Wazuh)
 
 - `archivo_aislado`: 1
-- `clic_enlace`: 1
+- `clic_enlace`: 2
 - `correo_abierto`: 3
 - `correo_recibido`: 3
 - `correo_reportado`: 1
-- `enlace_contenido`: 1
+- `credencial_comprometida`: 1
+- `credencial_revocada`: 1
+- `enlace_contenido`: 2
 - `enlace_inspeccionado`: 1
-- `mision_completada`: 3
+- `incidente_abierto`: 1
+- `incidente_actualizado`: 1
+- `incidente_resuelto`: 1
+- `mision_completada`: 7
 - `partida_finalizada`: 1
 - `pdf_abierto`: 1
 - `pdf_reportado`: 1
@@ -143,6 +181,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-26T12:16:06-06:00 en 14 s, con un 
 
 ## Comportamientos inesperados
 
-- (esperado) Error de consola (rojo, paso 1): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es un envío rechazado a propósito (antes de iniciar o tras finalizar)
-- (esperado) Error de consola (rojo, paso 10): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es un envío rechazado a propósito (antes de iniciar o tras finalizar)
+- (esperado) Error de consola (rojo, paso 1): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es una acción rechazada a propósito (enviar antes de iniciar o tras finalizar, resolver un incidente con la amenaza activa)
+- (esperado) Error de consola (azul, paso 10): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es una acción rechazada a propósito (enviar antes de iniciar o tras finalizar, resolver un incidente con la amenaza activa)
+- (esperado) Error de consola (rojo, paso 12): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es una acción rechazada a propósito (enviar antes de iniciar o tras finalizar, resolver un incidente con la amenaza activa)
 - Ninguno: todas las comprobaciones pasaron y no hubo errores de consola inesperados.

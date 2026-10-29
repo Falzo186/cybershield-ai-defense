@@ -155,7 +155,7 @@ def main():
     chk("rojo no ve misiones", c.get("/api/misiones", headers=H(tr)).status_code == 403)
     chk("espectador no ve misiones", c.get("/api/misiones").status_code == 403)
     m = c.get("/api/misiones", headers=H(ta)).json()
-    estados = {x["id"]: x["estado"] for x in m["misiones"]}
+    estados = {x["id"]: x["estado"] for x in m["misiones"] if x["id"] <= 4}
     chk("azul ve su progreso (1 completada, CLIC_ENLACE no completa misiones, manual pendiente)",
         m["usuario"] == "luis.gomez" and estados == {1: "completada", 2: "pendiente", 3: "pendiente", 4: "pendiente"}
         and m["puntos"] == 10 and m["riesgo_partida"] == 5)
@@ -180,7 +180,7 @@ def main():
     chk("contener dos veces -> 409", c.post(f"/api/correo/{cid}/contener", headers=H(ta)).status_code == 409)
     m = c.get("/api/misiones", headers=H(ta)).json()
     chk("misiones 1-3 completadas (30 pts), la del PDF pendiente",
-        {x["id"]: x["estado"] for x in m["misiones"]} == {1: "completada", 2: "completada", 3: "completada",
+        {x["id"]: x["estado"] for x in m["misiones"] if x["id"] <= 4} == {1: "completada", 2: "completada", 3: "completada",
                                                           4: "pendiente"} and m["puntos"] == 30)
     r = c.get(enlace)
     chk("un clic sobre el enlace contenido se bloquea y no suma riesgo",
@@ -218,12 +218,13 @@ def main():
         and srv.ESTADO_PARTIDA.riesgo_acumulado == antes + 15 - 10)
     chk("reportar el PDF dos veces -> 409", ev("pdf_reportado", f"correo:{pdf_id}").status_code == 409)
     m = c.get("/api/misiones", headers=H(ta)).json()
-    chk("las 4 misiones completadas (40 pts)", {x["estado"] for x in m["misiones"]} == {"completada"} and m["puntos"] == 40)
+    chk("las 4 misiones del buzón completadas (40 pts)",
+        {x["estado"] for x in m["misiones"] if x["id"] <= 4} == {"completada"} and m["puntos"] == 40)
 
     # --- marcador de la partida (general / espectadores) ---
     mk = srv._marcador()
     chk("marcador: puntos de Azul y misiones", mk["usuario_azul"] == "luis.gomez" and mk["puntos_azul"] == 40
-        and (mk["misiones_completadas"], mk["misiones_total"]) == (4, 4))
+        and (mk["misiones_completadas"], mk["misiones_total"]) == (4, 8))
     chk("marcador: riesgo actual de la partida", mk["riesgo"] == srv.ESTADO_PARTIDA.riesgo_acumulado)
     chk("marcador: Rojo en 0 (el enlace clicado se contuvo y el PDF abierto se reportó)",
         (mk["puntos_rojo"], mk["rojo_enlaces_sin_contener"], mk["rojo_pdfs_sin_reportar"]) == (0, 0, 0))
@@ -297,6 +298,66 @@ def main():
     e = {y["id"]: y for y in c.get("/api/correo/enviados", headers=H(tr)).json()["enviados"]}
     chk("Rojo ve su campaña (clic y adjunto abierto), no si se leyó o reportó", sop_id in e and "leido" not in e[sop_id]
         and "reportado" not in e[sop_id])
+
+    # --- incidentes, credenciales ficticias y misiones con responsable (Fase E) ---
+    enl_sop = [y for y in c.get("/api/buzon", headers=H(ta)).json()["correos"] if y["id"] == sop_id][0]["enlace"]
+    chk("sin abrir el enlace no se pueden entregar credenciales (409)", c.post(enl_sop + "/credenciales").status_code == 409)
+    pag = c.get(enl_sop)
+    chk("la página del enlace de soporte imita un inicio de sesión SIN campos de texto",
+        'action="' + enl_sop + '/credenciales"' in pag.text and "<input" not in pag.text
+        and "form-action 'self'" in pag.headers["content-security-policy"])
+    m7 = {x["id"]: x for x in c.get("/api/misiones", headers=H(ta)).json()["misiones"]}
+    chk("revocar está bloqueada hasta abrir un incidente", m7[7]["estado"] == "bloqueada"
+        and m7[7]["requiere"] == ["Abrir un incidente de seguridad"])
+    rojo0 = srv._marcador()["puntos_rojo"]
+    r = c.post(enl_sop + "/credenciales")
+    chk("entregar la contraseña en la página falsa: credencial comprometida", r.status_code == 200
+        and "COMPROMETIDA" in r.text and c.get("/api/credenciales", headers=H(ta)).json()["estado"] == "comprometida")
+    mk = srv._marcador()
+    chk("Rojo +15 por la credencial sin revocar y el marcador la cuenta",
+        mk["puntos_rojo"] == rojo0 + 15 and mk["rojo_credenciales_sin_revocar"] == 1 and mk["credenciales_comprometidas"] == 1)
+    chk("enviarla dos veces no suma otra vez", c.post(enl_sop + "/credenciales").status_code == 200
+        and srv._marcador()["puntos_rojo"] == rojo0 + 15)
+    chk("Rojo ve la credencial obtenida en su campaña", [y for y in c.get("/api/correo/enviados", headers=H(tr))
+                                                          .json()["enviados"] if y["id"] == sop_id][0]["credencial_obtenida"])
+    chk("Rojo y el espectador no ven credenciales ni incidentes",
+        c.get("/api/credenciales", headers=H(tr)).status_code == 403 and c.get("/api/incidentes", headers=H(tr)).status_code == 403
+        and c.get("/api/incidentes", headers=H(te)).status_code == 403)
+    chk("Rojo no revoca ni abre incidentes", P("/api/credenciales/revocar", tr).status_code == 403
+        and P("/api/incidentes", tr, titulo="x" * 5, severidad="alta").status_code == 403)
+    chk("severidad inventada -> 422", P("/api/incidentes", ta, titulo="Phishing", severidad="enorme").status_code == 422)
+    chk("asociar un correo ajeno -> 404", P("/api/incidentes", ta, titulo="Phishing", severidad="alta",
+                                           correo_id=ajeno).status_code == 404)
+    r = P("/api/incidentes", ta, titulo="Credencial robada por phishing", severidad="critica", correo_id=sop_id)
+    inc = r.json()["incidente"]
+    chk("Beto abre un incidente: completa su misión con él como autor y la evidencia",
+        r.status_code == 200 and inc["abierto_por"] == "Beto"
+        and [m["id"] for m in r.json()["regla"]["misiones_completadas"]] == [6])
+    m6 = {x["id"]: x for x in c.get("/api/misiones", headers=H(ta)).json()["misiones"]}
+    chk("la misión registra quién y la evidencia", (m6[6]["completada_por"], m6[6]["evidencia"]) ==
+        ("Beto", f"incidente:{inc['id']}") and m6[7]["estado"] == "pendiente")
+    chk("Bea asume la misión de revocar", P("/api/misiones/7/asumir", ta2).json()["responsable"] == "Bea"
+        and {x["id"]: x for x in c.get("/api/misiones", headers=H(ta)).json()["misiones"]}[7]["responsable"] == "Bea")
+    chk("Rojo no asume misiones", P("/api/misiones/7/asumir", tr).status_code == 403)
+    chk("el árbitro ve los incidentes", c.get("/api/incidentes", headers=H(tg)).json()["incidentes"][0]["id"] == inc["id"])
+    chk("no se salta de abierto a resuelto (409)", P(f"/api/incidentes/{inc['id']}/estado", ta, estado="resuelto",
+                                                     resolucion="Todo arreglado ya.").status_code == 409)
+    P(f"/api/incidentes/{inc['id']}/estado", ta, estado="en_investigacion")
+    r = P(f"/api/incidentes/{inc['id']}/estado", ta, estado="resuelto", resolucion="Todo arreglado ya.")
+    chk("no se resuelve con la amenaza activa y explica qué falta (409)", r.status_code == 409
+        and "credencial" in mensaje(r) and "contenido" in mensaje(r))
+    r = P("/api/credenciales/revocar", ta2)
+    chk("Bea revoca la credencial: regla -15 y misión completada", r.status_code == 200
+        and r.json()["regla"]["riesgo"] == -15 and [m["id"] for m in r.json()["regla"]["misiones_completadas"]] == [7])
+    chk("revocar dos veces -> 409", P("/api/credenciales/revocar", ta).status_code == 409)
+    chk("Rojo pierde los 15 de la credencial", srv._marcador()["puntos_rojo"] == rojo0)
+    P(f"/api/correo/{sop_id}/contener", ta)
+    r = P(f"/api/incidentes/{inc['id']}/estado", ta, estado="resuelto", resolucion="Credencial revocada y enlace contenido.")
+    chk("con todo contenido, el incidente se resuelve y completa su misión", r.status_code == 200
+        and r.json()["incidente"]["estado"] == "resuelto" and [m["id"] for m in r.json()["regla"]["misiones_completadas"]] == [8])
+    chk("un incidente resuelto no cambia de estado (409)",
+        P(f"/api/incidentes/{inc['id']}/estado", ta, estado="en_investigacion").status_code == 409)
+    chk("asumir una misión completada -> 409", P("/api/misiones/8/asumir", ta).status_code == 409)
     chk("Azul no ve los envíos de Rojo", c.get("/api/correo/enviados", headers=H(ta)).status_code == 403)
     acc = {f["accion"] for f in repositorio.por_defecto().auditoria(500)}
     chk("todas las acciones del correo quedan en la auditoría", {"CORREO_RECIBIDO", "CORREO_ABIERTO", "REMITENTE_VERIFICADO",
@@ -314,7 +375,7 @@ def main():
         srv.ms.emitir = original
     fin = r.json()
     chk("general finaliza: puntajes congelados y ganador", r.status_code == 200
-        and (fin["puntos_rojo"], fin["puntos_azul"], fin["ganador"]) == (15, 40, "azul"))
+        and (fin["puntos_rojo"], fin["puntos_azul"], fin["ganador"]) == (15, 90, "azul"))  # 40 buzón + 5 verificar + 10 incidente + 20 revocar + 15 resolver
     chk("se difunde el resultado por SSE", [t for t, _ in eventos if t in ("marcador_partida", "partida_finalizada")]
         == ["marcador_partida", "partida_finalizada"])
     chk("finalizar dos veces -> 409", c.post("/api/partida/finalizar", headers=H(tg)).status_code == 409)

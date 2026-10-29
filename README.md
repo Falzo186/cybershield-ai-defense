@@ -214,12 +214,32 @@ Nada se sube desde la UI.
 
 ### Misiones del Equipo Azul
 
-| Misión | Se completa con | Puntos |
-|---|---|---|
-| Reportar un correo sospechoso | `correo_reportado` | 10 |
-| Contener un enlace clicado | `enlace_contenido` (después de un clic) | 15 |
-| Revisar el buzón diariamente | manual (la marca Azul) | 5 |
-| Revisar un documento recibido | `pdf_abierto` | 10 |
+| Misión | Se completa con | Puntos | Prioridad | Plazo | Requiere |
+|---|---|---|---|---|---|
+| Reportar un correo sospechoso | `correo_reportado` | 10 | alta | 3 min | — |
+| Contener un enlace clicado | `enlace_contenido` (después de un clic) | 15 | alta | 4 min | — |
+| Revisar el buzón diariamente | manual (la marca Azul) | 5 | baja | — | — |
+| Revisar un documento recibido | `pdf_abierto` | 10 | media | — | — |
+| Verificar el remitente de un correo | `remitente_verificado` | 5 | media | 2 min | — |
+| Abrir un incidente de seguridad | `incidente_abierto` | 10 | alta | — | — |
+| Revocar una credencial comprometida | `credencial_revocada` | 20 | alta | — | incidente abierto |
+| Resolver el incidente | `incidente_resuelto` | 15 | media | — | incidente abierto |
+
+- El **plazo** cuenta desde el inicio de la partida: fuera de plazo la misión vale la mitad.
+- Una misión con **dependencias** está *bloqueada*: su evento no la completa hasta que se cumplan las anteriores
+  (el aviso lo explica).
+- Cada participante puede **asumir** una misión (responsable visible para su equipo). Al completarse queda quién lo
+  hizo, cuándo y la **evidencia** (`correo:<id>`, `incidente:<id>`, `credencial:<usuario>`).
+
+### Incidentes y credenciales ficticias (Fase E)
+
+- El correo de *Soporte técnico* lleva a una página que imita un inicio de sesión. **No tiene campos**: un botón
+  representa entregar la contraseña. Eso deja **comprometida** la credencial ficticia de la cuenta (riesgo +20,
+  Rojo **+15** mientras no se revoque). Contener el enlace no basta.
+- Azul **abre incidentes** (título, severidad y correo relacionado; también desde el propio correo), los pasa a
+  *en investigación* y los **resuelve** con una explicación. El servidor no deja resolverlos mientras el enlace del
+  correo siga clicado sin contener o la credencial siga sin revocar, y dice qué falta.
+- **Revocar** la credencial (riesgo −15) anula los puntos de Rojo por ella. Rojo ve en su campaña «credencial obtenida».
 
 ### Reglas deterministas y puntaje
 

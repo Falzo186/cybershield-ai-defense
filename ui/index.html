@@ -277,6 +277,7 @@
       <div class="tabs buzon-tabs" role="tablist" aria-label="Vista del Equipo Azul">
         <button type="button" role="tab" class="subtab" data-azul="correos" aria-selected="true" aria-controls="azul-correos">CORREOS</button>
         <button type="button" role="tab" class="subtab" data-azul="misiones" aria-selected="false" aria-controls="azul-misiones">MISIONES</button>
+        <button type="button" role="tab" class="subtab" data-azul="incidentes" aria-selected="false" aria-controls="azul-incidentes">INCIDENTES <b id="incidentes-cuenta"></b></button>
       </div>
       <div id="azul-correos" role="tabpanel">
         <div class="buzon-head">
@@ -298,6 +299,22 @@
           <button type="button" id="btn-misiones-refrescar" class="btn btn-mini">↻ Actualizar</button>
         </div>
         <ul id="misiones-lista" class="misiones-lista" aria-label="Misiones del Equipo Azul"></ul>
+      </div>
+      <div id="azul-incidentes" role="tabpanel" hidden>
+        <section id="credencial" class="credencial" aria-live="polite"></section>
+        <form id="incidente-form" class="incidente-form">
+          <h3>ABRIR INCIDENTE</h3>
+          <label>Título <input id="inc-titulo" class="sel" maxlength="80" minlength="3" required placeholder="p. ej. Phishing de soporte técnico"></label>
+          <label>Severidad
+            <select id="inc-severidad" class="sel">
+              <option value="baja">Baja</option><option value="media">Media</option>
+              <option value="alta" selected>Alta</option><option value="critica">Crítica</option>
+            </select>
+          </label>
+          <label>Correo relacionado <select id="inc-correo" class="sel"><option value="">— ninguno —</option></select></label>
+          <button type="submit" class="btn btn-mini btn-primary">🚨 Abrir incidente</button>
+        </form>
+        <ul id="incidentes-lista" class="misiones-lista" aria-label="Incidentes de la partida"></ul>
       </div>
     </div>
     <button type="button" id="buzon-cerrar" class="btn">CERRAR (Esc)</button>

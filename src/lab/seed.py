@@ -2,22 +2,39 @@
 from datetime import datetime
 
 
-# Misiones fijas del Equipo Azul: (id, título, condicion_evento, puntos). condicion_evento = evento de
-# sesion.REGLAS_EVENTO que la completa, o "manual" (la marca completada el propio equipo azul).
+# Misiones fijas del Equipo Azul:
+#   (id, título, condicion_evento, puntos, prioridad, plazo_s, depende_de, descripcion)
+# condicion_evento = evento de sesion.REGLAS_EVENTO que la completa, o "manual" (la marca el propio equipo azul).
+# plazo_s = segundos desde el inicio de la partida (None = sin plazo); fuera de plazo vale la mitad.
+# depende_de = ids (separados por comas) que deben estar completadas ANTES: si no, el evento no la completa.
 MISIONES = [
-    (1, "Reportar un correo sospechoso", "correo_reportado", 10),
-    (2, "Contener un enlace clicado", "enlace_contenido", 15),  # acción de Azul DESPUÉS de un CLIC_ENLACE
-    (3, "Revisar el buzón diariamente", "manual", 5),
-    (4, "Revisar un documento recibido", "pdf_abierto", 10),
+    (1, "Reportar un correo sospechoso", "correo_reportado", 10, "alta", 180, "",
+     "Reporta un correo de phishing para que seguridad pueda avisar al resto."),
+    (2, "Contener un enlace clicado", "enlace_contenido", 15, "alta", 240, "",  # DESPUÉS de un CLIC_ENLACE
+     "Si alguien abrió un enlace malicioso, contenlo para que los siguientes clics no tengan efecto."),
+    (3, "Revisar el buzón diariamente", "manual", 5, "baja", None, "",
+     "Márcala tú cuando hayas revisado todo el buzón."),
+    (4, "Revisar un documento recibido", "pdf_abierto", 10, "media", None, "",
+     "Previsualiza un adjunto en el visor seguro y valora sus indicadores."),
+    (5, "Verificar el remitente de un correo", "remitente_verificado", 5, "media", 120, "",
+     "Comprueba el dominio de un remitente antes de actuar sobre su correo."),
+    (6, "Abrir un incidente de seguridad", "incidente_abierto", 10, "alta", None, "",
+     "Registra el incidente: qué pasó, gravedad y correo relacionado."),
+    (7, "Revocar una credencial comprometida", "credencial_revocada", 20, "alta", None, "6",
+     "Si una cuenta envió su contraseña a una página falsa, revócala. Requiere un incidente abierto antes."),
+    (8, "Resolver el incidente", "incidente_resuelto", 15, "media", None, "6",
+     "Cierra el incidente con su resolución cuando la amenaza esté contenida."),
 ]
 
 
 def sembrar_misiones(conn):
     """Aparte del resto: también llega a BD creadas antes de existir las misiones. MISIONES es la fuente de
     verdad: si una misión ya existe, se actualiza su definición (el progreso de los usuarios no se toca)."""
-    conn.executemany("INSERT INTO misiones VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
-                     "titulo=excluded.titulo, condicion_evento=excluded.condicion_evento, puntos=excluded.puntos",
-                     MISIONES)
+    conn.executemany("INSERT INTO misiones(id,titulo,condicion_evento,puntos,prioridad,plazo_s,depende_de,descripcion) "
+                     "VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
+                     "titulo=excluded.titulo, condicion_evento=excluded.condicion_evento, puntos=excluded.puntos, "
+                     "prioridad=excluded.prioridad, plazo_s=excluded.plazo_s, depende_de=excluded.depende_de, "
+                     "descripcion=excluded.descripcion", MISIONES)
     conn.commit()
 
 

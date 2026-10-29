@@ -30,12 +30,30 @@ CREATE TABLE IF NOT EXISTS enlaces(
     ruta_local TEXT NOT NULL CHECK(ruta_local = '/l/' || id));
 CREATE TABLE IF NOT EXISTS misiones(
     id INTEGER PRIMARY KEY, titulo TEXT NOT NULL, condicion_evento TEXT NOT NULL,
-    puntos INTEGER NOT NULL CHECK(puntos >= 0));
+    puntos INTEGER NOT NULL CHECK(puntos >= 0), prioridad TEXT NOT NULL DEFAULT 'media', plazo_s INTEGER,
+    depende_de TEXT NOT NULL DEFAULT '', descripcion TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS progreso_mision(
     partida TEXT NOT NULL, usuario TEXT NOT NULL REFERENCES usuarios(usuario),
     mision_id INTEGER NOT NULL REFERENCES misiones(id),
     estado TEXT NOT NULL CHECK(estado IN ('pendiente','completada')), ts TEXT NOT NULL,
+    completada_por TEXT, evidencia TEXT, puntos_obtenidos INTEGER, a_tiempo INTEGER,
     PRIMARY KEY(partida, usuario, mision_id));
+CREATE TABLE IF NOT EXISTS asignaciones_mision(
+    partida TEXT NOT NULL, mision_id INTEGER NOT NULL REFERENCES misiones(id), participante TEXT NOT NULL,
+    ts TEXT NOT NULL, PRIMARY KEY(partida, mision_id));
+CREATE TABLE IF NOT EXISTS incidentes_partida(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, partida TEXT NOT NULL,
+    titulo TEXT NOT NULL CHECK(length(titulo) BETWEEN 3 AND 80),
+    severidad TEXT NOT NULL CHECK(severidad IN ('baja','media','alta','critica')),
+    estado TEXT NOT NULL CHECK(estado IN ('abierto','en_investigacion','resuelto')),
+    correo_id INTEGER REFERENCES correos(id), abierto_por TEXT NOT NULL, ts_apertura TEXT NOT NULL,
+    resolucion TEXT CHECK(resolucion IS NULL OR length(resolucion) BETWEEN 10 AND 500),
+    resuelto_por TEXT, ts_resolucion TEXT);
+CREATE TABLE IF NOT EXISTS compromisos_credencial(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, partida TEXT NOT NULL, usuario TEXT NOT NULL REFERENCES usuarios(usuario),
+    correo_id INTEGER NOT NULL REFERENCES correos(id), ts TEXT NOT NULL, revocada_ts TEXT, revocada_por TEXT);
+CREATE UNIQUE INDEX IF NOT EXISTS compromiso_activo ON compromisos_credencial(partida, usuario)
+    WHERE revocada_ts IS NULL;
 CREATE TABLE IF NOT EXISTS contenciones(
     correo_id INTEGER PRIMARY KEY REFERENCES correos(id), usuario TEXT NOT NULL REFERENCES usuarios(usuario),
     ts TEXT NOT NULL);
@@ -100,6 +118,20 @@ def _migrar_auditoria(conn):
             conn.execute(f"ALTER TABLE auditoria ADD COLUMN {col} TEXT")
 
 
+def _migrar_misiones(conn):
+    """Fase E: misiones ganó prioridad, plazo, dependencias y descripción; progreso_mision, quién la completó, la
+    evidencia y los puntos obtenidos. ADD COLUMN conserva el progreso existente (las columnas nuevas quedan NULL)."""
+    nuevas = {"misiones": (("prioridad", "TEXT NOT NULL DEFAULT 'media'"), ("plazo_s", "INTEGER"),
+                           ("depende_de", "TEXT NOT NULL DEFAULT ''"), ("descripcion", "TEXT NOT NULL DEFAULT ''")),
+              "progreso_mision": (("completada_por", "TEXT"), ("evidencia", "TEXT"), ("puntos_obtenidos", "INTEGER"),
+                                  ("a_tiempo", "INTEGER"))}
+    for tabla, cols in nuevas.items():
+        existentes = {f[1] for f in conn.execute(f"PRAGMA table_info({tabla})")}
+        for col, tipo in cols:
+            if col not in existentes:
+                conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {col} {tipo}")
+
+
 def _migrar_correos(conn):
     """correos ganó la columna adjunto (id de un PDF fijo del catálogo, o NULL)."""
     columnas = {f[1] for f in conn.execute("PRAGMA table_info(correos)")}
@@ -113,4 +145,5 @@ def crear(conn):
     conn.executescript(DDL)
     _migrar_correos(conn)
     _migrar_auditoria(conn)
+    _migrar_misiones(conn)
     conn.commit()

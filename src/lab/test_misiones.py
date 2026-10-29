@@ -14,10 +14,11 @@ def chk(nombre, cond):
 def main():
     repo = repositorio.abrir(":memory:")
     ms = repo.misiones("p1", "ana.perez")
-    chk("4 misiones fijas sembradas, todas pendientes",
-        [m["titulo"] for m in ms] == ["Reportar un correo sospechoso", "Contener un enlace clicado",
-                                      "Revisar el buzón diariamente", "Revisar un documento recibido"]
-        and {m["estado"] for m in ms} == {"pendiente"})
+    chk("8 misiones fijas sembradas; pendientes salvo las que dependen de otra (bloqueadas)",
+        [m["titulo"] for m in ms[:4]] == ["Reportar un correo sospechoso", "Contener un enlace clicado",
+                                          "Revisar el buzón diariamente", "Revisar un documento recibido"]
+        and len(ms) == 8 and [m["estado"] for m in ms].count("bloqueada") == 2
+        and {m["estado"] for m in ms} == {"pendiente", "bloqueada"})
     chk("cada condición es un evento con regla o 'manual'",
         all(m["condicion_evento"] in sesion.REGLAS_EVENTO or m["condicion_evento"] == "manual" for m in ms))
 
@@ -26,18 +27,19 @@ def main():
         [m["id"] for m in hechas] == [1] and repo.misiones("p1", "ana.perez")[0]["estado"] == "completada")
     chk("el progreso es por usuario", repo.misiones("p1", "luis.gomez")[0]["estado"] == "pendiente")
     chk("el progreso es por partida: una partida nueva arranca limpia",
-        {m["estado"] for m in repo.misiones("p2", "ana.perez")} == {"pendiente"})
+        "completada" not in {m["estado"] for m in repo.misiones("p2", "ana.perez")})
     chk("repetir el evento no vuelve a completarla", repo.completar_misiones_evento("p1", "ana.perez", "correo_reportado") == [])
     chk("la completación queda en auditoría", repo.auditoria(1)[0]["accion"] == "MISION_COMPLETADA")
     chk("'manual' no se completa por evento", repo.completar_misiones_evento("p1", "ana.perez", "manual") == [])
 
-    chk("misión manual -> True", repo.completar_mision_manual("p1", "ana.perez", 3) is True)
+    chk("misión manual -> la misión completada", repo.completar_mision_manual("p1", "ana.perez", 3)["id"] == 3)
     chk("misión manual dos veces -> False", repo.completar_mision_manual("p1", "ana.perez", 3) is False)
     chk("una misión por evento no se completa a mano", repo.completar_mision_manual("p1", "ana.perez", 2) is None)
     chk("misión inexistente -> None", repo.completar_mision_manual("p1", "ana.perez", 99) is None)
 
     try:
-        repo.conn.execute("INSERT INTO progreso_mision VALUES('p1', 'ana.perez', 2, 'hackeada', 'x')")
+        repo.conn.execute("INSERT INTO progreso_mision(partida,usuario,mision_id,estado,ts) "
+                          "VALUES('p1', 'ana.perez', 2, 'hackeada', 'x')")
         estado_libre = True
     except sqlite3.IntegrityError:
         estado_libre = False
@@ -50,7 +52,7 @@ def main():
     repo.conn.execute("UPDATE misiones SET condicion_evento='CLIC_ENLACE' WHERE id=2")  # definición vieja
     seed.sembrar_misiones(repo.conn)
     chk("volver a sembrar no duplica y actualiza la definición",
-        len(repo.misiones("p1", "ana.perez")) == 4 and repo.misiones("p1", "ana.perez")[1]["condicion_evento"] == "enlace_contenido")
+        len(repo.misiones("p1", "ana.perez")) == 8 and repo.misiones("p1", "ana.perez")[1]["condicion_evento"] == "enlace_contenido")
     chk("re-sembrar conserva el progreso", repo.misiones("p1", "ana.perez")[1]["estado"] == "completada")
 
     print(f"Total {sum(resultados)}/{len(resultados)}")

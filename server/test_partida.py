@@ -74,6 +74,8 @@ def main():
     chk("iniciar dos veces -> 409", lanza(lambda: p.iniciar(5), 409))
     reloj.t += 120
     chk("el restante lo cuenta el reloj del servidor", p.restante_s() == 180 and not p.vencida())
+    chk("transcurrido para los plazos de las misiones", p.transcurrido_s() == 120
+        and pt.Partida(reloj=reloj).transcurrido_s() is None)
     reloj.t += 181
     chk("vence al agotarse el tiempo", p.vencida() and p.restante_s() == 0)
     p.finalizar("tiempo")
