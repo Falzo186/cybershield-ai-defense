@@ -1,0 +1,13 @@
+<!--
+  Bloque para el ossec.conf del AGENTE de Wazuh instalado en la máquina que ejecuta el laboratorio
+  (o del manager, si el laboratorio corre en la misma máquina). Ajustar la ruta a la instalación real.
+  Windows: la ruta suele ser C:\ruta\al\proyecto\llm-redteam\data\eventos.jsonl
+-->
+<ossec_config>
+  <localfile>
+    <log_format>json</log_format>
+    <location>/ruta/al/proyecto/llm-redteam/data/eventos.jsonl</location>
+    <!-- Etiqueta opcional para distinguir el origen en los paneles -->
+    <label key="laboratorio">cybershield</label>
+  </localfile>
+</ossec_config>

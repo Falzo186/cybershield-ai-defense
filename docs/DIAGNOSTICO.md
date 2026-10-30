@@ -546,3 +546,84 @@ servidor. Propuesta:
   cambia la composición del escritorio, que cubre la E2E en las 4 vistas.
 - **Avance estimado:** ~88 % del plan (A, B, C, D, E, F y G hechas; H pendiente: pruebas integrales, regresiones y
   adaptador Wazuh documentado).
+
+## 17. Informe de la Fase H — pruebas integrales, regresiones y adaptador Wazuh (rama `feature/fase-h-integracion`)
+
+- **Objetivo:** pruebas integrales de todo el sistema, regresiones cubiertas y el adaptador de Wazuh documentado.
+- **Estado inicial:**
+  - 20 suites, que yo lanzaba desde un script fuera del repositorio;
+  - nada probaba que el servidor **sobreviviera a un reinicio**;
+  - el JSONL del SIEM no tenía su contrato verificado;
+  - de Wazuh solo había una frase en el README.
+- **Archivos (todos nuevos salvo la documentación):**
+  - `ejecutar_pruebas.py`: todas las suites en un comando, con resumen y código de salida;
+  - `e2e/test_reinicio.py`: integración con servidor real y reinicios;
+  - `integraciones/wazuh/`: `README.md`, `ossec_localfile.xml`, `local_rules.xml` (18 reglas),
+    `eventos_ejemplo.jsonl` (eventos reales) y `test_reglas.py`;
+  - `README.md`, `docs/CONTRATO_API.md` y este informe.
+- **Prueba de integración con reinicio** (`e2e/test_reinicio.py`, 24/24): un servidor real (proceso aparte, BD en
+  archivo temporal, Ollama falso) juega una partida completa por la API. La partida incluye práctica, phishing con
+  credencial robada, reporte, un ataque IA con datos expuestos y la finalización. Después se para y se arranca dos
+  veces. Comprueba:
+  - **lo que sobrevive:** el historial de partidas, el desglose guardado (idéntico), la cronología (mismas
+    entradas), el ataque IA y la ronda de práctica;
+  - **lo que no:** las sesiones, que están en memoria. El token anterior da 403, hay que volver a unirse y se
+    puede jugar otra partida;
+  - **el contrato del JSONL:** cada línea con los 11 campos, solo tipos conocidos, la partida correcta, `CRITICO`
+    en los datos expuestos, y el archivo que solo crece;
+  - **la BD:** las migraciones son idempotentes (mismo esquema tras cada reinicio) y la auditoría es append-only
+    (un `DELETE` se rechaza).
+- **Adaptador Wazuh:** 18 reglas (ids 100100-100140) que cuelgan de una base que exige el decodificador JSON y
+  `origen: cybershield-lab`:
+  - nivel 12 para una credencial comprometida y para datos expuestos por la IA;
+  - 8 para un clic de phishing o la IA engañada;
+  - 6-7 para accesos denegados, fallo seguro o un incidente abierto;
+  - una correlación (3 denegaciones en 120 s, nivel 10);
+  - técnicas MITRE (T1566.001/.002, T1078, T1213).
+
+  `test_reglas.py` (14/14) comprueba sin conexión la estructura, que cada uno de los 26 tipos tiene regla propia
+  (y falla si alguien añade un tipo sin regla) y, en una **simulación aproximada**, que cada evento real cae en su
+  regla y nivel. **No se ha probado contra un Wazuh real:** el orden real de evaluación, OS_Regex, la correlación y
+  el envío del agente necesitan `wazuh-logtest`. El README lo dice.
+- **Regresiones:** cada fallo encontrado durante el proyecto tiene una prueba que lo detectaría si volviera:
+
+  | Fallo (fase) | Prueba que lo cubre |
+  |---|---|
+  | +2 s de latencia con `localhost` en Windows (§5.1, A) | `test_cliente`: localhost → 127.0.0.1 con reintento |
+  | Rondas de práctica sin trazabilidad (§5.2) | `test_resultados` y `test_reinicio` (BD y JSONL) |
+  | Equipo inaccesible al perder el token (§5.3, C) | `test_app` (reconexión) y `test_reinicio` (volver a unirse) |
+  | Ataque vacío enviado como ataque (§5.4, A) | `test_cliente`: `prompt` vacío = error |
+  | HTTP 500 de Ollama sin su mensaje (§5.5, A) | `test_cliente` |
+  | `qwen3` con respuesta vacía por el razonamiento (A) | `test_cliente`: `think: false` |
+  | Texto de resolución perdido al redibujar (E) | E2E: «el texto de resolución escrito antes se conserva» |
+  | La vista de Rojo no se enteraba de la revocación (F) | `test_batalla_partida` (emite `ia_estado`) y E2E 3i |
+  | La ventana de la batalla sin icono (F, visto en G) | E2E: se abren por su icono Resultados, Seguridad, Archivos e Incidentes |
+  | Las pestañas nuevas vaciaban el botón de práctica (G) | E2E: «el botón conserva su texto» |
+  | Respuestas antiguas pintadas encima de las nuevas (G, sin confirmar) | E2E espera los totales correctos, con diagnóstico |
+  | Secciones de aplicaciones sin permiso visibles y con 403 (B) | E2E: «sin errores de consola inesperados» en las 4 vistas |
+  | Totales del desglose distintos del marcador (G) | `test_informe` y `test_resultados` |
+  | Acceso de una ruta distinto del catálogo de aplicaciones (B) | `test_apps` (matriz para 4 equipos y sin sesión) |
+
+- **Pruebas (resultados reales):** `python ejecutar_pruebas.py` → **22/22 suites en verde, 758/758
+  comprobaciones**, incluida la E2E en Chromium real (106/106). Unas 2 minutos en total.
+- **Decisiones tomadas (reversibles; revísalas):**
+  - las pruebas usan el **Ollama falso**, así que la batería no necesita modelos y es determinista. Las mediciones
+    con modelos reales están documentadas aparte (Fase F) y no forman parte de la batería;
+  - no añadí integración continua (GitHub Actions), porque publica y ejecuta en infraestructura externa; se puede
+    hacer cuando lo apruebes;
+  - los niveles de Wazuh son una propuesta razonada, no una calibración con datos reales.
+- **Pendiente del proyecto (consolidado):**
+  - **Wazuh:** conectarlo de verdad y validar las reglas con `wazuh-logtest`;
+  - **seguridad:** sin límites de frecuencia ni caducidad de tokens (§6). Las sesiones viven en memoria (se pierden
+    al reiniciar, como comprueba `test_reinicio`) y la vista de espectador es abierta en la LAN;
+  - **juego:**
+    - el progreso de las misiones es del usuario azul compartido;
+    - la regla de la Fase D (previsualizar un PDF da +5 a Rojo) sigue pendiente de revisar;
+    - un incidente sin correo no comprueba nada al resolverse;
+  - **UI:**
+    - 16 px de scroll interno en el Centro de control de General a 1366×768;
+    - las ventanas antiguas de IA no están limitadas por el catálogo;
+    - una lectura incorrecta del desglose (1 de 7 pasadas) sin causa confirmada;
+  - **arquitectura:** `server/app.py` sigue siendo monolítico (~1 800 líneas).
+- **Avance estimado:** el plan A-H está **completo**. Frente a la visión completa, ~90 %: falta conectar Wazuh de
+  verdad, la seguridad de las sesiones y dividir el servidor en módulos.
