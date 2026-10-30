@@ -30,6 +30,7 @@
 | 11 | Rojo | ⚔ *Batalla de la partida* → técnica *autoridad* → **Lanzar ataque IA**. | Rojo ataca con la credencial robada: si el defensor atiende la petición, **datos expuestos** (+10). Todas las vistas ven «esperando a la Ollama…» y los segundos reales. |
 | 11-12 | Azul | En el correo, **🚨 Abrir incidente** → pestaña Incidentes → **🔒 Revocar credencial** → **Investigar** → intenta **Resolver** (lo rechaza: falta contener) → **Contener** → **Resolver**. | Dependencias entre misiones; el servidor explica qué falta. |
 | 12 | Rojo | Lanza otro ataque IA. | Con la credencial revocada vuelve a ser invitado: el defensor lo contiene (Azul +5). Enseña los tokens y la carga del modelo. |
+| 12 | Azul / Rojo | Azul abre **🔐 Seguridad** (qué falta, de lo más grave a lo menos) y **🗂️ Archivos**; Rojo abre **🔔**. | Cada equipo solo tiene sus aplicaciones (lo decide el servidor). Rojo se entera de los clics, pero nunca de lo que hace Azul. |
 | 12 | General | Maximiza **Auditoría** (□) para enseñar el rastro; enseña `data/eventos.jsonl`. | Cada acción queda en una auditoría append-only y en JSON para Wazuh. |
 | 12-13 | General | 🏁 **Finalizar partida** → confirma. | Resultado congelado; tras cerrar, Rojo/Azul reciben 409. |
 | 13 | General | En la pantalla final, **📊 Ver desglose y cronología** → pestaña *Cronología* → filtra *Batalla IA*. | Cada punto tiene su fórmula y la suma es el marcador. La cronología cuenta la partida minuto a minuto, y Rojo la ve entera ahora que terminó. |

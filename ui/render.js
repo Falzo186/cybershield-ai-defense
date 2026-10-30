@@ -956,6 +956,165 @@ const R = (() => {
     ul.replaceChildren(...e.ataques.filter((a) => a.estado !== "en_curso").reverse().map(itemAtaqueIA));
   }
 
+  // ---------- aplicaciones por permiso (Fase B) ----------
+  const PERMISO_TXT = { escritura: "LECTURA Y ACCIONES", lectura: "SOLO LECTURA" };
+  const chip = (cls, t) => el("span", "marca " + cls, t);
+
+  // acciones: {ver(correoId), reportar(correoId), aislar(correoId)} (solo si d.puede_actuar)
+  function setArchivos(d, acciones) {
+    const ul = $("arch-lista");
+    ul.replaceChildren();
+    if (d.bloqueado) { $("arch-info").textContent = d.bloqueado; return; }
+    if (d.vista === "rojo") {
+      $("arch-permiso").textContent = PERMISO_TXT.lectura;
+      $("arch-info").textContent = "Adjuntos que puedes enviar (plantillas fijas: PDF de solo texto) y si se abrieron. " +
+        "Como en una campaña real, no sabes si se reportaron o aislaron.";
+      d.catalogo.forEach((c) => {
+        const li = el("li", "app-item riesgo-" + c.adjunto.riesgo);
+        li.append(el("b", null, "📎 " + c.adjunto.titulo), el("span", "muted", "Plantilla «" + c.nombre + "» · " + c.adjunto.archivo +
+          " · riesgo del contexto: " + c.adjunto.riesgo));
+        ul.append(li);
+      });
+      d.enviados.forEach((e) => {
+        const li = el("li", "app-item");
+        const f = el("div", "app-fila");
+        f.append(el("b", null, "Enviado: " + e.asunto), el("span", "fecha", fechaCorta(e.ts)),
+          chip(e.adjunto_abierto ? "marca-pdf" : "marca-gris", e.adjunto_abierto ? "📎 ADJUNTO ABIERTO" : "📎 sin abrir"));
+        li.append(f);
+        ul.append(li);
+      });
+      return;
+    }
+    $("arch-permiso").textContent = PERMISO_TXT[d.puede_actuar ? "escritura" : "lectura"];
+    $("arch-info").textContent = "Adjuntos recibidos en el buzón de " + (d.usuario || "Azul") + ". Se abren en el visor " +
+      "seguro: nada se descarga ni se ejecuta. El riesgo describe el contexto del correo, no el archivo.";
+    d.adjuntos.forEach((c) => {
+      const li = el("li", "app-item riesgo-" + c.adjunto.riesgo);
+      const f = el("div", "app-fila");
+      f.append(el("b", null, "📎 " + c.adjunto.titulo), el("span", "muted", c.adjunto.archivo + " · riesgo " + c.adjunto.riesgo),
+        c.pdf_abierto ? chip("marca-pdf", "ABIERTO") : chip("marca-gris", "sin abrir"),
+        ...(c.pdf_reportado ? [chip("marca-contenido", "REPORTADO")] : []), ...(c.aislado ? [chip("marca-contenido", "AISLADO")] : []));
+      li.append(f, el("span", "muted", "De " + c.de + " · «" + c.asunto + "» · " + fechaCorta(c.ts)));
+      if (d.puede_actuar) {
+        const b = el("div", "app-botones");
+        const boton = (t, fn, off) => { const x = el("button", "btn btn-mini", t); x.type = "button"; x.disabled = !!off; x.addEventListener("click", () => fn(c.id)); return x; };
+        b.append(boton("👁 Previsualizar", acciones.ver), boton("⚑ Reportar PDF", acciones.reportar, c.pdf_reportado),
+          boton("🧪 Aislar", acciones.aislar, c.aislado));
+        li.append(b);
+      }
+      ul.append(li);
+    });
+  }
+
+  function setSeguridad(d, acciones) {
+    const res = $("seg-resumen");
+    res.replaceChildren();
+    if (d.bloqueado) { res.append(el("p", "muted", d.bloqueado)); return; }
+    $("seg-permiso").textContent = PERMISO_TXT[d.puede_actuar ? "escritura" : "lectura"];
+    const caja = (titulo, valor, cls, extra) => { const c = el("div", "seg-caja"); c.append(el("span", "muted", titulo), el("b", cls, valor)); if (extra) c.append(extra); return c; };
+    const r = Math.round(d.riesgo || 0);
+    const cred = d.credencial.estado;
+    let revocar = null;
+    if (cred === "comprometida" && d.puede_actuar) {
+      revocar = el("button", "btn btn-mini btn-danger", "🔒 Revocar credencial");
+      revocar.type = "button";
+      revocar.addEventListener("click", acciones.revocar);
+    }
+    const df = d.defensor;
+    res.append(caja("Riesgo de la partida", r + "/100", r > 70 ? "bad" : r >= 30 ? "warn" : "ok"),
+      caja("Credencial de " + (d.usuario || "Azul"), cred.toUpperCase(), cred === "comprometida" ? "bad" : "ok", revocar),
+      caja("Defensor IA", df.modelo ? df.modelo + (df.ok === true ? " · ✓" : df.ok === false ? " · ⚠ falló" : " · sin comprobar") : "SIN CONFIGURAR",
+        df.modelo && df.ok !== false ? "ok" : "warn"));
+    $("seg-recos").replaceChildren(...d.recomendaciones.map((x) => {
+      const li = el("li", "app-item niv-" + x.nivel);
+      li.append(el("b", null, x.texto), el("span", "muted", "→ " + x.accion));
+      return li;
+    }));
+    const c = d.controles;
+    const dl = $("seg-controles");
+    dl.replaceChildren();
+    [["Correos recibidos", c.correos], ["Reportados", c.reportados], ["Enlaces clicados", c.enlaces_clicados],
+      ["Enlaces contenidos", c.enlaces_contenidos], ["Adjuntos abiertos", c.adjuntos_abiertos], ["Adjuntos reportados", c.adjuntos_reportados],
+      ["Adjuntos aislados", c.adjuntos_aislados], ["Incidentes abiertos / resueltos", c.incidentes_abiertos + " / " + c.incidentes_resueltos],
+      ["Ataques IA contenidos", c.ataques_ia_contenidos], ["Ataques IA con datos expuestos", c.ataques_ia_datos_expuestos]]
+      .forEach(([k, v]) => dl.append(el("dt", null, k), el("dd", null, v)));
+  }
+
+  function setIncidentesGen(d) {
+    const ul = $("incg-lista");
+    ul.replaceChildren();
+    if (d.bloqueado) { ul.append(el("li", "muted", d.bloqueado)); return; }
+    d.incidentes.forEach((i) => {
+      const li = el("li", "app-item " + (i.estado === "resuelto" ? "niv-BAJO" : i.severidad === "critica" || i.severidad === "alta" ? "niv-ALTO" : "niv-MEDIO"));
+      const f = el("div", "app-fila");
+      f.append(el("b", null, "#" + i.id + " " + i.titulo), el("span", "marca marca-gris", i.severidad.toUpperCase()),
+        el("span", "marca " + (i.estado === "resuelto" ? "marca-contenido" : "marca-pdf"), i.estado.replace("_", " ").toUpperCase()));
+      li.append(f, el("span", "muted", "Abierto por " + (i.abierto_por || "—") + " · " + fechaCorta(i.ts_apertura) +
+        (i.correo_id ? " · correo " + i.correo_id : "")));
+      if (i.pendiente && i.pendiente.length) li.append(el("span", null, "Para resolverlo falta: " + i.pendiente.join("; ")));
+      if (i.resolucion) li.append(el("span", null, "Resolución (" + (i.resuelto_por || "—") + "): " + i.resolucion));
+      ul.append(li);
+    });
+  }
+
+  function setRecursos(d) {
+    $("rec-nota").textContent = d.nota;
+    const t = $("rec-tabla");
+    const cab = el("tr");
+    ["Datos", "Sensibilidad", "Herramienta", ...d.roles].forEach((x) => cab.append(el("th", null, x)));
+    t.replaceChildren(cab, ...d.recursos.map((r) => {
+      const tr = el("tr");
+      const td = el("td", null, r.tabla);
+      td.append(el("span", "inf-formula", r.descripcion));
+      tr.append(td, el("td", null, (SENS_ICONO[r.sensibilidad] || "") + " " + r.sensibilidad), el("td", "mono", r.herramienta),
+        ...d.roles.map((rol) => el("td", null, { "sí": "✓ sí", "no": "✕ no", "con autorización": "◆ con autorización" }[r.acceso[rol]])));
+      return tr;
+    }));
+  }
+
+  function setAyuda(d) {
+    const c = $("ayuda-cuerpo");
+    const pasos = el("ul");
+    d.pasos.forEach((p) => pasos.append(el("li", null, p)));
+    const apps = el("ul");
+    d.apps.forEach((a) => apps.append(el("li", null, a.icono + " " + a.titulo + " — " + a.descripcion + " (" + PERMISO_TXT[a.permiso].toLowerCase() + ")")));
+    const p = d.puntos_rojo;
+    const puntos = el("ul");
+    [`Rojo: +${p.enlace_sin_contener} por enlace clicado sin contener, +${p.pdf_abierto_sin_reportar} por PDF abierto sin reportar, +${p.credencial_sin_revocar} por credencial sin revocar (se pierden al corregirlo).`,
+      `Rojo, batalla IA: datos expuestos ${Object.entries(p.datos_expuestos).filter(([, v]) => v).map(([k, v]) => k + " +" + v).join(", ")} (permanentes); IA engañada +${p.ia_enganada}. Máximo ${d.max_ataques_ia} ataques.`,
+      `Azul: ${d.puntos_azul.misiones}; +${d.puntos_azul.ataque_contenido} por ataque IA contenido.`]
+      .forEach((x) => puntos.append(el("li", null, x)));
+    const reglas = el("table", "inf-tabla");
+    const cab = el("tr");
+    ["Evento", "Riesgo", "Qué significa"].forEach((x) => cab.append(el("th", null, x)));
+    reglas.append(cab, ...d.reglas.map((r) => {
+      const tr = el("tr");
+      tr.append(el("td", "mono", r.evento), el("td", "num", (r.riesgo > 0 ? "+" : "") + r.riesgo), el("td", null, r.explicacion || ""));
+      return tr;
+    }));
+    c.replaceChildren(el("h3", null, "QUÉ HACE TU EQUIPO (" + d.equipo.toUpperCase() + ")"), pasos,
+      el("h3", null, "TUS APLICACIONES Y PERMISOS"), apps, el("h3", null, "PUNTOS"), puntos,
+      el("h3", null, "REGLAS: CADA EVENTO Y SU CONSECUENCIA"), reglas);
+  }
+
+  // ---------- notificaciones ----------
+  function setNotificaciones(lista, noLeidas) {
+    const n = $("notif-cuenta");
+    n.hidden = !noLeidas;
+    n.textContent = noLeidas > 99 ? "99+" : String(noLeidas);
+    $("btn-notif").title = noLeidas ? noLeidas + " notificaciones sin leer" : "Notificaciones de la partida";
+    $("notif-lista").replaceChildren(...lista.map((x) => {
+      const li = el("li", (x.leida ? "" : "nueva") + (x.nivel === "alerta" ? " n-alerta" : ""));
+      li.append(el("span", "hora", x.hora), document.createTextNode(x.texto));
+      return li;
+    }));
+  }
+  function mostrarNotificaciones(si) {
+    $("notif-panel").hidden = !si;
+    $("btn-notif").setAttribute("aria-expanded", String(si));
+  }
+  const notificacionesAbiertas = () => !$("notif-panel").hidden;
+
   // ---------- resultados y cronología (Fase G) ----------
   const CAT_TXT = { partida: "Partida", correo: "Correo", enlace: "Enlaces", documento: "Documentos", credencial: "Credenciales",
     incidente: "Incidentes", mision: "Misiones", batalla_ia: "Batalla IA", acceso: "Accesos a la BD", practica: "Práctica" };
@@ -1294,7 +1453,8 @@ const R = (() => {
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
     mostrarBuzon, buzonAbierto, buzonEsModal, alojarBuzon, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
-    setBatallaPartida, setIaEnCurso, setTabInforme, setPartidasInforme, setResultados, initFiltrosCronologia,
+    setArchivos, setSeguridad, setIncidentesGen, setRecursos, setAyuda, setNotificaciones, mostrarNotificaciones,
+    notificacionesAbiertas, setBatallaPartida, setIaEnCurso, setTabInforme, setPartidasInforme, setResultados, initFiltrosCronologia,
     filtrosCronologia, setCronologia, setVistaAzul, setMisiones, setMarcadorPartida, marcarLeido, mostrarResultadoCorreo, mostrarVisor, cerrarVisor,
     visorAbierto, setEnviadosRojo, setCredencial, setCorreosIncidente, setIncidentes, setOllamaComprobando, mostrarResultado, cerrarResultado, resultadoAbierto,
   };

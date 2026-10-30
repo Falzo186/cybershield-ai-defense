@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field  # noqa: E402
 
 import mock_server as ms  # noqa: E402
 import partida as pt  # noqa: E402
-from src.lab import ataque_ia, atacante, cliente_ollama, correos, documentos, informe, motor, repositorio, sesion  # noqa: E402
+from src.lab import apps, ataque_ia, atacante, cliente_ollama, correos, documentos, informe, motor, repositorio, sesion  # noqa: E402
 
 app = ms.app
 HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -56,7 +56,8 @@ RESTO = ["politicas", "autorizacion", "herramienta", "bd"]
 # anónimo) solo se puede hacer GET a RUTAS_PUBLICAS; una sesión de espectador tampoco puede modificar nada.
 CODIGO_ARBITRO = os.getenv("CS_CODIGO_ARBITRO") or f"{secrets.randbelow(10 ** 6):06d}"
 SALA = pt.Sala(CODIGO_ARBITRO)
-RUTAS_PUBLICAS = ("/api/eventos", "/api/estado", "/api/ia/estado", "/api/cronologia", "/api/resultados", "/api/partidas")
+RUTAS_PUBLICAS = ("/api/eventos", "/api/estado", "/api/ia/estado", "/api/cronologia", "/api/resultados", "/api/partidas",
+                  "/api/apps", "/api/recursos", "/api/ayuda")
 RUTA_SESION = "/api/sesion"
 # Rutas reservadas a UN equipo (además de exigir sesión). Detener, iniciar y cerrar la partida es cosa del árbitro;
 # Rojo envía correos de entrenamiento y Azul los lee en su buzón.
@@ -1660,6 +1661,89 @@ def _guardar_practica(r, ident, modo, matq, mdef, d=None):
             **_metricas("def", None if filtro else df))
     except Exception as exc:  # noqa: BLE001 - no poder guardar nunca tumba la práctica
         ms.emitir("error", {"mensaje": f"No se pudo guardar la ronda de práctica: {exc}"})
+
+
+# ---------- aplicaciones del escritorio por permiso (Fase B) ----------
+# El catálogo (src/lab/apps.py) dice qué aplicación ve cada equipo y con qué permiso; el escritorio lo pide aquí y
+# las rutas de Archivos y Seguridad lo usan para decidir el acceso (403 si el equipo no tiene esa aplicación).
+def _sin_app(request, app_id):
+    if apps.permiso(app_id, request.state.equipo) is None:
+        titulo = apps.APPS[app_id][0]
+        return _prohibido(f"Tu equipo no tiene la aplicación «{titulo}».")
+    return None
+
+
+@app.get("/api/apps")
+async def catalogo_apps(request: Request, equipo: str | None = None):
+    """Aplicaciones del equipo de la sesión (o, sin sesión, del equipo pedido; por defecto espectador)."""
+    eq = request.state.equipo or (equipo if equipo in apps.EQUIPOS else "espectador")
+    return {"equipo": eq, "apps": apps.catalogo(eq), "grupos": [{"id": g, "titulo": t} for g, t in apps.GRUPOS]}
+
+
+@app.get("/api/recursos")
+async def ver_recursos():
+    return apps.recursos()
+
+
+@app.get("/api/ayuda")
+async def ver_ayuda(request: Request, equipo: str | None = None):
+    return apps.ayuda(request.state.equipo or (equipo if equipo in apps.EQUIPOS else "espectador"))
+
+
+@app.get("/api/archivos")
+async def ver_archivos(request: Request):
+    """Rojo: los adjuntos que puede enviar y si se abrieron (nunca si se reportaron). Azul y General: los adjuntos
+    recibidos en la partida con su riesgo y su estado (abierto, reportado, aislado)."""
+    if err := _sin_app(request, "archivos"):
+        return err
+    repo = repositorio.por_defecto()
+    if request.state.equipo == "rojo":
+        catalogo = [{"plantilla": pid, "nombre": p["nombre"], "adjunto": documentos.info(p["adjunto"])}
+                    for pid, p in correos.PLANTILLAS.items() if p.get("adjunto")]
+        enviados = [{**e, "adjunto": documentos.info(correos.adjunto(e["plantilla_id"]))}
+                    for e in repo.enviados_rojo(PARTIDA_ID) if e["con_adjunto"]]
+        return {"vista": "rojo", "catalogo": catalogo, "enviados": enviados}
+    usuario = USUARIO_EQUIPO.get("azul")
+    lista = [{k: c[k] for k in ("id", "de", "asunto", "ts", "adjunto", "pdf_abierto", "pdf_reportado", "aislado", "carpeta")}
+             for c in (repo.buzon(PARTIDA_ID, usuario) if usuario else []) if c["adjunto"]]
+    return {"vista": request.state.equipo, "usuario": usuario, "adjuntos": lista,
+            "puede_actuar": apps.permiso("archivos", request.state.equipo) == "escritura"}
+
+
+@app.get("/api/seguridad")
+async def ver_seguridad(request: Request):
+    """Centro de seguridad de Azul (el árbitro lo ve en lectura): credencial, defensor IA, controles aplicados y una
+    lista determinista de lo que falta, con la acción que lo arregla."""
+    if err := _sin_app(request, "seguridad"):
+        return err
+    repo = repositorio.por_defecto()
+    usuario = USUARIO_EQUIPO.get("azul")
+    buzon_ = repo.buzon(PARTIDA_ID, usuario) if usuario else []
+    cred = repo.credenciales(PARTIDA_ID, usuario) if usuario else {"estado": "segura", "historial": []}
+    rojo = repo.logros_rojo(PARTIDA_ID)
+    incidentes = repo.incidentes(PARTIDA_ID)
+    ia = repo.puntos_ia(PARTIDA_ID)
+    d = CONFIG_ROL["azul"]
+    estado = {"credencial": cred["estado"], "enlaces_sin_contener": rojo["enlaces_sin_contener"],
+              "pdfs_sin_reportar": rojo["pdfs_sin_reportar"], "defensor_ok": DEFENSOR_IA["ok"],
+              "defensor_modelo": d["modelo"] if d else None,
+              "incidentes_abiertos": sum(i["estado"] != "resuelto" for i in incidentes),
+              "correos_sin_revisar": sum(not c["leido"] and c["carpeta"] == "entrada" for c in buzon_),
+              "riesgo": ESTADO_PARTIDA.riesgo_acumulado, "fase": PARTIDA.fase}
+    return {"usuario": usuario, "fase": PARTIDA.fase, "riesgo": ESTADO_PARTIDA.riesgo_acumulado,
+            "credencial": cred, "defensor": {"modelo": estado["defensor_modelo"], "host": d["host"] if d else None,
+                                             **DEFENSOR_IA},
+            "controles": {"correos": len(buzon_), "reportados": sum(c["reportado"] for c in buzon_),
+                          "enlaces_clicados": sum(c["clicado"] for c in buzon_),
+                          "enlaces_contenidos": sum(c["contenido"] for c in buzon_),
+                          "adjuntos_abiertos": sum(c["pdf_abierto"] for c in buzon_),
+                          "adjuntos_reportados": sum(c["pdf_reportado"] for c in buzon_),
+                          "adjuntos_aislados": sum(c["aislado"] for c in buzon_),
+                          "incidentes_abiertos": estado["incidentes_abiertos"],
+                          "incidentes_resueltos": sum(i["estado"] == "resuelto" for i in incidentes),
+                          "ataques_ia_contenidos": ia["contenidos"], "ataques_ia_datos_expuestos": ia["datos_expuestos"]},
+            "recomendaciones": apps.recomendaciones(estado),
+            "puede_actuar": apps.permiso("seguridad", request.state.equipo) == "escritura"}
 
 
 # ---------- manual REAL ----------

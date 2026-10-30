@@ -111,6 +111,12 @@ const API = (() => {
     lanzarAtaqueIA: (modelo, host, tecnica, intensidad) => req("POST", "/api/ia/ataque",
       { modelo, host, tecnica: tecnica || null, intensidad }),
     configurarDefensorIA: (modelo, host) => req("POST", "/api/ia/defensor", { modelo, host }),
+    // Fase B: aplicaciones por permiso (el catálogo y el acceso los decide el servidor)
+    apps: (equipo) => req("GET", "/api/apps" + (equipo ? "?equipo=" + encodeURIComponent(equipo) : "")),
+    archivos: () => req("GET", "/api/archivos"),
+    seguridad: () => req("GET", "/api/seguridad"),
+    recursos: () => req("GET", "/api/recursos"),
+    ayuda: (equipo) => req("GET", "/api/ayuda" + (equipo ? "?equipo=" + encodeURIComponent(equipo) : "")),
     // Fase G: resultados con fórmulas, cronología filtrable e historial de partidas (lectura)
     partidas: () => req("GET", "/api/partidas"),
     resultados: (partida) => req("GET", "/api/resultados" + (partida ? "?partida=" + encodeURIComponent(partida) : "")),

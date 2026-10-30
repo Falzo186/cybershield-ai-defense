@@ -483,3 +483,66 @@ servidor. Propuesta:
   la práctica escribe en la BD. Lo cubren todas las suites. El servidor en marcha debe reiniciarse para crear las
   tablas.
 - **Avance estimado:** ~78 % del plan (A, C, D, E, F y G hechas; B parcial; H pendiente).
+
+## 16. Informe de la Fase B — aplicaciones del escritorio por permiso y notificaciones (rama `feature/fase-b-escritorio`)
+
+- **Objetivo:** aplicaciones del escritorio según el permiso de cada equipo (Correo, IA, Misiones, Archivos,
+  Seguridad, Incidentes, Recursos, Auditoría, Resultados y Ayuda) y notificaciones.
+- **Estado inicial:**
+  - el escritorio tenía 6 ventanas y 3 accesos, filtrados por una lista fija en el cliente;
+  - no había Archivos, Seguridad, Recursos ni Ayuda;
+  - General no tenía vista de incidentes (pendiente de la Fase E);
+  - no había notificaciones, solo avisos que desaparecen a los 5 s.
+- **Archivos:**
+  - nuevos: `src/lab/apps.py` (catálogo, recomendaciones, Recursos, Ayuda), `src/lab/test_apps.py`,
+    `server/test_apps.py`;
+  - `server/app.py` (`/api/apps`, `/api/archivos`, `/api/seguridad`, `/api/recursos`, `/api/ayuda`);
+  - `ui/index.html`, `render.js`, `app.js`, `api.js`, `escritorio.js`, `styles.css`; `e2e/demo_partida.py`;
+  - `README.md`, `docs/CONTRATO_API.md`, `docs/GUION_DEMO.md`.
+- **Cambios:**
+  - **Catálogo en el servidor:** 14 aplicaciones con su permiso (lectura o escritura) por equipo. El escritorio lo
+    pide al arrancar, pinta solo esas, cierra y bloquea las demás ventanas y pone en cada icono su descripción. Si
+    el servidor no responde, usa el orden de reserva.
+  - **Archivos:**
+    - Azul: sus adjuntos con riesgo y estado, y las acciones previsualizar, reportar y aislar;
+    - General: lo mismo en lectura;
+    - Rojo: los adjuntos que puede enviar y si se abrieron, nunca si se reportaron.
+  - **Seguridad:** la credencial (con botón para revocarla), el defensor IA, los controles aplicados y lo que falta,
+    de lo más grave a lo menos, con la acción que lo arregla. Es **determinista**: lo mismo con el mismo estado.
+  - **Incidentes** para General, en solo lectura y con lo que falta para resolver cada uno (pendiente de la Fase E).
+  - **Recursos:** la matriz de acceso por rol, calculada con `permisos.evaluar_acceso`.
+  - **Ayuda:** qué hace cada equipo, sus aplicaciones y permisos, los puntos y las reglas.
+  - **Notificaciones 🔔:** con contador de no leídas, por vista. Rojo solo recibe lo que mediría una campaña real.
+- **Fallos encontrados por las pruebas:**
+  - Si un equipo no tenía una aplicación, su ventana no se creaba, pero la sección quedaba **suelta y visible** en
+    la página y se cargaba. Hubo 11 respuestas 403 en la consola de Rojo y Azul. Ahora una sección de aplicación
+    fuera de una ventana no se muestra.
+  - La propia E2E tenía una comprobación demasiado amplia: confundía el resultado «CONTENIDO» de un ataque de Rojo
+    con una acción de Azul. Se corrigió la prueba, no el código.
+- **Pruebas (resultados reales, batería completa en verde):**
+  - `test_apps` 23/23 (nuevo): catálogo por equipo, el espectador solo lee, orden por gravedad de las
+    recomendaciones, Recursos coincide con `evaluar_acceso` en todos los roles y tablas;
+  - `server/test_apps.py` 27/27 (nuevo): el catálogo depende de la sesión, no del parámetro. Para cada ruta de
+    aplicación, el acceso coincide con el catálogo para los 4 equipos y sin sesión. Además: Archivos según el
+    equipo (Rojo nunca ve reportes), Seguridad cambia al comprometer, revocar y contener, y General la ve sin poder
+    revocar;
+  - resto de suites sin cambios en verde (`test_app` 157/157, `test_batalla_partida` 43/43, `test_resultados`
+    29/29…);
+  - `e2e/demo_partida.py` **106/106** en Chromium real (antes 96): Seguridad con la credencial crítica primero,
+    iconos por vista, Archivos de Azul, Incidentes de General y notificaciones de Rojo (y que no incluyen las
+    acciones de Azul).
+- **Vistas:** `capturas_vistas.py` sin cambios (solo General +16 px en Centro de control a 1366×768). Las aplicaciones
+  nuevas son flotantes y empiezan cerradas, así que no tocan el mosaico.
+- **Decisiones tomadas (reversibles; revísalas):**
+  - las aplicaciones nuevas **solo existen en la vista escritorio**; la clásica queda como compatibilidad;
+  - las notificaciones se guardan **en el navegador**, no en el servidor;
+  - Azul gestiona los incidentes en su buzón (como hasta ahora); la ventana de Incidentes es la de supervisión de
+    General;
+  - la visibilidad por equipo ordena lo que ve cada vista, pero **no es secreto**: la vista de espectador y el flujo
+    SSE son abiertos en la LAN (§6).
+- **Pendiente:** el catálogo no limita todavía las ventanas antiguas de IA (todas las ven todos, en lectura, como
+  antes); no hay notificaciones del sistema operativo; no hay exportación CSV → H.
+- **Riesgos de regresión:** bajos. Las rutas nuevas son de lectura (las acciones siguen en las rutas de siempre) y
+  cambia la composición del escritorio, que cubre la E2E en las 4 vistas.
+- **Avance estimado:** ~88 % del plan (A, B, C, D, E, F y G hechas; H pendiente: pruebas integrales, regresiones y
+  adaptador Wazuh documentado).

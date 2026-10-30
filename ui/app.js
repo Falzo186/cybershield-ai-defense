@@ -476,6 +476,7 @@
     // Marcador de la partida Rojo/Azul: solo lo muestran el árbitro (general) y los espectadores.
     marcador_partida(d) {
       refrescarInforme();
+      refrescarApps();
       if (estado.rol !== "general" && estado.rol !== "espectador") return;
       R.setMarcadorPartida(d);
       $("btn-finalizar").disabled = !!d.final; // ya no hay nada que cerrar
@@ -489,6 +490,8 @@
     },
     auditoria(d) {
       R.addAuditoria(d);
+      const n = (NOTIF_AUDITORIA[d.accion] || {})[estado.rol];
+      if (n) notificar(n[0] + (d.recurso ? " · " + d.recurso : ""), n[1]);
       // Correo nuevo o clic en un enlace: el equipo azul refresca su buzón (contador y botón «Contener» al día);
       // Rojo, el seguimiento de su campaña (clics y adjuntos abiertos).
       if ((d.accion === "CORREO_ENVIADO" || d.accion === "CLIC_ENLACE") && estado.rol === "azul" && API.tieneToken()) {
@@ -504,7 +507,10 @@
     incidentes_cambio() { if (estado.rol === "azul" && API.tieneToken()) { cargarIncidentes(); cargarMisiones(); } },
     credenciales_cambio(d) {
       if (estado.rol !== "azul" || !API.tieneToken()) return;
-      if (d.estado === "comprometida") R.toast("⚠ La credencial de " + d.usuario + " está COMPROMETIDA: revócala en Incidentes");
+      if (d.estado === "comprometida") {
+        R.toast("⚠ La credencial de " + d.usuario + " está COMPROMETIDA: revócala en Incidentes");
+        notificar("⚠ Credencial de " + d.usuario + " COMPROMETIDA: revócala", "alerta");
+      }
       cargarIncidentes();
     },
     // Fase F: batalla de la partida
@@ -515,6 +521,8 @@
       if (a) {
         const pts = [a.puntos_rojo && "Rojo +" + a.puntos_rojo, a.puntos_azul && "Azul +" + a.puntos_azul].filter(Boolean).join(" · ");
         R.toast("⚔ Ataque IA #" + a.n + ": " + a.titulo + (pts ? " (" + pts + ")" : "") + " — " + a.explicacion);
+        notificar("⚔ Ataque IA #" + a.n + ": " + a.titulo + (pts ? " (" + pts + ")" : ""),
+          a.resultado === "datos_expuestos" || a.resultado === "fallo_seguro" ? "alerta" : "info");
       }
     },
     metricas(d) { aplicarMetricas(d); },
@@ -818,7 +826,14 @@
     const cambioFase = !estado.partida || estado.partida.fase !== p.fase;
     estado.partida = p;
     R.setPartida(p);
-    if (cambioFase) { aplicarControles(); refrescarInforme(); }
+    if (cambioFase) {
+      aplicarControles();
+      refrescarInforme();
+      refrescarApps();
+      if (nueva || notif.clave !== claveNotif()) cargarNotif(); // cada partida tiene sus notificaciones
+      if (p.fase === "en_curso") notificar("▶ La partida ha empezado", "info");
+      if (p.fase === "finalizada") notificar("🏁 La partida ha terminado: mira Resultados", "info");
+    }
     if (estado.batalla && estado.batalla.fase_partida !== p.fase && !nueva) pintarBatalla({ ...estado.batalla, fase_partida: p.fase });
     if (nueva) {
       estado.finalMostrado = false;
@@ -849,6 +864,78 @@
       R.toast("🛡 Defensor IA activo y verificado: " + modelo);
     } catch (e) { R.toast(e.message); }
   }
+
+  // ---------- aplicaciones por permiso (Fase B) ----------
+  // Cada ventana se carga al hacerse visible y se refresca (agrupado) con los cambios de la partida mientras se ve.
+  const APPS_CARGA = {
+    archivos: async () => {
+      try {
+        R.setArchivos(await API.archivos(), {
+          ver: (id) => accionPdf("pdf_abierto", id).then(cargarAppsVisibles),
+          reportar: (id) => accionPdf("pdf_reportado", id).then(cargarAppsVisibles),
+          aislar: (id) => accionSimple(() => API.aislarAdjunto(id), "🧪 Adjunto aislado").then(cargarAppsVisibles),
+        });
+      } catch (e) { R.setArchivos({ bloqueado: e.message }); }
+    },
+    seguridad: async () => {
+      try {
+        R.setSeguridad(await API.seguridad(), { revocar: async () => {
+          try {
+            const r = await API.revocarCredencial();
+            R.toast("🔒 Credencial revocada" + textoRegla(r.regla || {}));
+          } catch (e) { R.toast(e.message); }
+          cargarAppsVisibles();
+        } });
+      } catch (e) { R.setSeguridad({ bloqueado: e.message }); }
+    },
+    "incidentes-gen": async () => {
+      try { R.setIncidentesGen(await API.incidentes()); } catch (e) { R.setIncidentesGen({ bloqueado: e.message }); }
+    },
+    recursos: async () => { try { R.setRecursos(await API.recursos()); } catch (e) { R.toast(e.message); } },
+    ayuda: async () => { try { R.setAyuda(await API.ayuda(estado.rol || "espectador")); } catch (e) { R.toast(e.message); } },
+  };
+  const appVisible = (clase) => !!(document.querySelector("section.panel." + clase) || {}).offsetParent;
+  let temporizadorApps = null;
+  function cargarAppsVisibles() {
+    Object.entries(APPS_CARGA).forEach(([clase, fn]) => { if (appVisible(clase)) fn(); });
+  }
+  function refrescarApps() {
+    clearTimeout(temporizadorApps);
+    temporizadorApps = setTimeout(cargarAppsVisibles, 800);
+  }
+
+  // ---------- notificaciones ----------
+  // Lo que pasa en la partida y le importa a ESTA vista (sin repetir los avisos de las acciones propias). Se guardan en
+  // este navegador (las 50 últimas, por vista y partida): son una comodidad de la vista, no un registro.
+  const notif = { lista: [], clave: null };
+  function claveNotif() { return "cs_notif_" + (estado.rol || "x") + "_" + ((estado.partida && estado.partida.id) || ""); }
+  function cargarNotif() {
+    notif.clave = claveNotif();
+    try { notif.lista = JSON.parse(LS.get(notif.clave) || "[]") || []; } catch (_) { notif.lista = []; }
+    pintarNotif();
+  }
+  function pintarNotif() {
+    R.setNotificaciones(notif.lista, notif.lista.filter((x) => !x.leida).length);
+    LS.set(notif.clave || claveNotif(), JSON.stringify(notif.lista));
+  }
+  function notificar(texto, nivel) {
+    const d = new Date();
+    const hora = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    notif.lista = [{ texto, nivel: nivel || "info", hora, leida: R.notificacionesAbiertas() }, ...notif.lista].slice(0, 50);
+    pintarNotif();
+  }
+  // acción de auditoría (SSE) -> {equipo: [texto, nivel]}
+  const NOTIF_AUDITORIA = {
+    CORREO_ENVIADO: { azul: ["📬 Ha llegado un correo nuevo al buzón", "info"] },
+    CLIC_ENLACE: { rojo: ["🔗 Alguien pulsó el enlace de uno de tus correos", "info"], azul: ["⚠ Un empleado pulsó el enlace de un correo: contenlo", "alerta"],
+      general: ["🔗 Clic en un enlace de phishing", "alerta"] },
+    PDF_ABIERTO: { rojo: ["📎 Abrieron uno de tus adjuntos", "info"] },
+    CREDENCIAL_COMPROMETIDA: { rojo: ["🔑 Has obtenido una credencial", "info"], general: ["🔑 Credencial comprometida", "alerta"] },
+    CREDENCIAL_REVOCADA: { general: ["🔒 Azul revocó la credencial", "info"] },
+    MISION_COMPLETADA: { azul: ["🎯 Misión completada", "info"] },
+    INCIDENTE_ABIERTO: { general: ["🚨 Azul abrió un incidente", "info"] },
+    INCIDENTE_RESUELTO: { general: ["✓ Azul resolvió un incidente", "info"] },
+  };
 
   // ---------- resultados y cronología (Fase G) ----------
   const informe = { tab: "resultados", partida: null, temporizador: null, carga: 0 };
@@ -977,6 +1064,21 @@
     $("inf-q").addEventListener("input", () => { clearTimeout(informe.temporizador); informe.temporizador = setTimeout(cargarInforme, 400); });
     $("inf-filtros").addEventListener("submit", (ev) => { ev.preventDefault(); cargarInforme(); });
     $("final-desglose").addEventListener("click", () => { R.cerrarResultado(); abrirInforme("resultados"); });
+    if ("IntersectionObserver" in window) {
+      Object.entries(APPS_CARGA).forEach(([clase, fn]) => {
+        const s = document.querySelector("section.panel." + clase);
+        if (s) new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) fn(); }).observe(s);
+      });
+    }
+    $("btn-notif").addEventListener("click", () => {
+      R.mostrarNotificaciones(!R.notificacionesAbiertas());
+    });
+    $("notif-leidas").addEventListener("click", () => { notif.lista.forEach((x) => { x.leida = true; }); pintarNotif(); });
+    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && R.notificacionesAbiertas()) R.mostrarNotificaciones(false); });
+    document.addEventListener("click", (ev) => {
+      if (R.notificacionesAbiertas() && !ev.target.closest("#notif-panel, #btn-notif")) R.mostrarNotificaciones(false);
+    });
+    cargarNotif();
     // Se carga al hacerse visible (abrir la ventana desde su icono, restaurarla o, en la vista clásica, al llegar a ella).
     if ("IntersectionObserver" in window) {
       new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) cargarInforme(); })
