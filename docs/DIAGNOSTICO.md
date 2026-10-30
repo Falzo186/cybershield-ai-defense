@@ -414,3 +414,72 @@ servidor. Propuesta:
 - **Riesgos de regresión:** medios. Cambian los puntos de la partida (la batalla suma) y la práctica queda bloqueada
   durante la partida. Lo cubren todas las suites. El servidor en marcha debe reiniciarse para crear la tabla nueva.
 - **Avance estimado:** ~70 % del plan (A, C, D, E y F hechas; B parcial; G y H pendientes).
+
+## 15. Informe de la Fase G — persistencia, cronología y resultados (rama `feature/fase-g-resultados`)
+
+- **Objetivo:** persistir rondas e inferencias, ofrecer una cronología filtrable y un panel de resultados con las
+  fórmulas documentadas.
+- **Estado inicial:**
+  - los ataques de la partida ya se guardaban (Fase F), pero las rondas de **práctica** solo viajaban por SSE
+    (§5.2: 0 líneas en la tabla y en `eventos.jsonl`);
+  - el resultado final vivía en memoria (`RESULTADO_FINAL`) y se perdía al reiniciar o al empezar otra partida;
+  - no había cronología, solo el flujo de auditoría en vivo;
+  - el resultado se veía como dos totales, sin decir de dónde salían.
+- **Archivos:**
+  - nuevos: `src/lab/informe.py` (cronología, visibilidad, filtros, desglose), `src/lab/test_informe.py`,
+    `server/test_resultados.py`;
+  - `src/lab/schema.py` (tablas `rondas_practica` y `resultados_partida`), `repositorio.py`;
+  - `server/app.py` (`/api/partidas`, `/api/cronologia`, `/api/resultados`, resultado guardado al cerrar, rondas de
+    práctica guardadas);
+  - `ui/index.html`, `render.js`, `app.js`, `api.js`, `escritorio.js`, `styles.css` (ventana 📊 *Resultados*);
+    `e2e/demo_partida.py`;
+  - `README.md`, `docs/CONTRATO_API.md`, `docs/GUION_DEMO.md`.
+- **Cambios:**
+  - **Desglose con fórmulas:** cada punto de Rojo y de Azul sale como cantidad × valor = subtotal, con la fórmula
+    (la mitad si la misión se completó fuera de plazo), quién la completó y con qué evidencia. Incluye también el
+    riesgo, con las reglas aplicadas y por qué el final puede diferir de la suma sin acotar, y la estadística de la
+    batalla IA: medias, mínimos y máximos sin rellenar las métricas que faltan, tokens y carga. Usa las mismas
+    constantes que el marcador.
+  - **Cronología:** desde la auditoría de la partida, con el minuto de partida (negativo en la preparación), 10
+    categorías y filtros por categoría, equipo, nivel mínimo y texto, aplicados en el servidor.
+  - **Visibilidad:** durante la partida, Rojo solo ve lo que mediría una campaña real, y el desglose lo ven el árbitro
+    y los espectadores; al finalizar, todos. No es un control de seguridad: la vista de espectador es abierta en la LAN.
+  - **Persistencia:** el resultado final se guarda en la BD (una sola vez) y se consulta por partida. Las rondas de
+    práctica se guardan con sus métricas y dejan `ronda_practica` en el JSONL; así se cierra §5.2.
+  - **Exportar informe** descarga los datos del servidor, no los del navegador.
+  - Se oculta el marcador de práctica «BATALLA IA vs IA» durante la partida (pendiente de la Fase F).
+- **Fallos encontrados por las pruebas:**
+  - **Desde la Fase F, la ventana *Batalla de la partida* no tenía icono** en el escritorio: si se cerraba, no había
+    forma de volver a abrirla. El escritorio solo pinta los iconos de una lista fija de grupos. Ahora están
+    *Batalla de la partida* y *Resultados*.
+  - **Las pestañas nuevas usaban la clase `.tab`**, y el código antiguo trataba todo `.tab` como pestañas de modo:
+    al pulsar *Cronología*, el botón de práctica se quedaba sin texto. Ahora se seleccionan solo
+    `.tab[data-modo]`, y la E2E lo comprueba.
+  - **Una pasada de la E2E (1 de 7) leyó «Rojo 0 pts»** en el desglose cuando el resultado era 10. El servidor
+    devuelve siempre 10 (lo comprueba `test_resultados`). No lo reproduje en 6 pasadas más. Causa más probable:
+    varias cargas solapadas, con una respuesta antigua pintada al final, aunque no explica del todo esos números.
+    Desde entonces la UI solo pinta la respuesta de la última carga, y la E2E espera a los totales correctos
+    (con diagnóstico si no llegan). Queda **sin confirmar**.
+- **Pruebas (resultados reales, batería completa en verde):**
+  - `test_informe` 31/31 (nuevo): traducción de la auditoría, visibilidad de Rojo, filtros, desglose que cuadra con
+    `puntaje_rojo`, medias sin inventar, persistencia y columnas permitidas;
+  - `server/test_resultados.py` 29/29 (nuevo, con el Ollama falso): rondas de práctica guardadas con métricas y en la
+    auditoría, 403 a los equipos durante la partida, desglose en vivo igual al marcador, cronología restringida para
+    Rojo y completa para Azul, filtros y 400, resultado guardado al finalizar y consultable desde otra partida, 404;
+  - `server/test_app.py` 157/157, `test_batalla_partida.py` 43/43, `test_partida.py` 30/30 y todas las unitarias;
+  - `e2e/demo_partida.py` **96/96** en Chromium real (antes 87), con el paso 6 (desglose desde la pantalla final,
+    fórmulas, cronología filtrada por *Batalla IA*, Rojo ve el desglose al finalizar). Las 6 últimas pasadas, en
+    verde.
+- **Vistas:** `capturas_vistas.py` sin cambios respecto a la Fase F. *Resultados* es flotante y empieza cerrada, así
+  que no altera el mosaico; con 8 iconos, la columna de iconos de General se desplaza (ya tenía scroll propio).
+- **Decisiones tomadas (reversibles; revísalas):**
+  - durante la partida, los equipos no ven el desglose (solo el árbitro y los espectadores);
+  - la práctica de la preparación aparece en la cronología de esa partida, en negativo;
+  - se guardan el prompt y la decisión de cada ronda de práctica, pero no los datos devueltos (solo su sensibilidad
+    y veredicto).
+- **Pendiente:** General sigue sin una vista propia de incidentes (la cronología los muestra, pero no se gestionan
+  desde ahí); no hay exportación CSV; la cronología muestra como mucho 500 entradas por consulta (filtrable) → B/H.
+- **Riesgos de regresión:** bajos-medios. Las rutas nuevas son de lectura, el cierre de partida escribe una fila más y
+  la práctica escribe en la BD. Lo cubren todas las suites. El servidor en marcha debe reiniciarse para crear las
+  tablas.
+- **Avance estimado:** ~78 % del plan (A, C, D, E, F y G hechas; B parcial; H pendiente).

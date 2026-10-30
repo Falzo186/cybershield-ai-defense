@@ -57,6 +57,8 @@
       { id: "control", titulo: "Centro de control", icono: "🎛️", sel: "section.panel.ctr", abierta: ["rojo", "azul", "general", "espectador", ""] },
       { id: "defensor", titulo: "IA Defensora", icono: "🛡️", sel: "section.panel.def", abierta: ["azul", "general", "espectador", ""] },
       { id: "batalla", titulo: "Batalla de la partida", icono: "⚔️", sel: "section.panel.bpartida", abierta: ["rojo", "azul", "general", "espectador", ""] },
+      // Resultados: flotante y más grande (tablas y cronología); se abre desde su icono o desde la pantalla final.
+      { id: "resultados", titulo: "Resultados", icono: "📊", sel: "section.panel.informe", abierta: [], flotante: true, tam: [780, 540] },
       { id: "auditoria", titulo: "Auditoría", icono: "📜", sel: "section.panel.aud", abierta: ["rojo", "azul", "general", "espectador", ""], minH: 100 },
       // Buzón: la MISMA tarjeta del modal (render.js delega abrir/cerrar en esta ventana con R.alojarBuzon).
       // Se abre desde el acceso «Correo/Buzón» (que carga los datos), nunca sola al recargar, y flota fuera del mosaico.
@@ -423,9 +425,9 @@
     // ---------- iconos y barra de tareas ----------
     // Grupos de iconos por función, de arriba abajo, separados por una línea sutil.
     const GRUPOS_ICONOS = [
-      ["Herramientas del equipo", ["atacante", "control", "defensor"]],
+      ["Herramientas del equipo", ["atacante", "control", "defensor", "batalla"]],
       ["Comunicación", ["correo"]],
-      ["Registro y seguimiento", ["auditoria", "misiones", "finalizar"]],
+      ["Registro y seguimiento", ["auditoria", "resultados", "misiones", "finalizar"]],
     ];
     const botonesIcono = new Map();
 

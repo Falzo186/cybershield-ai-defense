@@ -32,6 +32,7 @@
 | 12 | Rojo | Lanza otro ataque IA. | Con la credencial revocada vuelve a ser invitado: el defensor lo contiene (Azul +5). Enseña los tokens y la carga del modelo. |
 | 12 | General | Maximiza **Auditoría** (□) para enseñar el rastro; enseña `data/eventos.jsonl`. | Cada acción queda en una auditoría append-only y en JSON para Wazuh. |
 | 12-13 | General | 🏁 **Finalizar partida** → confirma. | Resultado congelado; tras cerrar, Rojo/Azul reciben 409. |
+| 13 | General | En la pantalla final, **📊 Ver desglose y cronología** → pestaña *Cronología* → filtra *Batalla IA*. | Cada punto tiene su fórmula y la suma es el marcador. La cronología cuenta la partida minuto a minuto, y Rojo la ve entera ahora que terminó. |
 | 13-15 | — | Preguntas. La *Batalla IA vs IA* «mejor de N» es práctica: tras finalizar. | Cada ataque son dos llamadas de 5-30 s en CPU: deja tiempo para que terminen. |
 
 Resultado de la prueba automatizada con este guion: **Rojo 10 — Azul 90**, riesgo final 20/100. Usa un Ollama

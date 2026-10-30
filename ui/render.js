@@ -349,7 +349,7 @@ const R = (() => {
   function setModo(modo, manualReal) {
     const usaModelo = modo === "batalla" || (modo === "manual" && !!manualReal);
     setManualOrigen(!!manualReal);
-    document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.modo === modo)));
+    document.querySelectorAll(".tab[data-modo]").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.modo === modo)));
     $("atq-vista").hidden = modo === "manual";
     $("term").hidden = modo !== "manual";
     $("rondas-wrap").hidden = modo !== "batalla";
@@ -373,7 +373,7 @@ const R = (() => {
     $("sel-dificultad").disabled = c || $("chk-demo").checked; // en demostración el usuario es admin, no hay dificultad
     $("chk-demo").disabled = c;
     document.querySelectorAll("[data-refrescar]").forEach((b) => { b.disabled = c; });
-    document.querySelectorAll(".tab").forEach((t) => { t.disabled = c; });
+    document.querySelectorAll(".tab[data-modo]").forEach((t) => { t.disabled = c; });
     $("term-input").disabled = c;
   }
   function setConexion(est) {
@@ -956,6 +956,114 @@ const R = (() => {
     ul.replaceChildren(...e.ataques.filter((a) => a.estado !== "en_curso").reverse().map(itemAtaqueIA));
   }
 
+  // ---------- resultados y cronología (Fase G) ----------
+  const CAT_TXT = { partida: "Partida", correo: "Correo", enlace: "Enlaces", documento: "Documentos", credencial: "Credenciales",
+    incidente: "Incidentes", mision: "Misiones", batalla_ia: "Batalla IA", acceso: "Accesos a la BD", practica: "Práctica" };
+  const minSeg = (s) => (s == null ? "—" : (s < 0 ? "-" : "") + String(Math.floor(Math.abs(s) / 60)).padStart(2, "0") + ":" +
+    String(Math.abs(s) % 60).padStart(2, "0"));
+
+  function setTabInforme(t) {
+    document.querySelectorAll("[data-inf]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.inf === t)));
+    $("inf-resultados").hidden = t !== "resultados";
+    $("inf-cronologia").hidden = t !== "cronologia";
+  }
+
+  function setPartidasInforme(d, elegida) {
+    const sel = $("inf-sel-partida");
+    const opciones = [[d.actual.id, "Actual · " + d.actual.id + " (" + d.actual.fase.replace("_", " ") + ")"],
+      ...d.finalizadas.filter((p) => p.partida !== d.actual.id).map((p) => [p.partida, p.partida + " · " +
+        (p.ganador === "empate" ? "empate" : "gana " + p.ganador) + " " + p.puntos_rojo + "-" + p.puntos_azul])];
+    sel.replaceChildren(...opciones.map(([v, t]) => { const o = el("option", null, t); o.value = v; return o; }));
+    sel.value = elegida || d.actual.id;
+  }
+
+  function tablaEquipo(nombre, cls, eq) {
+    const box = el("section", "inf-equipo " + cls);
+    box.append(el("div", null, nombre), el("div", "inf-total", eq.total + " pts"));
+    const tabla = el("table", "inf-tabla");
+    const cab = el("tr");
+    [["Concepto", ""], ["Cant.", "num"], ["× pts", "num"], ["= Subtotal", "num"]].forEach(([t, c]) => cab.append(el("th", c || null, t)));
+    tabla.append(cab);
+    eq.lineas.forEach((l) => {
+      const tr = el("tr");
+      const td = el("td", null, l.concepto);
+      td.append(el("span", "inf-formula", l.formula), el("span", "inf-formula", l.explicacion));
+      tr.append(td, el("td", "num", l.cantidad), el("td", "num", l.unitario), el("td", "num", l.subtotal));
+      tabla.append(tr);
+    });
+    const tot = el("tr");
+    tot.append(el("th", null, "Total (suma de subtotales)"), el("td"), el("td"), el("th", "num", eq.total));
+    tabla.append(tot);
+    box.append(tabla);
+    return box;
+  }
+
+  // d = /api/resultados, o {bloqueado: mensaje} si esta vista aún no puede verlos.
+  function setResultados(d) {
+    const eqs = $("inf-equipos");
+    const extra = $("inf-extra");
+    eqs.replaceChildren();
+    extra.replaceChildren();
+    if (d.bloqueado) { $("inf-aviso").textContent = d.bloqueado; return; }
+    $("inf-partida").textContent = d.partida + (d.guardado ? " · guardado" : " · en vivo");
+    const f = d.final;
+    $("inf-aviso").textContent = (f ? "🏁 " + (f.ganador === "empate" ? "Empate" : "Gana " + f.ganador.toUpperCase()) +
+      " · " + f.puntos_rojo + "-" + f.puntos_azul + " · resultado guardado en el servidor. " : "Partida " +
+      String(d.fase).replace("_", " ") + ": cálculo en vivo con el estado actual. ") + d.formula_ganador;
+    eqs.append(tablaEquipo("🔴 Equipo Rojo", "rojo", d.rojo), tablaEquipo("🔵 Equipo Azul" + (d.usuario_azul ? " (" + d.usuario_azul + ")" : ""), "azul", d.azul));
+    const r = d.riesgo;
+    const sr = el("section");
+    sr.append(el("b", null, "Riesgo final: " + Math.round(r.final) + "/100"), el("p", "muted", r.explicacion));
+    const ul = el("ul");
+    r.reglas.forEach((x) => ul.append(el("li", null, x.evento + ": " + x.veces + " × " + (x.riesgo_unitario > 0 ? "+" : "") +
+      x.riesgo_unitario + " = " + (x.subtotal > 0 ? "+" : "") + x.subtotal)));
+    sr.append(ul, el("span", "muted", "Suma sin acotar: " + r.suma_sin_acotar));
+    const b = d.batalla_ia;
+    const sb = el("section");
+    const med = (m) => (m.n ? segs(m.media) + " de media (" + m.n + " inferencias; " + segs(m.min) + "-" + segs(m.max) + ")" : "—");
+    sb.append(el("b", null, "Batalla IA: " + b.lanzados + " ataques"));
+    const ub = el("ul");
+    Object.entries(b.por_resultado).forEach(([k, v]) => ub.append(el("li", null, k.replace(/_/g, " ") + ": " + v)));
+    ub.append(el("li", null, "Atacante: " + med(b.atacante_ms)), el("li", null, "Defensor: " + med(b.defensor_ms)),
+      el("li", null, "Tokens atacante " + nd(b.tokens.atacante_entrada) + " entrada / " + nd(b.tokens.atacante_salida) +
+        " salida · defensor " + nd(b.tokens.defensor_entrada) + " / " + nd(b.tokens.defensor_salida)),
+      el("li", null, "Carga de modelos: " + segs(b.carga_ms)));
+    sb.append(ub, el("p", "muted", b.nota));
+    extra.append(sr, sb);
+  }
+
+  function initFiltrosCronologia(categorias, alCambiar) {
+    const box = $("inf-cats");
+    if (box.childElementCount) return;
+    categorias.forEach((c) => {
+      const l = el("label");
+      const i = el("input");
+      i.type = "checkbox";
+      i.value = c;
+      i.addEventListener("change", alCambiar);
+      l.append(i, document.createTextNode(CAT_TXT[c] || c));
+      box.append(l);
+    });
+  }
+  function filtrosCronologia() {
+    return { categoria: [...document.querySelectorAll("#inf-cats input:checked")].map((i) => i.value),
+      equipo: $("inf-equipo").value, nivel: $("inf-nivel").value, q: $("inf-q").value.trim() };
+  }
+
+  function setCronologia(d) {
+    $("inf-partida").textContent = d.partida;
+    $("inf-crono-info").textContent = d.coinciden + " de " + d.total + " eventos" + (d.coinciden > d.entradas.length
+      ? " (se muestran los " + d.entradas.length + " últimos)" : "") + (d.restringida
+      ? " · Vista de Rojo durante la partida: solo lo que una campaña real podría observar; al finalizar se ve todo." : "");
+    $("inf-lista").replaceChildren(...d.entradas.map((e) => {
+      const li = el("li", "inf-ev eq-" + e.equipo);
+      li.title = e.ts || "";
+      li.append(el("span", "t", minSeg(e.t_s)), el("span", "cat", (CAT_TXT[e.categoria] || e.categoria) + " · " + e.equipo),
+        el("span", null, e.texto), el("span", "niv niv-" + e.nivel, e.nivel || ""));
+      return li;
+    }));
+  }
+
   // ---------- marcador de la partida Rojo/Azul (vista general y espectador, solo lectura) ----------
   function setMarcadorPartida(d) {
     const m = $("marcador-partida");
@@ -1186,7 +1294,8 @@ const R = (() => {
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
     mostrarBuzon, buzonAbierto, buzonEsModal, alojarBuzon, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
-    setBatallaPartida, setIaEnCurso, setVistaAzul, setMisiones, setMarcadorPartida, marcarLeido, mostrarResultadoCorreo, mostrarVisor, cerrarVisor,
+    setBatallaPartida, setIaEnCurso, setTabInforme, setPartidasInforme, setResultados, initFiltrosCronologia,
+    filtrosCronologia, setCronologia, setVistaAzul, setMisiones, setMarcadorPartida, marcarLeido, mostrarResultadoCorreo, mostrarVisor, cerrarVisor,
     visorAbierto, setEnviadosRojo, setCredencial, setCorreosIncidente, setIncidentes, setOllamaComprobando, mostrarResultado, cerrarResultado, resultadoAbierto,
   };
 })();

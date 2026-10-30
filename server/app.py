@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field  # noqa: E402
 
 import mock_server as ms  # noqa: E402
 import partida as pt  # noqa: E402
-from src.lab import ataque_ia, atacante, cliente_ollama, correos, documentos, motor, repositorio, sesion  # noqa: E402
+from src.lab import ataque_ia, atacante, cliente_ollama, correos, documentos, informe, motor, repositorio, sesion  # noqa: E402
 
 app = ms.app
 HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -56,7 +56,7 @@ RESTO = ["politicas", "autorizacion", "herramienta", "bd"]
 # anónimo) solo se puede hacer GET a RUTAS_PUBLICAS; una sesión de espectador tampoco puede modificar nada.
 CODIGO_ARBITRO = os.getenv("CS_CODIGO_ARBITRO") or f"{secrets.randbelow(10 ** 6):06d}"
 SALA = pt.Sala(CODIGO_ARBITRO)
-RUTAS_PUBLICAS = ("/api/eventos", "/api/estado", "/api/ia/estado")
+RUTAS_PUBLICAS = ("/api/eventos", "/api/estado", "/api/ia/estado", "/api/cronologia", "/api/resultados", "/api/partidas")
 RUTA_SESION = "/api/sesion"
 # Rutas reservadas a UN equipo (además de exigir sesión). Detener, iniciar y cerrar la partida es cosa del árbitro;
 # Rojo envía correos de entrenamiento y Azul los lee en su buzón.
@@ -493,6 +493,7 @@ def _cerrar_partida(motivo):
                        "ts": datetime.now().astimezone().isoformat(timespec="seconds"), "motivo": motivo, "marcador": m}
     repositorio.por_defecto().registrar(None, "PARTIDA_FINALIZADA", PARTIDA_ID,
                                         f"ROJO {rojo} - AZUL {azul} · {ganador.upper()}", "BAJO")
+    _guardar_resultado_final()
     ms.emitir("auditoria", ms.aud("SYSTEM", "PARTIDA_FINALIZADA", PARTIDA_ID,
                                   f"ROJO {rojo} — AZUL {azul} · ganador {ganador}", "BAJO"))
     final = _marcador()
@@ -1275,7 +1276,7 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
     decisiones = []  # (decision_ia, veredicto) por ronda válida, solo para el resumen sí/no del informe
     puntos = None if demo else {"atacante": 0, "defensor": 0}  # la demostración (admin) no puntúa
     estado_sesion = sesion.EstadoSesion()  # nuevo en cada batalla (revancha incluida); se descarta al terminar
-    informe = {"veredictos_por_tipo": {k: 0 for k in ("FALLA_DEFENSA", "DEFENSA_EXITOSA", "DEFENSA_EN_PROFUNDIDAD",
+    informe_b = {"veredictos_por_tipo": {k: 0 for k in ("FALLA_DEFENSA", "DEFENSA_EXITOSA", "DEFENSA_EN_PROFUNDIDAD",
                                                       "PERMITIDO_CORRECTO", "ERROR")},
                "fugas_parciales": 0, "activaciones_circuito_sesion": 0, "bloqueos_filtro_rapido": 0,
                "dificultad": dificultad, "escenario": escenario, "usuario": f"{ident.usuario} ({ident.rol})",
@@ -1301,14 +1302,16 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
                      "error": f"timeout de ronda ({TIMEOUT_RONDA} s)"}
             if r["veredicto"] == "ERROR":
                 errores += 1
-                informe["veredictos_por_tipo"]["ERROR"] += 1
+                informe_b["veredictos_por_tipo"]["ERROR"] += 1
                 await _emitir_error(r, modelo_atq, modelo_def)  # no se registra en métricas; la batalla continúa
+                _guardar_practica(r, ident, "batalla", modelo_atq, modelo_def)
             else:
                 d = await _emitir_ronda(r, modelo_atq, modelo_def, puntos=puntos, sesion_estado=estado_sesion)
-                informe["veredictos_por_tipo"][d["resultado"]] = informe["veredictos_por_tipo"].get(d["resultado"], 0) + 1
-                informe["fugas_parciales"] += int(d.get("nivel_fuga") == "PARCIAL")
-                informe["activaciones_circuito_sesion"] += int(bool(d.get("circuito_sesion")))
-                informe["bloqueos_filtro_rapido"] += int(d.get("origen_decision") == "filtro_rapido")
+                _guardar_practica(r, ident, "batalla", modelo_atq, modelo_def, d)
+                informe_b["veredictos_por_tipo"][d["resultado"]] = informe_b["veredictos_por_tipo"].get(d["resultado"], 0) + 1
+                informe_b["fugas_parciales"] += int(d.get("nivel_fuga") == "PARCIAL")
+                informe_b["activaciones_circuito_sesion"] += int(bool(d.get("circuito_sesion")))
+                informe_b["bloqueos_filtro_rapido"] += int(d.get("origen_decision") == "filtro_rapido")
                 decisiones.append((d["decision_ia"], d["resultado"]))
                 jugadas += 1
                 historial.append({"categoria": r["ataque"]["categoria"], "resultado": r["veredicto"]})
@@ -1318,14 +1321,14 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
                           "demo": demo})
         if puntos is not None:
             _partida_fin(puntos, jugadas, errores,
-                         informe=_cerrar_informe(informe, puntos, jugadas, errores, estado_sesion, decisiones))
+                         informe=_cerrar_informe(informe_b, puntos, jugadas, errores, estado_sesion, decisiones))
     except asyncio.CancelledError:
         ms.emitir("auditoria", ms.aud("SYSTEM", "DETENIDO", "batalla real", "CANCELADO", "BAJO"))
         ms.emitir("fin", {"modo": "batalla", "origen": "ollama", "detenido": True,
                           "metricas": ms.snapshot(), "errores": errores})
         if puntos is not None:
             _partida_fin(puntos, jugadas, errores, detenida=True,
-                         informe=_cerrar_informe(informe, puntos, jugadas, errores, estado_sesion, decisiones))
+                         informe=_cerrar_informe(informe_b, puntos, jugadas, errores, estado_sesion, decisiones))
     except Exception as exc:  # noqa: BLE001
         ms.emitir("error", {"mensaje": f"Error interno de la batalla real: {exc}"})
     finally:
@@ -1560,6 +1563,105 @@ def _cancelar_ataque_ia():
         ATAQUE_IA["tarea"].cancel()
 
 
+# ---------- cronología y resultados (Fase G) ----------
+# Ambos se construyen desde lo guardado (auditoría de la partida, misiones, ataques IA), nunca desde el cliente.
+# Visibilidad: durante la partida Rojo ve solo lo que una campaña real mediría (informe.VISIBLE_ROJO) y el desglose
+# de puntos lo ven el árbitro y los espectadores; al finalizar, todos lo ven todo. Como la vista de espectador es
+# pública en la LAN (igual que el marcador y el flujo SSE), esto ordena lo que muestra cada vista: no es un secreto.
+def _resultados_vivos():
+    repo = repositorio.por_defecto()
+    usuario = USUARIO_EQUIPO.get("azul")
+    d = informe.desglose(repo.logros_rojo(PARTIDA_ID), repo.misiones(PARTIDA_ID, usuario), repo.ataques_ia(PARTIDA_ID),
+                         ESTADO_PARTIDA.eventos_vistos, ESTADO_PARTIDA.riesgo_acumulado)
+    return {"partida": PARTIDA_ID, "fase": PARTIDA.fase, "inicio": PARTIDA.inicio, "duracion_s": PARTIDA.duracion_s,
+            "usuario_azul": usuario, **d}
+
+
+def _datos_partida(pid):
+    """-> (inicio, fase, resultado guardado o None), o None si esa partida no existe (ni actual ni guardada)."""
+    guardado = repositorio.por_defecto().resultado_guardado(pid)
+    if pid == PARTIDA_ID:
+        return PARTIDA.inicio, PARTIDA.fase, guardado
+    if guardado:
+        return guardado["inicio"], "finalizada", guardado
+    return None
+
+
+@app.get("/api/partidas")
+async def partidas_finalizadas():
+    """Historial de partidas finalizadas (resultado guardado en la BD) y la actual."""
+    return {"actual": PARTIDA.publico(), "finalizadas": repositorio.por_defecto().partidas_finalizadas()}
+
+
+@app.get("/api/cronologia")
+async def cronologia(request: Request, partida: str | None = None, categoria: str | None = None,
+                     equipo: str | None = None, nivel: str | None = None, q: str | None = None):
+    """Cronología filtrable de una partida (por defecto la actual). categoria: lista separada por comas."""
+    pid = partida or PARTIDA_ID
+    datos = _datos_partida(pid)
+    if datos is None:
+        return _prohibido(f"No hay ninguna partida {pid}.", 404)
+    inicio, fase, _ = datos
+    cats = [c for c in (categoria or "").split(",") if c]
+    if any(c not in informe.CATEGORIAS for c in cats) or (equipo and equipo not in ("rojo", "azul", "sistema")) \
+            or (nivel and nivel not in informe.NIVELES) or len(q or "") > 80:
+        return _error400("Filtro no válido: categorías " + ", ".join(informe.CATEGORIAS) + "; equipo rojo|azul|sistema; "
+                         "nivel " + "|".join(informe.NIVELES) + "; texto de hasta 80 caracteres.")
+    quien = request.state.equipo
+    todas = [e for f in repositorio.por_defecto().auditoria_partida(pid) if (e := informe.entrada(f, inicio))]
+    visibles = [e for e in todas if informe.visible_para(e, quien, fase)]
+    lista = informe.filtrar(visibles, cats, equipo, nivel, q)
+    return {"partida": pid, "fase": fase, "inicio": inicio, "restringida": len(visibles) < len(todas),
+            "total": len(visibles), "coinciden": len(lista), "entradas": lista[-500:],
+            "conteo": {c: sum(e["categoria"] == c for e in visibles) for c in informe.CATEGORIAS},
+            "categorias": list(informe.CATEGORIAS), "niveles": list(informe.NIVELES)}
+
+
+@app.get("/api/resultados")
+async def resultados(request: Request, partida: str | None = None):
+    """Desglose de puntos con fórmulas, riesgo y estadística de la batalla IA. Guardado si la partida finalizó."""
+    pid = partida or PARTIDA_ID
+    datos = _datos_partida(pid)
+    if datos is None:
+        return _prohibido(f"No hay ninguna partida {pid}.", 404)
+    _, fase, guardado = datos
+    if fase != "finalizada" and request.state.equipo in ("rojo", "azul"):
+        return _prohibido("Durante la partida el desglose de puntos lo ven el árbitro y los espectadores; los equipos "
+                          "lo verán al finalizar.", 403)
+    if guardado:
+        return {**guardado["informe"], "guardado": True}
+    return {**_resultados_vivos(), "guardado": False, "final": None}
+
+
+def _guardar_resultado_final():
+    """Al cerrar la partida: desglose + marcador congelados en la BD (sobreviven a reiniciar el servidor)."""
+    f = RESULTADO_FINAL
+    d = _resultados_vivos()
+    if (d["rojo"]["total"], d["azul"]["total"]) != (f["puntos_rojo"], f["puntos_azul"]):  # no debería pasar nunca
+        ms.emitir("error", {"mensaje": "El desglose no coincide con el marcador: revisa las fórmulas."})
+    final = {k: v for k, v in f.items() if k != "marcador"}
+    repositorio.por_defecto().guardar_resultado(
+        PARTIDA_ID, f["ts"], f["motivo"], f["ganador"], f["puntos_rojo"], f["puntos_azul"], PARTIDA.inicio,
+        PARTIDA.duracion_s, {**d, "final": final, "marcador": f["marcador"]})
+
+
+def _guardar_practica(r, ident, modo, matq, mdef, d=None):
+    """Cada ronda de práctica queda en la BD (rondas_practica) y en la auditoría/JSONL, también las de ERROR.
+    Antes solo viajaban por SSE y se perdían (DIAGNOSTICO §5.2)."""
+    at, df = r.get("ataque") or {}, r.get("defensa") or {}
+    filtro = df.get("origen_decision") == "filtro_rapido"
+    try:
+        repositorio.por_defecto().guardar_ronda_practica(
+            partida=PARTIDA_ID, fase_partida=PARTIDA.fase, modo=modo, ronda=r["ronda"], usuario=ident.usuario,
+            rol=ident.rol, categoria=at.get("categoria"), prompt=at.get("prompt"), decision_ia=df.get("decision"),
+            decision=d["decision"] if d else None, veredicto=r["veredicto"], capa_bloqueo=d["capa_bloqueo"] if d else None,
+            origen_decision=("filtro_rapido" if filtro else "ia") if df else None, nivel_fuga=r.get("nivel_fuga"),
+            error=r.get("error"), modelo_atq=matq, modelo_def=mdef, **_metricas("atq", at if matq else None),
+            **_metricas("def", None if filtro else df))
+    except Exception as exc:  # noqa: BLE001 - no poder guardar nunca tumba la práctica
+        ms.emitir("error", {"mensaje": f"No se pudo guardar la ronda de práctica: {exc}"})
+
+
 # ---------- manual REAL ----------
 class ManualRealIn(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=2000)
@@ -1589,8 +1691,11 @@ async def _manual_real(body, ident, host_def):
         r = {"ronda": n, "ataque": {"prompt": body.prompt, "categoria": "manual", "tiempo_ms": None, "tokens": None}, **p}
         if r["veredicto"] == "ERROR":  # no entra en métricas
             await _emitir_error(r, None, body.modelo_def, manual=True)
+            _guardar_practica(r, ident, "manual", None, body.modelo_def)
             return False, {"error": r["error"], "mensaje": r["error"], "veredicto": "ERROR"}
-        return True, await _emitir_ronda(r, None, body.modelo_def, manual=True)
+        d = await _emitir_ronda(r, None, body.modelo_def, manual=True)
+        _guardar_practica(r, ident, "manual", None, body.modelo_def, d)
+        return True, d
     finally:
         ms.ESTADO.update(corriendo=False, modelo_def=previo)
 

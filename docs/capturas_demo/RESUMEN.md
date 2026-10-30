@@ -1,8 +1,8 @@
 # Prueba de extremo a extremo — partida Rojo vs Azul
 
-Generado por `e2e/demo_partida.py` el 2026-10-30T08:30:04-06:00 en 23 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
+Generado por `e2e/demo_partida.py` el 2026-10-30T09:26:07-06:00 en 24 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
 
-**Resultado: 87/87 comprobaciones correctas.**
+**Resultado: 96/96 comprobaciones correctas.**
 
 ## 1. Preparación: cada participante entra con su nombre, entra un espectador y el árbitro inicia la partida
 
@@ -22,6 +22,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-30T08:30:04-06:00 en 23 s, con un 
 - ✅ el espectador no tiene token ni botones de acción: esperado `True`, observado `True`
 - ✅ marcador inicial en General: esperado `{'riesgo': 0, 'rojo': 0, 'azul': 0}`, observado `{'riesgo': 0, 'rojo': 0, 'azul': 0}`
 - ✅ durante la partida la práctica queda en pausa (botón desactivado y explicado): esperado `(True, True)`, observado `(True, True)`
+- ✅ el marcador de la práctica («BATALLA IA vs IA») se oculta durante la partida: esperado `True`, observado `True`
 
 ![01_general_preparacion.jpg](01_general_preparacion.jpg)
 ![02_general_inicio.jpg](02_general_inicio.jpg)
@@ -30,7 +31,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-30T08:30:04-06:00 en 23 s, con un 
 
 ## 2. Rojo envía 3 correos (uno sin adjunto y dos con PDF)
 
-- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Tu paquete no pudo ser entregado»
+- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Actualización de tu recibo de nómina (30/10/2026)» | ✓ Correo enviado a ana.perez: «Tu paquete no pudo ser entregado»
 - ✅ los 3 envíos se confirman: esperado `3`, observado `3`
 - ✅ el buzón de Azul se actualiza solo por SSE: esperado `3`, observado `3`
 
@@ -167,7 +168,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-30T08:30:04-06:00 en 23 s, con un 
 
 ## 4. Verificación: misiones, marcador en General y Espectador
 
-- Evidencia de «Revocar»: Completada por Beto Azul · 30/10/2026 08:29 · evidencia: credencial:ana.perez
+- Evidencia de «Revocar»: Completada por Beto Azul · 30/10/2026 09:26 · evidencia: credencial:ana.perez
 - Marcador final antes de cerrar: {'riesgo': 20, 'rojo': 10, 'azul': 90, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}
 - Líneas de auditoría en General: 50
 - ✅ misiones completadas: todas salvo la manual: esperado `[True, True, False, True, True, True, True, True]`, observado `[True, True, False, True, True, True, True, True]`
@@ -186,11 +187,28 @@ Generado por `e2e/demo_partida.py` el 2026-10-30T08:30:04-06:00 en 23 s, con un 
 - ✅ puntajes finales (Rojo — Azul): esperado `('10', '90')`, observado `('10', '90')`
 - ✅ el Espectador también ve el resultado: esperado `True`, observado `True`
 - ✅ tras finalizar, Rojo ya no puede enviar (409): esperado `True`, observado `True`
-- ✅ sin errores de consola inesperados en ninguna vista: esperado `[]`, observado `[]`
 
 ![23_general_resultado.jpg](23_general_resultado.jpg)
 ![24_espectador_resultado.jpg](24_espectador_resultado.jpg)
 ![25_rojo_tras_finalizar.jpg](25_rojo_tras_finalizar.jpg)
+
+## 6. Resultados con fórmulas y cronología filtrable (guardados en el servidor)
+
+- Batalla IA en el desglose: Riesgo final: 20/100 ·  · Cada evento suma o resta su riesgo fijo (REGLAS_EVENTO), en orden y acotado a 0-100 en cada paso: el riesgo nunca baja de 0 ni deja «saldo a favor», así que el final puede diferir de la suma sin acotar. ·  · CLIC_ENLACE: 2 × +15 = +30 · archivo_aislado: 1 × -5 = -5 · correo
+- Cronología filtrada: 00:00 BATALLA IA · AZUL Azul fijó su defensor IA (modelo:falso-defensor) BAJO | 00:08 BATALLA IA · ROJO La IA de Rojo lanzó un ataque (ataque_ia:1) como ana.perez: Rita Rojo · credencial_robada MEDIO | 00:10 BATALLA IA · ROJO Resultado del ataque IA (ataque_ia:1): DATOS_EXPUESTOS CRITICO | 00:13 BATALLA IA · ROJO La IA de Rojo lanzó un ataque (ataque_ia:2) como visita.demo: Rita Rojo · invitado MEDIO
+- ✅ desde la pantalla final, General abre el desglose: esperado `True`, observado `True`
+- ✅ los totales del desglose coinciden con el resultado final: esperado `('10 pts', '90 pts')`, observado `('10 pts', '90 pts')`
+- ✅ cada línea muestra su fórmula (fuga IA, misiones, ataques contenidos): esperado `True`, observado `True`
+- ✅ el resultado consta como guardado en el servidor: esperado `True`, observado `True`
+- ✅ la cronología lista la partida completa: esperado `True`, observado `True`
+- ✅ las pestañas de Resultados no tocan las de la práctica (el botón conserva su texto): esperado `INICIAR SIMULACIÓN`, observado `INICIAR SIMULACIÓN`
+- ✅ filtrar por «Batalla IA» deja solo los ataques: esperado `True`, observado `True`
+- ✅ tras finalizar, Rojo también ve el desglose: esperado `True`, observado `True`
+- ✅ sin errores de consola inesperados en ninguna vista: esperado `[]`, observado `[]`
+
+![26_general_desglose.jpg](26_general_desglose.jpg)
+![27_general_cronologia_filtrada.jpg](27_general_cronologia_filtrada.jpg)
+![28_rojo_desglose.jpg](28_rojo_desglose.jpg)
 
 ## Eventos escritos en eventos.jsonl (formato para Wazuh)
 

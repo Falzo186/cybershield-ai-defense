@@ -213,6 +213,35 @@
     <ol id="bp-lista" class="bp-lista" data-vacio="Aún no hay ataques IA en esta partida."></ol>
   </section>
 
+  <!-- Fase G: resultados con fórmulas y cronología filtrable (datos guardados en el servidor) -->
+  <section class="panel informe" aria-labelledby="t-inf">
+    <h2 id="t-inf">📊 RESULTADOS Y CRONOLOGÍA <span id="inf-partida" class="badge">—</span></h2>
+    <div class="inf-barra">
+      <div class="tabs" role="tablist" aria-label="Resultados o cronología">
+        <button type="button" role="tab" class="tab" data-inf="resultados" aria-selected="true">RESULTADOS</button>
+        <button type="button" role="tab" class="tab" data-inf="cronologia" aria-selected="false">CRONOLOGÍA</button>
+      </div>
+      <label>Partida <select id="inf-sel-partida" class="sel" aria-label="Partida"></select></label>
+      <button type="button" id="inf-actualizar" class="btn btn-mini">↻ Actualizar</button>
+      <button type="button" id="inf-exportar" class="btn btn-mini" title="Resultados y cronología tal como los devuelve el servidor">⬇ Exportar informe (JSON)</button>
+    </div>
+    <div id="inf-resultados" role="tabpanel">
+      <p id="inf-aviso" class="muted" aria-live="polite"></p>
+      <div id="inf-equipos" class="inf-equipos"></div>
+      <div id="inf-extra" class="inf-extra"></div>
+    </div>
+    <div id="inf-cronologia" role="tabpanel" hidden>
+      <form id="inf-filtros" class="inf-filtros" autocomplete="off">
+        <div id="inf-cats" class="inf-cats" role="group" aria-label="Categorías"></div>
+        <label>Equipo <select id="inf-equipo" class="sel"><option value="">Todos</option><option value="rojo">Rojo</option><option value="azul">Azul</option><option value="sistema">Sistema</option></select></label>
+        <label>Nivel mínimo <select id="inf-nivel" class="sel"><option value="">Cualquiera</option><option value="MEDIO">Medio</option><option value="ALTO">Alto</option><option value="CRITICO">Crítico</option></select></label>
+        <label>Buscar <input id="inf-q" class="sel" type="search" maxlength="80" spellcheck="false"></label>
+      </form>
+      <p id="inf-crono-info" class="muted" aria-live="polite"></p>
+      <ol id="inf-lista" class="inf-lista" data-vacio="Sin eventos con estos filtros."></ol>
+    </div>
+  </section>
+
   <section class="panel aud" aria-labelledby="t-aud">
     <div class="aud-head">
       <h2 id="t-aud">AUDITORÍA</h2>
@@ -383,7 +412,7 @@
       <div class="final-eq final-azul"><span>🔵 EQUIPO AZUL</span><b id="final-azul">0</b></div>
     </div>
     <ul id="final-detalle" class="final-detalle"></ul>
-    <div class="reto-botones"><button type="button" id="final-cerrar" class="btn">CERRAR (Esc)</button></div>
+    <div class="reto-botones"><button type="button" id="final-desglose" class="btn btn-primary">📊 VER DESGLOSE Y CRONOLOGÍA</button><button type="button" id="final-cerrar" class="btn">CERRAR (Esc)</button></div>
   </div>
 </div>
 
