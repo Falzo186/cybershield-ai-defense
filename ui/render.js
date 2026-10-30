@@ -861,6 +861,101 @@ const R = (() => {
     });
   }
 
+  // ---------- batalla de la partida (Fase F) ----------
+  // Solo se muestran fases y métricas REALES: la fase actual, el tiempo transcurrido desde que empezó (el servidor
+  // envía cuánto llevaba al emitirla) y, al terminar, los tokens y la carga que informó Ollama ("—" si no los dio).
+  const RES_IA = { datos_expuestos: "r-bad", ia_enganada: "r-depth", contenido: "r-ok", fallo_seguro: "r-warn",
+    error_atacante: "r-warn" };
+  const TECNICA = (t) => (t ? String(t).replace(/_/g, " ") : "libre");
+  const nd = (v) => (v == null ? "—" : String(v));
+  const segs = (ms) => (ms == null ? "—" : ms < 1000 ? ms + " ms" : (ms / 1000).toFixed(1).replace(".", ",") + " s");
+  const hostCorto = (h) => String(h || "?").replace(/^https?:\/\//, "").replace(/:11434$/, "");
+  let relojIA = null;
+
+  function setIaEnCurso(en) {
+    const box = $("bp-encurso");
+    clearInterval(relojIA);
+    relojIA = null;
+    box.replaceChildren();
+    box.classList.toggle("activo", !!en);
+    if (!en) { box.append(el("span", "muted", "Sin ataque en curso.")); return; }
+    const t0 = Date.now() - (en.transcurrido_ms || 0);
+    const quien = { atacante: "la Ollama del atacante (Rojo)", defensor: "la Ollama del defensor (Azul)" }[en.fase] ||
+      "la comprobación de los modelos";
+    const linea = el("b");
+    const pinta = () => {
+      linea.textContent = "⏳ Ataque #" + (en.n || "…") + " · esperando a " + quien + " · " + (en.modelo || "—") + " · " +
+        Math.floor((Date.now() - t0) / 1000) + " s";
+    };
+    pinta();
+    relojIA = setInterval(pinta, 1000);
+    box.append(linea, el("span", "muted bp-nota", (en.usuario ? "Identidad: " + en.usuario +
+      (en.origen_identidad === "credencial_robada" ? " (credencial robada)" : " (invitado)") + " · técnica " +
+      TECNICA(en.tecnica) + ". " : "") + "Es el tiempo real transcurrido: Ollama no informa del avance, así que no hay porcentaje."));
+    if (en.prompt) box.append(el("pre", "mono box bp-prompt", en.prompt));
+  }
+
+  function itemAtaqueIA(a) {
+    const li = el("li", "bp-ataque " + (RES_IA[a.resultado] || ""));
+    const cab = el("div", "bp-fila");
+    cab.append(el("b", null, "#" + a.n), el("span", "bp-titulo", a.titulo || a.resultado || "—"),
+      el("span", null, a.usuario + (a.origen_identidad === "credencial_robada" ? " 🔑 credencial robada" : " · invitado")),
+      el("span", "muted", "técnica " + TECNICA(a.categoria || a.tecnica) + " · intensidad " + a.intensidad +
+        (a.lanzado_por ? " · lanzado por " + a.lanzado_por : "")),
+      el("b", null, (a.puntos_rojo ? "Rojo +" + a.puntos_rojo : "") + (a.puntos_rojo && a.puntos_azul ? " · " : "") +
+        (a.puntos_azul ? "Azul +" + a.puntos_azul : "") || "sin puntos"));
+    li.append(cab, el("span", null, a.explicacion || ""));
+    if (a.prompt) {
+      const det = el("details");
+      det.append(el("summary", null, "Mensaje del atacante"), el("pre", "mono box bp-prompt", a.prompt));
+      li.append(det);
+    }
+    const m = el("div", "bp-metricas mono");
+    const linea = (etq, modelo, ms, tin, tout, carga) => el("span", null, etq + " " + (modelo || "—") + " · " + segs(ms) +
+      " · tokens " + nd(tin) + " entrada / " + nd(tout) + " salida" + (carga ? " · incluye " + segs(carga) + " de carga del modelo" : ""));
+    m.append(linea("Atacante", a.modelo_atq, a.atq_ms, a.atq_tokens_entrada, a.atq_tokens_salida, a.atq_carga_ms));
+    if (a.origen_decision === "filtro_rapido") m.append(el("span", null, "Defensor ⚡ filtro rápido determinista: sin inferencia"));
+    else if (a.resultado !== "error_atacante" && a.estado !== "cancelado") {
+      m.append(linea("Defensor", a.modelo_def, a.def_ms, a.def_tokens_entrada, a.def_tokens_salida, a.def_carga_ms));
+    }
+    if (a.decision_ia || a.capa_bloqueo || a.error) {
+      m.append(el("span", null, [a.decision_ia && "Propuesta de la IA: " + a.decision_ia,
+        a.capa_bloqueo && "capa que frenó: " + a.capa_bloqueo, a.herramienta && "herramienta: " + a.herramienta,
+        a.error && "error: " + a.error].filter(Boolean).join(" · ")));
+    }
+    li.append(m);
+    return li;
+  }
+
+  // opts: {rol, conToken}. Rojo ve el formulario de ataque; Azul, el botón para fijar su defensor.
+  function setBatallaPartida(e, opts) {
+    $("bp-cupo").textContent = e.lanzados + "/" + e.max_ataques + " ataques";
+    const d = e.defensor || {};
+    const def = $("bp-defensor");
+    def.textContent = d.modelo
+      ? d.modelo + " @ " + hostCorto(d.host) + (d.ok === true ? " · ✓ verificado" : d.ok === false ? " · ⚠ " + (d.error || "no responde") : "")
+      : "⚠ sin configurar: cada ataque se deniega por fallo seguro y Azul no puntúa";
+    def.className = d.modelo && d.ok !== false ? "ok" : "warn";
+    const id = e.identidad || {};
+    $("bp-identidad").textContent = id.origen === "credencial_robada"
+      ? "🔑 " + id.usuario + " (" + id.rol + ") · credencial robada sin revocar"
+      : id.usuario + " (" + id.rol + ") · sin credencial robada";
+    $("bp-identidad").className = id.origen === "credencial_robada" ? "warn" : "";
+    $("bp-puntos").textContent = "Rojo " + e.puntos.rojo + " · Azul " + e.puntos.azul;
+    const sel = $("bp-tecnica");
+    if (sel.options.length === 1) (e.tecnicas || []).forEach((t) => { const o = el("option", null, TECNICA(t)); o.value = t; sel.append(o); });
+    $("bp-rojo").hidden = !(opts.rol === "rojo" && opts.conToken);
+    $("bp-azul").hidden = !(opts.rol === "azul" && opts.conToken);
+    const lanzar = $("bp-lanzar");
+    lanzar.disabled = e.fase_partida !== "en_curso" || !!e.en_curso || e.restantes <= 0;
+    lanzar.title = e.fase_partida !== "en_curso" ? "Solo con la partida en curso"
+      : e.en_curso ? "Espera a que termine el ataque en curso"
+      : e.restantes <= 0 ? "Ya lanzaste todos los ataques de esta partida" : "Usa el modelo y la Ollama de la ventana IA Atacante";
+    setIaEnCurso(e.en_curso);
+    const ul = $("bp-lista");
+    ul.replaceChildren(...e.ataques.filter((a) => a.estado !== "en_curso").reverse().map(itemAtaqueIA));
+  }
+
   // ---------- marcador de la partida Rojo/Azul (vista general y espectador, solo lectura) ----------
   function setMarcadorPartida(d) {
     const m = $("marcador-partida");
@@ -883,6 +978,7 @@ const R = (() => {
       item(null, "Reportes", d.correos_reportados + d.pdf_reportados),
       item(null, "PDF abiertos", d.pdf_abiertos),
       ...(d.incidentes_abiertos ? [item(null, "Incidentes", d.incidentes_abiertos)] : []),
+      ...(d.ataques_ia ? [item(null, "Ataques IA", d.ataques_ia + " · Rojo +" + d.puntos_rojo_ia + " / Azul +" + d.puntos_azul_ia)] : []),
       item(null, "Accesos de Rojo denegados", d.denegaciones_rojo));
     if (d.final) m.prepend(item("mp-final", "🏁 FINAL", d.final.ganador === "empate" ? "EMPATE" : "GANA " + d.final.ganador.toUpperCase()));
   }
@@ -900,6 +996,8 @@ const R = (() => {
     [["Rojo: enlaces clicados sin contener", mk.rojo_enlaces_sin_contener],
       ["Rojo: PDFs abiertos sin reportar", mk.rojo_pdfs_sin_reportar],
       ["Rojo: accesos denegados en batallas", mk.denegaciones_rojo],
+      ["Batalla IA: ataques lanzados", mk.ataques_ia || 0],
+      ["Batalla IA: puntos Rojo / Azul", (mk.puntos_rojo_ia || 0) + " / " + (mk.puntos_azul_ia || 0)],
       ["Azul: misiones completadas", mk.misiones_completadas + "/" + mk.misiones_total],
       ["Riesgo final de la partida", Math.round(mk.riesgo || 0) + "/100"],
       ["Finalizada", fechaCorta(final.ts)]].forEach(([k, v]) => {
@@ -1088,7 +1186,7 @@ const R = (() => {
     setMarcador, setDemo, setProbe, mostrarReto, setCuenta, mostrarEspera, mostrarPartida, cerrarPartida, partidaAbierta, setOllama, setUsuarios, valorSelect,
     mostrarModal, cerrarModal, modalAbierto,
     mostrarBuzon, buzonAbierto, buzonEsModal, alojarBuzon, setPlantillas, setDestinatarios, setBuzon, setBotonBuzon, mostrarCorreo,
-    setVistaAzul, setMisiones, setMarcadorPartida, marcarLeido, mostrarResultadoCorreo, mostrarVisor, cerrarVisor,
+    setBatallaPartida, setIaEnCurso, setVistaAzul, setMisiones, setMarcadorPartida, marcarLeido, mostrarResultadoCorreo, mostrarVisor, cerrarVisor,
     visorAbierto, setEnviadosRojo, setCredencial, setCorreosIncidente, setIncidentes, setOllamaComprobando, mostrarResultado, cerrarResultado, resultadoAbierto,
   };
 })();

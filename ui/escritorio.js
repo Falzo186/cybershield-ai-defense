@@ -56,6 +56,7 @@
       { id: "atacante", titulo: "IA Atacante", icono: "🗡️", sel: "section.panel.atq", abierta: ["rojo", "general", "espectador", ""] },
       { id: "control", titulo: "Centro de control", icono: "🎛️", sel: "section.panel.ctr", abierta: ["rojo", "azul", "general", "espectador", ""] },
       { id: "defensor", titulo: "IA Defensora", icono: "🛡️", sel: "section.panel.def", abierta: ["azul", "general", "espectador", ""] },
+      { id: "batalla", titulo: "Batalla de la partida", icono: "⚔️", sel: "section.panel.bpartida", abierta: ["rojo", "azul", "general", "espectador", ""] },
       { id: "auditoria", titulo: "Auditoría", icono: "📜", sel: "section.panel.aud", abierta: ["rojo", "azul", "general", "espectador", ""], minH: 100 },
       // Buzón: la MISMA tarjeta del modal (render.js delega abrir/cerrar en esta ventana con R.alojarBuzon).
       // Se abre desde el acceso «Correo/Buzón» (que carga los datos), nunca sola al recargar, y flota fuera del mosaico.

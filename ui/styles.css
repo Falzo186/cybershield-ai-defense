@@ -30,7 +30,7 @@ h3 { font-size: 12px; letter-spacing: .08em; color: var(--texto-sec); margin: 14
 
 .app {
   height: 100vh; padding: 10px; gap: 10px;
-  display: grid; grid-template-rows: auto minmax(0, 1fr) 210px;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto 210px;
 }
 
 /* ---------- header ---------- */
@@ -211,7 +211,7 @@ caption { text-align: left; color: var(--texto-sec); font-size: 11px; letter-spa
 
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {
-  .app { height: auto; min-height: 100vh; grid-template-rows: auto auto 320px; }
+  .app { height: auto; min-height: 100vh; grid-template-rows: auto auto auto 320px; }
   .mid { grid-template-columns: 1fr; }
   .panel { overflow: visible; }
   .aud { overflow: hidden; }
@@ -658,3 +658,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .incidente-form label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--texto-sec); }
 .incidente-form button { justify-self: start; }
 #incidentes-cuenta { color: var(--warn); font-family: var(--mono); }
+
+/* ---------- batalla de la partida (Fase F) ---------- */
+.bpartida { border-top: 3px solid var(--warn); max-height: 260px; }
+body.escritorio .bpartida { max-height: none; }
+.bp-cab { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 14px; }
+.bp-cab b.ok { color: var(--ok); } .bp-cab b.warn { color: var(--warn); }
+.bp-form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; margin: 8px 0; }
+.bp-form label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--texto-sec); }
+.bp-encurso { margin: 8px 0; padding: 8px 10px; border: 1px dashed var(--borde); border-radius: 6px; display: grid; gap: 4px; }
+.bp-encurso.activo { border-color: var(--warn); border-style: solid; }
+.bp-nota { font-size: 12px; }
+.bp-prompt { max-height: 90px; overflow: auto; white-space: pre-wrap; margin: 0; }
+.bp-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.bp-lista:empty::before { content: attr(data-vacio); color: var(--texto-sec); font-size: 13px; }
+.bp-ataque { background: var(--panel2); border: 1px solid var(--borde); border-left: 3px solid var(--texto-sec); border-radius: 6px; padding: 8px 10px; display: grid; gap: 4px; font-size: 13px; }
+.bp-ataque.r-ok { border-left-color: var(--ok); } .bp-ataque.r-bad { border-left-color: var(--bad); }
+.bp-ataque.r-depth, .bp-ataque.r-warn { border-left-color: var(--warn); }
+.bp-fila { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.bp-titulo { font-weight: 700; letter-spacing: .04em; }
+.bp-ataque.r-ok .bp-titulo { color: var(--ok); } .bp-ataque.r-bad .bp-titulo { color: var(--bad); }
+.bp-ataque.r-depth .bp-titulo, .bp-ataque.r-warn .bp-titulo { color: var(--warn); }
+.bp-metricas { font-size: 12px; color: var(--texto-sec); display: grid; gap: 2px; }
+.bp-ataque details summary { cursor: pointer; color: var(--texto-sec); font-size: 12px; }

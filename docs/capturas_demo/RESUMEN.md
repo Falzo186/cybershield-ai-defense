@@ -1,8 +1,8 @@
 # Prueba de extremo a extremo — partida Rojo vs Azul
 
-Generado por `e2e/demo_partida.py` el 2026-10-29T11:02:06-06:00 en 17 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
+Generado por `e2e/demo_partida.py` el 2026-10-30T08:30:04-06:00 en 23 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
 
-**Resultado: 69/69 comprobaciones correctas.**
+**Resultado: 87/87 comprobaciones correctas.**
 
 ## 1. Preparación: cada participante entra con su nombre, entra un espectador y el árbitro inicia la partida
 
@@ -13,10 +13,15 @@ Generado por `e2e/demo_partida.py` el 2026-10-29T11:02:06-06:00 en 17 s, con un 
 - ✅ azul tiene su sesión y su nombre en la cabecera: esperado `True`, observado `True`
 - ✅ todas las vistas ven la partida en preparación: esperado `['PREPARACIÓN', 'PREPARACIÓN', 'PREPARACIÓN', 'PREPARACIÓN']`, observado `['PREPARACIÓN', 'PREPARACIÓN', 'PREPARACIÓN', 'PREPARACIÓN']`
 - ✅ antes de iniciar, Rojo no puede enviar (409): esperado `True`, observado `True`
+- ✅ Azul fija su defensor IA y el servidor lo comprueba contra su Ollama: esperado `True`, observado `True`
+- ✅ todas las vistas ven el defensor de Azul verificado: esperado `[True, True, True, True]`, observado `[True, True, True, True]`
+- ✅ solo Rojo ve el formulario de ataque y solo Azul el de defensor: esperado `(True, False, False, True)`, observado `(True, False, False, True)`
+- ✅ antes de iniciar, el botón de ataque está desactivado: esperado `True`, observado `True`
 - ✅ al iniciar, las 4 vistas muestran la cuenta atrás: esperado `True`, observado `True`
 - ✅ todas cuentan lo mismo (±2 s, el reloj lo manda el servidor): esperado `True`, observado `True`
 - ✅ el espectador no tiene token ni botones de acción: esperado `True`, observado `True`
 - ✅ marcador inicial en General: esperado `{'riesgo': 0, 'rojo': 0, 'azul': 0}`, observado `{'riesgo': 0, 'rojo': 0, 'azul': 0}`
+- ✅ durante la partida la práctica queda en pausa (botón desactivado y explicado): esperado `(True, True)`, observado `(True, True)`
 
 ![01_general_preparacion.jpg](01_general_preparacion.jpg)
 ![02_general_inicio.jpg](02_general_inicio.jpg)
@@ -25,7 +30,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-29T11:02:06-06:00 en 17 s, con un 
 
 ## 2. Rojo envía 3 correos (uno sin adjunto y dos con PDF)
 
-- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Actualización de tu recibo de nómina (29/10/2026)» | ✓ Correo enviado a ana.perez: «Tu paquete no pudo ser entregado»
+- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Tu paquete no pudo ser entregado»
 - ✅ los 3 envíos se confirman: esperado `3`, observado `3`
 - ✅ el buzón de Azul se actualiza solo por SSE: esperado `3`, observado `3`
 
@@ -111,63 +116,94 @@ Generado por `e2e/demo_partida.py` el 2026-10-29T11:02:06-06:00 en 17 s, con un 
 
 ![14_pagina_falsa_credencial.jpg](14_pagina_falsa_credencial.jpg)
 
+## 3g'. Batalla de la partida: la IA de Rojo ataca con la credencial robada
+
+- Identidad del atacante: 🔑 ana.perez (empleado) · credencial robada sin revocar
+- En curso (Azul): ⏳ Ataque #1 · esperando a la Ollama del atacante (Rojo) · falso-atacante · 0 s
+- Ataque #1: #1 · DATOS EXPUESTOS · ana.perez 🔑 credencial robada · técnica autoridad · intensidad 2 · lanzado por Rita Rojo · Rojo +10 · La IA de Rojo pidió datos con la credencial robada de ana.perez y el asistente se los entregó: para el sistema era una petición válida de esa cuenta. Datos INTERNA expuestos. Control que falló: la credencial comprometida seguía activa. Se evita revocándola en cuanto se detecta el phishing; lo ya filtrado no se recupera.
+- ✅ Rojo ve que su IA atacará como la cuenta robada: esperado `True`, observado `True`
+- ✅ todas las vistas ven la fase real del ataque (esperando a la Ollama…): esperado `True`, observado `True`
+- ✅ mientras dura, Rojo no puede lanzar otro: esperado `True`, observado `True`
+- ✅ el defensor atiende una petición válida para esa cuenta: DATOS EXPUESTOS: esperado `True`, observado `True`
+- ✅ Rojo +10 (datos INTERNA) y la explicación nombra la credencial sin revocar: esperado `True`, observado `True`
+- ✅ tokens de entrada/salida tal como los informa Ollama: esperado `True`, observado `True`
+- ✅ marcador de la partida: Rojo 25 + 10 = 35; riesgo 35 + 20 = 55: esperado `(35, 55)`, observado `(35, 55)`
+- ✅ Azul recibe el aviso del ataque y su explicación: esperado `True`, observado `True`
+
+![15_rojo_ataque_ia_en_curso.jpg](15_rojo_ataque_ia_en_curso.jpg)
+![16_rojo_ataque_ia_datos_expuestos.jpg](16_rojo_ataque_ia_datos_expuestos.jpg)
+
 ## 3h. Azul abre un incidente desde el correo, revoca la credencial y lo resuelve
 
 - Aviso: 🚨 Incidente #1 abierto · misión completada: «Abrir un incidente de seguridad» +10 pts
-- Aviso: ✓ Credencial revocada · regla -15 → riesgo de la partida 20/100 · misión completada: «Revocar una credencial comprometida» +20 pts
+- Aviso: ✓ Credencial revocada · regla -15 → riesgo de la partida 40/100 · misión completada: «Revocar una credencial comprometida» +20 pts
 - Aviso: Aún no se puede resolver: el enlace del correo se clicó y aún no está contenido.
-- Aviso: ✓ Incidente resuelto · regla -5 → riesgo de la partida 0/100 · misión completada: «Resolver el incidente» +15 pts
+- Aviso: ✓ Incidente resuelto · regla -5 → riesgo de la partida 20/100 · misión completada: «Resolver el incidente» +15 pts
 - ✅ el formulario trae el correo ya elegido: esperado `True`, observado `True`
 - ✅ abrir el incidente completa su misión: esperado `True`, observado `True`
 - ✅ la credencial aparece COMPROMETIDA con botón para revocarla: esperado `True`, observado `True`
 - ✅ revocar completa su misión (desbloqueada por el incidente): esperado `True`, observado `True`
-- ✅ Rojo pierde los 15 de la credencial (le quedan los 10 del clic): esperado `10`, observado `10`
+- ✅ Rojo pierde los 15 de la credencial (le quedan 10 del clic y 10 de la fuga, que no se recupera): esperado `20`, observado `20`
 - ✅ no deja resolver con el enlace clicado sin contener, y explica por qué: esperado `True`, observado `True`
 - ✅ el enlace de soporte queda contenido: esperado `True`, observado `True`
 - ✅ la lista ya no muestra nada pendiente para resolver: esperado `True`, observado `True`
 - ✅ el texto de resolución escrito antes se conserva al redibujar: esperado `Credencial revocada; enlace de soporte contenido.`, observado `Credencial revocada; enlace de soporte contenido.`
 - ✅ resolver el incidente completa su misión: esperado `True`, observado `True`
-- ✅ marcador: Rojo 0, Azul 85 (40 + 10 incidente + 20 revocar + 15 resolver), riesgo 0: esperado `(0, 85, 0)`, observado `(0, 85, 0)`
+- ✅ marcador: Rojo 10 (la fuga), Azul 85 (40 + 10 incidente + 20 revocar + 15 resolver), riesgo 20: esperado `(10, 85, 20)`, observado `(10, 85, 20)`
 
-![15_azul_incidente_credencial.jpg](15_azul_incidente_credencial.jpg)
-![16_azul_incidente_resuelto.jpg](16_azul_incidente_resuelto.jpg)
+![17_azul_incidente_credencial.jpg](17_azul_incidente_credencial.jpg)
+![18_azul_incidente_resuelto.jpg](18_azul_incidente_resuelto.jpg)
+
+## 3i. Con la credencial revocada, la IA de Rojo vuelve a atacar como invitado y el defensor lo contiene
+
+- Ataque #2: #2 · CONTENIDO · visita.demo · invitado · técnica autoridad · intensidad 2 · lanzado por Rita Rojo · Azul +5 · La IA de Rojo atacó como invitado (visita.demo) y el defensor IA del Equipo Azul rechazó la solicitud: no salió ningún dato.
+- ✅ revocar devolvió a Rojo a invitado: esperado `True`, observado `True`
+- ✅ el defensor IA rechaza: CONTENIDO: esperado `True`, observado `True`
+- ✅ Azul +5 y la propuesta de la IA fue RECHAZAR: esperado `True`, observado `True`
+- ✅ marcador: Rojo 10, Azul 90: esperado `(10, 90)`, observado `(10, 90)`
+- ✅ el marcador de General resume la batalla IA: esperado `True`, observado `True`
+
+![19_general_batalla_partida.jpg](19_general_batalla_partida.jpg)
 
 ## 4. Verificación: misiones, marcador en General y Espectador
 
-- Evidencia de «Revocar»: Completada por Beto Azul · 29/10/2026 11:02 · evidencia: credencial:ana.perez
-- Marcador final antes de cerrar: {'riesgo': 0, 'rojo': 0, 'azul': 85, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}
-- Líneas de auditoría en General: 43
+- Evidencia de «Revocar»: Completada por Beto Azul · 30/10/2026 08:29 · evidencia: credencial:ana.perez
+- Marcador final antes de cerrar: {'riesgo': 20, 'rojo': 10, 'azul': 90, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}
+- Líneas de auditoría en General: 50
 - ✅ misiones completadas: todas salvo la manual: esperado `[True, True, False, True, True, True, True, True]`, observado `[True, True, False, True, True, True, True, True]`
 - ✅ cada misión dice quién la completó y con qué evidencia: esperado `True`, observado `True`
-- ✅ General y Espectador ven el mismo marcador: esperado `{'riesgo': 0, 'rojo': 0, 'azul': 85, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}`, observado `{'riesgo': 0, 'rojo': 0, 'azul': 85, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}`
+- ✅ General y Espectador ven el mismo marcador: esperado `{'riesgo': 20, 'rojo': 10, 'azul': 90, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}`, observado `{'riesgo': 20, 'rojo': 10, 'azul': 90, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}`
 - ✅ la auditoría de General registró la partida: esperado `True`, observado `True`
 
-![17_azul_misiones.jpg](17_azul_misiones.jpg)
-![18_espectador_marcador.jpg](18_espectador_marcador.jpg)
-![19_general_auditoria_maximizada.jpg](19_general_auditoria_maximizada.jpg)
+![20_azul_misiones.jpg](20_azul_misiones.jpg)
+![21_espectador_marcador.jpg](21_espectador_marcador.jpg)
+![22_general_auditoria_maximizada.jpg](22_general_auditoria_maximizada.jpg)
 
 ## 5. General finaliza la partida y se muestra el resultado
 
 - ✅ General ve la pantalla de resultado: esperado `True`, observado `True`
 - ✅ ganador: esperado `GANA EL EQUIPO AZUL`, observado `GANA EL EQUIPO AZUL`
-- ✅ puntajes finales (Rojo — Azul): esperado `('0', '85')`, observado `('0', '85')`
+- ✅ puntajes finales (Rojo — Azul): esperado `('10', '90')`, observado `('10', '90')`
 - ✅ el Espectador también ve el resultado: esperado `True`, observado `True`
 - ✅ tras finalizar, Rojo ya no puede enviar (409): esperado `True`, observado `True`
 - ✅ sin errores de consola inesperados en ninguna vista: esperado `[]`, observado `[]`
 
-![20_general_resultado.jpg](20_general_resultado.jpg)
-![21_espectador_resultado.jpg](21_espectador_resultado.jpg)
-![22_rojo_tras_finalizar.jpg](22_rojo_tras_finalizar.jpg)
+![23_general_resultado.jpg](23_general_resultado.jpg)
+![24_espectador_resultado.jpg](24_espectador_resultado.jpg)
+![25_rojo_tras_finalizar.jpg](25_rojo_tras_finalizar.jpg)
 
 ## Eventos escritos en eventos.jsonl (formato para Wazuh)
 
 - `archivo_aislado`: 1
+- `ataque_ia_lanzado`: 2
+- `ataque_ia_resultado`: 2
 - `clic_enlace`: 2
 - `correo_abierto`: 3
 - `correo_recibido`: 3
 - `correo_reportado`: 1
 - `credencial_comprometida`: 1
 - `credencial_revocada`: 1
+- `defensor_ia_configurado`: 1
 - `enlace_contenido`: 2
 - `enlace_inspeccionado`: 1
 - `incidente_abierto`: 1
@@ -182,6 +218,6 @@ Generado por `e2e/demo_partida.py` el 2026-10-29T11:02:06-06:00 en 17 s, con un 
 ## Comportamientos inesperados
 
 - (esperado) Error de consola (rojo, paso 1): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es una acción rechazada a propósito (enviar antes de iniciar o tras finalizar, resolver un incidente con la amenaza activa)
-- (esperado) Error de consola (azul, paso 10): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es una acción rechazada a propósito (enviar antes de iniciar o tras finalizar, resolver un incidente con la amenaza activa)
-- (esperado) Error de consola (rojo, paso 12): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es una acción rechazada a propósito (enviar antes de iniciar o tras finalizar, resolver un incidente con la amenaza activa)
+- (esperado) Error de consola (azul, paso 11): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es una acción rechazada a propósito (enviar antes de iniciar o tras finalizar, resolver un incidente con la amenaza activa)
+- (esperado) Error de consola (rojo, paso 14): `Failed to load resource: the server responded with a status of 409 (Conflict)` — es una acción rechazada a propósito (enviar antes de iniciar o tras finalizar, resolver un incidente con la amenaza activa)
 - Ninguno: todas las comprobaciones pasaron y no hubo errores de consola inesperados.

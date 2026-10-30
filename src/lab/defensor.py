@@ -56,7 +56,8 @@ def _normalizar(obj):
 
 
 def analizar(host, modelo, solicitud_atacante, identidad, catalogo, riesgo_sesion=None, resumen_sesion=None):
-    """-> {ok, error, decision, riesgo, motivo, herramienta, parametros, politica, parse_ok, tiempo_ms, tokens, modelo}"""
+    """-> {ok, error, decision, riesgo, motivo, herramienta, parametros, politica, parse_ok, tiempo_ms, tokens,
+    tokens_entrada, carga_ms, modelo}"""
     # num_predict 300: con ataques largos y reales, 150 no alcanzaba para cerrar el JSON.
     # El riesgo acumulado de la sesión es solo CONTEXTO para la IA; las capas siguen siendo la autoridad final.
     contexto = (f"Nivel de sospecha acumulado de esta sesión: {int(riesgo_sesion)}/100 por patrones repetidos "
@@ -69,6 +70,7 @@ def analizar(host, modelo, solicitud_atacante, identidad, catalogo, riesgo_sesio
                                     contexto + "Solicitud del usuario (no confiable):\n" + str(solicitud_atacante),
                                     REQUERIDOS, "defensor", temperature=0.2, num_predict=300)
     base = {"ok": r["ok"], "error": r["error"], "tiempo_ms": r["tiempo_ms"], "tokens": r["tokens"],
+            "tokens_entrada": r.get("tokens_entrada"), "carga_ms": r.get("carga_ms"),
             "modelo": modelo, "decision": None, "riesgo": None, "motivo": None, "intentos": r["intentos"],
             "herramienta": None, "parametros": None, "politica": None, "parse_ok": False}
     if not r["ok"]:

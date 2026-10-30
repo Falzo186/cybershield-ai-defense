@@ -8,7 +8,7 @@ RECHAZOS = ("RECHAZAR", "AISLAR", "SOLICITAR_AUTORIZACION", "MARCAR_COMO_RIESGO"
 
 
 def _meta(x):
-    return {k: x.get(k) for k in ("tiempo_ms", "tokens", "modelo", "intentos")}
+    return {k: x.get(k) for k in ("tiempo_ms", "tokens", "tokens_entrada", "carga_ms", "modelo", "intentos")}
 
 
 def _tiene_derecho(identidad, herramienta, repo):
@@ -87,6 +87,7 @@ def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_s
             out["defensa"] = {"decision": "RECHAZAR", "riesgo": 90, "motivo": f["motivo"],
                               "politica": "FILTRO-RAPIDO:" + f["categoria_detectada"], "herramienta": None,
                               "parametros": None, "parse_ok": True, "tiempo_ms": 0, "tokens": None,
+                              "tokens_entrada": None, "carga_ms": None,
                               "modelo": None, "intentos": 0, "origen_decision": "filtro_rapido"}
             out.update(veredicto="DEFENSA_EXITOSA", origen_decision="filtro_rapido")
             return out
