@@ -165,7 +165,8 @@ PDFs fijos de solo texto en `data/pdf/` (catálogo `src/lab/documentos.py`; nunc
 `{"timestamp":"2026-10-23T10:02:05-06:00","partida":"20261023-100100-ab12","equipo":"azul","usuario":"ana.perez","rol":"empleado","tipo":"clic_enlace","accion":"CLIC_ENLACE","recurso":"correo:3","resultado":"CLIC","riesgo":"ALTO","origen":"cybershield-lab"}`
 - `tipo`: `clic_enlace`, `clic_bloqueado`, `enlace_contenido`, `correo_reportado`, `pdf_abierto`, `pdf_reportado`, `mision_completada` (equipo `azul`) y `autorizacion_denegada` (todo `DENEGADO` de consultas/herramientas; equipo `null`).
 - `riesgo` es el `nivel_riesgo` de la fila de auditoría (BAJO/MEDIO/ALTO/CRITICO). Una BD en memoria (tests) no escribe el archivo. Un fallo al escribirlo no afecta a la auditoría.
-- Para Wazuh bastará un `<localfile>` con `log_format json` apuntando a este archivo; no hay nada conectado.
+- Para Wazuh bastará un `<localfile>` con `log_format json` apuntando a este archivo; no hay nada conectado. El adaptador documentado (localfile, reglas 100100-100140 y comprobación sin conexión) está en `integraciones/wazuh/` (Fase H).
+- Contrato verificado por `e2e/test_reinicio.py`: cada línea tiene exactamente los 11 campos (`timestamp, partida, equipo, usuario, rol, tipo, accion, recurso, resultado, riesgo, origen`), los tipos son los de `EVENTOS_SIEM` más `autorizacion_denegada`, y el archivo solo crece (nunca se reescribe al reiniciar).
 
 ### Puntaje de Rojo (añadido)
 `sesion.PUNTOS_ROJO`: +10 por cada correo de la partida con enlace clicado y NO contenido; +5 por cada correo con PDF abierto y NO reportado (una vez por correo, aunque haya varios clics/aperturas). Se calcula del estado actual (`Repositorio.logros_rojo`), así que contener/reportar le quita esos puntos; al finalizar se congela. `marcador_partida` añade `puntos_rojo`, `rojo_enlaces_sin_contener` y `rojo_pdfs_sin_reportar`.

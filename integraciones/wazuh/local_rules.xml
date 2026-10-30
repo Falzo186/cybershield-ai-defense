@@ -1,0 +1,135 @@
+<!--
+  Reglas de Wazuh para los eventos del laboratorio CyberShield (data/eventos.jsonl).
+  Adaptador DOCUMENTADO y comprobado sin conexión (integraciones/wazuh/test_reglas.py); NO probado contra un Wazuh real.
+
+  Uso: copiar este bloque en /var/ossec/etc/rules/local_rules.xml del manager y reiniciar (ver README.md).
+  Los eventos llegan con log_format json, así que el decodificador JSON de Wazuh ya separa los campos
+  (timestamp, partida, equipo, usuario, rol, tipo, accion, recurso, resultado, riesgo, origen).
+  Rango de ids: 100100-100199 (reservado para reglas locales).
+  Niveles: 3 informativo · 4-5 acción defensiva o intento frenado · 6-8 exposición · 10-12 compromiso.
+-->
+<group name="cybershield,laboratorio,">
+
+  <!-- Base: cualquier evento del laboratorio. El resto cuelga de esta. -->
+  <rule id="100100" level="3">
+    <decoded_as>json</decoded_as>
+    <field name="origen">^cybershield-lab$</field>
+    <description>CyberShield: evento del laboratorio ($(tipo))</description>
+  </rule>
+
+  <!-- Phishing: lo que hace el empleado (Azul) con los correos de Rojo -->
+  <rule id="100110" level="3">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^correo_recibido$|^correo_abierto$|^correo_archivado$|^respuesta_enviada$</field>
+    <description>CyberShield: actividad de correo ($(tipo), $(recurso))</description>
+    <group>correo,</group>
+  </rule>
+  <rule id="100111" level="8">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^clic_enlace$</field>
+    <description>CyberShield: un empleado pulsó un enlace de phishing ($(usuario), $(recurso))</description>
+    <mitre><id>T1566.002</id></mitre>
+    <group>phishing,</group>
+  </rule>
+  <rule id="100112" level="5">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^clic_bloqueado$</field>
+    <description>CyberShield: clic en un enlace ya contenido, bloqueado ($(recurso))</description>
+    <group>phishing,</group>
+  </rule>
+  <rule id="100113" level="6">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^pdf_abierto$</field>
+    <description>CyberShield: se abrió un adjunto de una fuente no verificada ($(usuario), $(recurso))</description>
+    <mitre><id>T1566.001</id></mitre>
+    <group>phishing,</group>
+  </rule>
+  <rule id="100114" level="12">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^credencial_comprometida$</field>
+    <description>CyberShield: credencial COMPROMETIDA en una página falsa ($(usuario), $(recurso))</description>
+    <mitre><id>T1566.002</id><id>T1078</id></mitre>
+    <group>phishing,credenciales,</group>
+  </rule>
+
+  <!-- Respuesta del Equipo Azul -->
+  <rule id="100120" level="4">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^correo_reportado$|^enlace_contenido$|^pdf_reportado$|^archivo_aislado$|^credencial_revocada$</field>
+    <description>CyberShield: acción defensiva de Azul ($(tipo), $(recurso))</description>
+    <group>respuesta,</group>
+  </rule>
+  <rule id="100121" level="3">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^remitente_verificado$|^enlace_inspeccionado$|^mision_completada$|^mision_asumida$|^defensor_ia_configurado$</field>
+    <description>CyberShield: verificación o tarea de Azul ($(tipo), $(resultado))</description>
+    <group>respuesta,</group>
+  </rule>
+  <rule id="100122" level="7">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^incidente_abierto$</field>
+    <description>CyberShield: incidente de seguridad abierto ($(recurso))</description>
+    <group>incidente,</group>
+  </rule>
+  <rule id="100123" level="3">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^incidente_actualizado$|^incidente_resuelto$</field>
+    <description>CyberShield: incidente $(tipo) ($(recurso))</description>
+    <group>incidente,</group>
+  </rule>
+
+  <!-- Batalla IA y accesos a la base de datos -->
+  <rule id="100130" level="5">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^ataque_ia_lanzado$</field>
+    <description>CyberShield: la IA de Rojo lanzó un ataque ($(recurso), $(resultado))</description>
+    <group>batalla_ia,</group>
+  </rule>
+  <rule id="100131" level="3">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^ataque_ia_resultado$</field>
+    <description>CyberShield: resultado de un ataque IA ($(recurso): $(resultado))</description>
+    <group>batalla_ia,</group>
+  </rule>
+  <rule id="100132" level="12">
+    <if_sid>100131</if_sid>
+    <field name="resultado">^DATOS_EXPUESTOS$</field>
+    <description>CyberShield: la IA de Rojo obtuvo datos no públicos ($(recurso), cuenta $(usuario))</description>
+    <mitre><id>T1078</id><id>T1213</id></mitre>
+    <group>batalla_ia,exfiltracion,</group>
+  </rule>
+  <rule id="100133" level="8">
+    <if_sid>100131</if_sid>
+    <field name="resultado">^IA_ENGANADA$</field>
+    <description>CyberShield: el defensor IA fue engañado; una capa determinista lo frenó ($(recurso))</description>
+    <group>batalla_ia,</group>
+  </rule>
+  <rule id="100134" level="7">
+    <if_sid>100131</if_sid>
+    <field name="resultado">^FALLO_SEGURO$</field>
+    <description>CyberShield: el defensor IA no respondió; solicitud denegada por fallo seguro ($(recurso))</description>
+    <group>batalla_ia,disponibilidad,</group>
+  </rule>
+  <rule id="100135" level="6">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^autorizacion_denegada$</field>
+    <description>CyberShield: acceso a datos denegado por las capas ($(usuario) con rol $(rol), $(recurso))</description>
+    <group>acceso,</group>
+  </rule>
+  <!-- Correlación: 3 denegaciones de la misma partida en 2 minutos = un atacante insistiendo -->
+  <rule id="100136" level="10" frequency="3" timeframe="120">
+    <if_matched_sid>100135</if_matched_sid>
+    <same_field>partida</same_field>
+    <description>CyberShield: denegaciones repetidas en la partida $(partida): posible ataque insistente</description>
+    <group>acceso,correlacion,</group>
+  </rule>
+
+  <!-- Partida y práctica -->
+  <rule id="100140" level="3">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^partida_finalizada$|^ronda_practica$</field>
+    <description>CyberShield: $(tipo) ($(resultado))</description>
+    <group>partida,</group>
+  </rule>
+
+</group>

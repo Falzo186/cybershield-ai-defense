@@ -349,9 +349,9 @@ pantalla de resultado. Desde ese momento las acciones de Rojo y Azul se rechazan
 
 ### Eventos preparados para Wazuh
 
-Cada evento relevante (clic, clic bloqueado, contención, reporte, PDF abierto/reportado, misión completada,
-autorización denegada y fin de partida) se escribe, desde el mismo punto que la auditoría, como **una línea JSON**
-en `data/eventos.jsonl`:
+Cada evento relevante (26 tipos: phishing, respuesta de Azul, credenciales, incidentes, misiones, batalla IA,
+accesos denegados, práctica y fin de partida) se escribe, desde el mismo punto que la auditoría, como **una línea
+JSON** en `data/eventos.jsonl`:
 
 ```json
 {"timestamp": "2026-10-23T10:16:12-06:00", "partida": "20261023-101553-6312", "equipo": "azul",
@@ -359,8 +359,15 @@ en `data/eventos.jsonl`:
  "recurso": "correo:5", "resultado": "ABIERTO", "riesgo": "BAJO", "origen": "cybershield-lab"}
 ```
 
-En las batallas IA vs IA, las denegaciones quedan con `equipo: "rojo"`. **Wazuh no está integrado**: el archivo
-está listo para leerse con un `<localfile>` y `log_format json` cuando se conecte.
+En las batallas IA vs IA, las denegaciones quedan con `equipo: "rojo"`. **Wazuh no está integrado.** El
+adaptador está en [`integraciones/wazuh/`](integraciones/wazuh/README.md):
+- el `<localfile>` con `log_format json`;
+- 18 reglas propias (por ejemplo, nivel 12 para una credencial comprometida o datos expuestos por la IA, con
+  técnicas MITRE);
+- una muestra real de eventos;
+- una comprobación sin conexión de que cada tipo de evento tiene su regla y su nivel.
+
+No se ha probado contra un Wazuh real.
 
 ### Cómo jugar una partida
 
@@ -370,7 +377,8 @@ está listo para leerse con un `<localfile>` y `log_format json` cuando se conec
    PDF; pestaña *Misiones* para ver el progreso.
 4. **General:** sigue el marcador y pulsa *🏁 Finalizar partida* para declarar el resultado.
 
-Pruebas: `python -m src.lab.test_correos`, `test_reglas`, `test_misiones`, `test_documentos`, `test_eventos`,
+**Todas las pruebas en un comando:** `python ejecutar_pruebas.py` (22 suites; `--rapido` omite la del navegador).
+Ninguna necesita Ollama real ni toca `data/lab.db`. Por separado: `python -m src.lab.test_correos`, `test_reglas`, `test_misiones`, `test_documentos`, `test_eventos`,
 `test_puntaje`, `test_cliente`, `test_incidentes`, `test_ataque_ia`, `test_informe`, `test_apps` (con
 `python -m src.lab.<nombre>`), `python server/test_app.py` (servidor completo, BD en memoria),
 `python server/test_resultados.py` (cronología, resultados y persistencia), `python server/test_apps.py`
@@ -386,10 +394,15 @@ Guion para la exposición: [`docs/GUION_DEMO.md`](docs/GUION_DEMO.md).
 
 ```
 ejecutar            arranque en un comando
-server/             app.py (servidor real) · mock_server.py (simulación)
+ejecutar_pruebas.py todas las pruebas (unitarias, servidor, integración con reinicio, Wazuh y navegador)
+server/             app.py (servidor real) · mock_server.py (simulación) · partida.py (sesiones y partida)
+e2e/                demo_partida.py (4 navegadores) · test_reinicio.py · ollama_falso.py (solo pruebas)
+integraciones/wazuh/  adaptador documentado para Wazuh (no conectado)
 ui/                 interfaz web (HTML + CSS + JS, sin frameworks)
 src/lab/            motor real: cliente Ollama, atacante, defensor, capas, SQLite
-                    + Red vs Blue: correos.py (plantillas), documentos.py (PDFs), sesion.py (reglas)
+                    + Red vs Blue: correos.py (plantillas), documentos.py (PDFs), sesion.py (reglas),
+                      ataque_ia.py (batalla de la partida), informe.py (cronología y resultados),
+                      apps.py (aplicaciones por permiso)
 data/pdf/           PDFs benignos de entrenamiento (catálogo fijo)
 data/eventos.jsonl  eventos para un SIEM (se genera al jugar; no se versiona)
 src/                prototipo CLI original (Fase 0)
