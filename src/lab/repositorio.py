@@ -39,7 +39,13 @@ EVENTOS_SIEM = {
     # Fase F: ataques IA dentro de la partida
     "ATAQUE_IA_LANZADO": ("ataque_ia_lanzado", "rojo"), "ATAQUE_IA_RESULTADO": ("ataque_ia_resultado", "rojo"),
     "DEFENSOR_IA_CONFIGURADO": ("defensor_ia_configurado", "azul"),
+    # Fase G: rondas de práctica (batalla «mejor de N» y prueba manual real), antes solo viajaban por SSE
+    "RONDA_PRACTICA": ("ronda_practica", None),
 }
+COLUMNAS_PRACTICA = ("partida", "fase_partida", "modo", "ronda", "usuario", "rol", "categoria", "prompt", "decision_ia",
+                     "decision", "veredicto", "capa_bloqueo", "origen_decision", "nivel_fuga", "error", "modelo_atq",
+                     "modelo_def", "atq_ms", "atq_tokens_entrada", "atq_tokens_salida", "atq_carga_ms", "def_ms",
+                     "def_tokens_entrada", "def_tokens_salida", "def_carga_ms")
 # Columnas de ataques_ia que se rellenan al terminar un ataque (constantes del código, nunca del cliente).
 COLUMNAS_CIERRE_IA = ("estado", "resultado", "veredicto", "decision_ia", "origen_decision", "capa_bloqueo",
                       "herramienta", "objetivo", "sensibilidad_objetivo", "sensibilidad_expuesta", "categoria",
@@ -542,6 +548,48 @@ class Repositorio:
             "FROM ataques_ia WHERE partida=?", (partida,)).fetchone()
         return {"rojo": f["rojo"], "azul": f["azul"], "lanzados": f["lanzados"], "datos_expuestos": f["expuestos"],
                 "contenidos": f["cont"]}
+
+    # ---------- persistencia de rondas, cronología y resultados (Fase G) ----------
+    def guardar_ronda_practica(self, **campos):
+        """Una ronda de práctica (batalla «mejor de N» o prueba manual real), también las de ERROR. -> id"""
+        malas = set(campos) - set(COLUMNAS_PRACTICA)
+        if malas:
+            raise ValueError(f"columnas no permitidas: {sorted(malas)}")
+        cols = list(campos)
+        with self.conn:
+            cur = self.conn.execute(f"INSERT INTO rondas_practica({', '.join(cols)}, ts) VALUES({', '.join('?' * len(cols))}, ?)",
+                                    (*[campos[c] for c in cols], _ahora()))
+        ident = self.identidad(campos["usuario"]) if campos.get("usuario") else None
+        self.registrar(ident, "RONDA_PRACTICA", f"{campos['modo']}:{campos['ronda']}", campos["veredicto"],
+                       "ALTO" if campos["veredicto"] == "FALLA_DEFENSA" else "BAJO")
+        return cur.lastrowid
+
+    def rondas_practica(self, partida=None, limite=200):
+        sql, args = "SELECT * FROM rondas_practica", ()
+        if partida is not None:
+            sql, args = sql + " WHERE partida=?", (partida,)
+        return [dict(f) for f in self.conn.execute(sql + " ORDER BY id DESC LIMIT ?", (*args, limite))]
+
+    def auditoria_partida(self, partida, limite=2000):
+        """Filas de auditoría de UNA partida, en orden cronológico (base de la cronología)."""
+        return [dict(f) for f in self.conn.execute(
+            "SELECT * FROM auditoria WHERE partida=? ORDER BY id LIMIT ?", (partida, limite))]
+
+    def guardar_resultado(self, partida, ts, motivo, ganador, puntos_rojo, puntos_azul, inicio, duracion_s, informe):
+        """Resultado congelado de una partida (sobrevive a reiniciar el servidor). Una sola vez por partida."""
+        with self.conn:
+            self.conn.execute("INSERT OR IGNORE INTO resultados_partida VALUES(?,?,?,?,?,?,?,?,?)",
+                              (partida, ts, motivo, ganador, puntos_rojo, puntos_azul, inicio, duracion_s,
+                               json.dumps(informe, ensure_ascii=False)))
+
+    def resultado_guardado(self, partida):
+        f = self.conn.execute("SELECT * FROM resultados_partida WHERE partida=?", (partida,)).fetchone()
+        return {**dict(f), "informe": json.loads(f["informe"])} if f else None
+
+    def partidas_finalizadas(self, limite=50):
+        return [dict(f) for f in self.conn.execute(
+            "SELECT partida, ts, motivo, ganador, puntos_rojo, puntos_azul, inicio, duracion_s FROM resultados_partida "
+            "ORDER BY ts DESC LIMIT ?", (limite,))]
 
     # ---------- incidentes de la partida (Fase E) ----------
     def abrir_incidente(self, partida, usuario, participante, titulo, severidad, correo_id=None):

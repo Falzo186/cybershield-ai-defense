@@ -277,6 +277,27 @@ como invitado, ambos **contenidos** (el defensor pidió autorización). Atacante
 modelo incluyó unos 7 s de carga (7 230 y 7 688 ms); la segunda, 14 y 33 ms. Son dos ataques: no es una tasa de
 defensa.
 
+### Resultados y cronología (Fase G)
+
+- Ventana **📊 Resultados**, que se abre desde su icono o desde *Ver desglose* en la pantalla final. Tiene dos
+  pestañas:
+  - **Resultados:** el desglose de los puntos de cada equipo, línea a línea, con la **fórmula** de cada línea (p. ej.
+    «10 × enlaces clicados que Azul no contuvo», «15 ÷ 2 (fuera de plazo)»), quién completó cada misión y con qué
+    evidencia. Incluye también el riesgo final con las reglas aplicadas y la estadística real de la batalla IA
+    (tiempos, tokens y carga de los modelos). Usa las mismas constantes que el marcador: la suma del desglose **es** el
+    marcador, y una prueba lo comprueba.
+  - **Cronología:** todo lo que pasó en la partida, minuto a minuto (lo de la preparación sale en negativo). Se filtra
+    por categoría, equipo, nivel de riesgo y texto.
+- **Quién ve qué:** durante la partida, Rojo solo ve en la cronología lo que mediría una campaña real (sus envíos,
+  clics, adjuntos abiertos, credenciales obtenidas y sus ataques), y el desglose lo ven el árbitro y los espectadores.
+  Al finalizar, todos lo ven todo. La vista de espectador es abierta en la LAN, así que esto ordena lo que muestra
+  cada vista, pero **no es un control de seguridad**.
+- **Persistencia:** el resultado final (desglose y marcador congelados) se guarda en `resultados_partida` y se puede
+  consultar desde el selector de partida aunque se haya empezado otra o se reinicie el servidor. Las rondas de
+  **práctica** (batalla «mejor de N» y prueba manual real) se guardan en `rondas_practica` con sus métricas de
+  inferencia, y en la auditoría y `eventos.jsonl` (`ronda_practica`); antes solo viajaban por SSE.
+- *Exportar informe (JSON)* descarga los resultados y la cronología tal como los devuelve el servidor.
+
 ### Reglas deterministas y puntaje
 
 | Evento | Riesgo de la partida | Efecto |
@@ -321,8 +342,9 @@ está listo para leerse con un `<localfile>` y `log_format json` cuando se conec
 4. **General:** sigue el marcador y pulsa *🏁 Finalizar partida* para declarar el resultado.
 
 Pruebas: `python -m src.lab.test_correos`, `test_reglas`, `test_misiones`, `test_documentos`, `test_eventos`,
-`test_puntaje`, `test_cliente`, `test_incidentes`, `test_ataque_ia` (con `python -m src.lab.<nombre>`),
-`python server/test_app.py` (servidor completo, BD en memoria) y `python server/test_batalla_partida.py` (batalla de la
+`test_puntaje`, `test_cliente`, `test_incidentes`, `test_ataque_ia`, `test_informe` (con `python -m src.lab.<nombre>`),
+`python server/test_app.py` (servidor completo, BD en memoria), `python server/test_resultados.py` (cronología,
+resultados y persistencia) y `python server/test_batalla_partida.py` (batalla de la
 partida contra un **Ollama falso**, `e2e/ollama_falso.py`, con respuestas fijas: prueba el camino, no la calidad de un modelo). La partida completa en navegadores reales: `python e2e/demo_partida.py` (requiere
 `pip install playwright` y `playwright install chromium`; escribe las capturas en `docs/capturas_demo/`).
 Guion para la exposición: [`docs/GUION_DEMO.md`](docs/GUION_DEMO.md).

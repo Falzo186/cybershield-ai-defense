@@ -209,6 +209,8 @@ def main(ver=False):
             chk("marcador inicial en General", {"riesgo": 0, "rojo": 0, "azul": 0}, {k: valores(general)[k] for k in ("riesgo", "rojo", "azul")})
             chk("durante la partida la práctica queda en pausa (botón desactivado y explicado)", (True, True),
                 (rojo.locator("#btn-main").is_disabled(), "pausa" in (rojo.get_attribute("#main-wrap", "title") or "")))
+            chk("el marcador de la práctica («BATALLA IA vs IA») se oculta durante la partida", True,
+                rojo.locator("#marcador").is_hidden())
             captura(general, "general_inicio")
             captura(rojo, "rojo_inicio")
             captura(azul, "azul_inicio")
@@ -499,10 +501,47 @@ def main(ver=False):
             ok = esperar(lambda: espectador.locator("#final-modal").is_visible())
             chk("el Espectador también ve el resultado", True, bool(ok))
             captura(espectador, "espectador_resultado")
+            provocados.add((len(pasos), "rojo"))  # enviar tras finalizar: el servidor debe rechazarlo (409)
             rojo.click("#btn-correo")
             t = esperar(lambda: "finalizó" in toast(rojo) and toast(rojo)) or toast(rojo)
             chk("tras finalizar, Rojo ya no puede enviar (409)", True, "finalizó" in t)
             captura(rojo, "rojo_tras_finalizar")
+
+            # ---------------------------------------------------------------------------------------------
+            paso("6. Resultados con fórmulas y cronología filtrable (guardados en el servidor)")
+            general.click("#final-desglose")
+            ok = esperar(lambda: general.locator(".inf-equipo.rojo .inf-total").count() == 1)
+            chk("desde la pantalla final, General abre el desglose", True, bool(ok))
+            leer = lambda: (general.inner_text(".inf-equipo.rojo .inf-total"), general.inner_text(".inf-equipo.azul .inf-total"))  # noqa: E731
+            totales = esperar(lambda: leer() == ("10 pts", "90 pts") and leer()) or leer()
+            if totales != ("10 pts", "90 pts"):  # diagnóstico: qué devuelve el servidor en ese momento
+                nota("API /api/resultados: " + str(general.evaluate(
+                    "fetch('/api/resultados').then(r => r.json()).then(d => [d.guardado, d.rojo.total, d.azul.total, d.partida])")))
+            chk("los totales del desglose coinciden con el resultado final", ("10 pts", "90 pts"), totales)
+            texto = general.inner_text("#inf-equipos")
+            chk("cada línea muestra su fórmula (fuga IA, misiones, ataques contenidos)", True,
+                "10 × ataques que sacaron datos INTERNA" in texto and "5 × ataques rechazados" in texto
+                and "Misión: Reportar un correo sospechoso" in texto)
+            chk("el resultado consta como guardado en el servidor", True, "guardado" in general.inner_text("#inf-aviso"))
+            nota("Batalla IA en el desglose: " + general.inner_text("#inf-extra").replace(chr(10), " · ")[:300])
+            general.wait_for_timeout(400)  # fin de la animación de apertura de la ventana
+            captura(general, "general_desglose")
+            general.click('[data-inf="cronologia"]')
+            ok = esperar(lambda: general.locator("#inf-lista .inf-ev").count() > 10)
+            total = general.locator("#inf-lista .inf-ev").count()
+            chk("la cronología lista la partida completa", True, bool(ok))
+            chk("las pestañas de Resultados no tocan las de la práctica (el botón conserva su texto)",
+                "INICIAR SIMULACIÓN", general.inner_text("#btn-main"))
+            general.locator("#inf-cats label", has_text="Batalla IA").click()
+            ok = esperar(lambda: 0 < general.locator("#inf-lista .inf-ev").count() < total
+                         and all("BATALLA IA" in x.upper() for x in general.locator("#inf-lista .cat").all_inner_texts()))
+            chk("filtrar por «Batalla IA» deja solo los ataques", True, bool(ok))
+            nota("Cronología filtrada: " + " | ".join(general.locator("#inf-lista .inf-ev").all_inner_texts()[:4]).replace(chr(10), " "))
+            captura(general, "general_cronologia_filtrada")
+            rojo.click('[data-icono="resultados"]')
+            ok = esperar(lambda: rojo.locator(".inf-equipo.azul .inf-total").count() == 1)
+            chk("tras finalizar, Rojo también ve el desglose", True, bool(ok))
+            captura(rojo, "rojo_desglose")
             inesperados = [f"{r}: {e}" for n, r, e in errores_js if not esperado(n, r, e)]
             chk("sin errores de consola inesperados en ninguna vista", [], inesperados)
 

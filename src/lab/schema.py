@@ -67,6 +67,16 @@ CREATE TABLE IF NOT EXISTS ataques_ia(
     atq_ms INTEGER, atq_tokens_entrada INTEGER, atq_tokens_salida INTEGER, atq_carga_ms INTEGER,
     def_ms INTEGER, def_tokens_entrada INTEGER, def_tokens_salida INTEGER, def_carga_ms INTEGER,
     ts_inicio TEXT NOT NULL, ts_fin TEXT, UNIQUE(partida, n));
+CREATE TABLE IF NOT EXISTS rondas_practica(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, partida TEXT, fase_partida TEXT, modo TEXT NOT NULL CHECK(modo IN ('batalla','manual')),
+    ronda INTEGER NOT NULL, usuario TEXT, rol TEXT, categoria TEXT, prompt TEXT, decision_ia TEXT, decision TEXT,
+    veredicto TEXT NOT NULL, capa_bloqueo TEXT, origen_decision TEXT, nivel_fuga TEXT, error TEXT,
+    modelo_atq TEXT, modelo_def TEXT,
+    atq_ms INTEGER, atq_tokens_entrada INTEGER, atq_tokens_salida INTEGER, atq_carga_ms INTEGER,
+    def_ms INTEGER, def_tokens_entrada INTEGER, def_tokens_salida INTEGER, def_carga_ms INTEGER, ts TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS resultados_partida(
+    partida TEXT PRIMARY KEY, ts TEXT NOT NULL, motivo TEXT NOT NULL, ganador TEXT NOT NULL CHECK(ganador IN ('rojo','azul','empate')),
+    puntos_rojo INTEGER NOT NULL, puntos_azul INTEGER NOT NULL, inicio TEXT, duracion_s INTEGER, informe TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS contenciones(
     correo_id INTEGER PRIMARY KEY REFERENCES correos(id), usuario TEXT NOT NULL REFERENCES usuarios(usuario),
     ts TEXT NOT NULL);

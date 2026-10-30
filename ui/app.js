@@ -125,6 +125,7 @@
     const sinOllama = usaOllama() && !ollamaListo();
     R.setCorriendo(estado.corriendo, sinOllama || enPartida,
       enPartida ? "Práctica en pausa durante la partida: usa «Batalla de la partida»" : "Inicie Ollama");
+    $("marcador").hidden = enPartida; // el marcador «BATALLA IA vs IA» es de la práctica: en la partida confundía
   }
 
   function setCorriendo(c) {
@@ -474,6 +475,7 @@
     partida_estado(d) { aplicarPartida(d); },
     // Marcador de la partida Rojo/Azul: solo lo muestran el árbitro (general) y los espectadores.
     marcador_partida(d) {
+      refrescarInforme();
       if (estado.rol !== "general" && estado.rol !== "espectador") return;
       R.setMarcadorPartida(d);
       $("btn-finalizar").disabled = !!d.final; // ya no hay nada que cerrar
@@ -816,7 +818,7 @@
     const cambioFase = !estado.partida || estado.partida.fase !== p.fase;
     estado.partida = p;
     R.setPartida(p);
-    if (cambioFase) aplicarControles();
+    if (cambioFase) { aplicarControles(); refrescarInforme(); }
     if (estado.batalla && estado.batalla.fase_partida !== p.fase && !nueva) pintarBatalla({ ...estado.batalla, fase_partida: p.fase });
     if (nueva) {
       estado.finalMostrado = false;
@@ -846,6 +848,55 @@
       await API.configurarDefensorIA(modelo, hostDe("def"));
       R.toast("🛡 Defensor IA activo y verificado: " + modelo);
     } catch (e) { R.toast(e.message); }
+  }
+
+  // ---------- resultados y cronología (Fase G) ----------
+  const informe = { tab: "resultados", partida: null, temporizador: null, carga: 0 };
+  const informeVisible = () => !!$("inf-equipos").offsetParent || !!$("inf-lista").offsetParent;
+
+  // Varias cargas pueden solaparse (icono, visibilidad, SSE): solo se pinta la respuesta de la ÚLTIMA.
+  async function cargarInforme() {
+    const n = ++informe.carga;
+    const vigente = () => n === informe.carga;
+    try {
+      const p = await API.partidas();
+      if (!vigente()) return;
+      if (!informe.partida || ![p.actual.id, ...p.finalizadas.map((x) => x.partida)].includes(informe.partida)) informe.partida = p.actual.id;
+      R.setPartidasInforme(p, informe.partida);
+    } catch (e) { R.toast(e.message); return; }
+    if (informe.tab === "resultados") {
+      try {
+        const d = await API.resultados(informe.partida);
+        if (vigente()) R.setResultados(d);
+      } catch (e) { if (vigente()) R.setResultados({ bloqueado: e.message }); }
+    } else {
+      try {
+        const d = await API.cronologia({ partida: informe.partida, ...R.filtrosCronologia() });
+        if (!vigente()) return;
+        R.initFiltrosCronologia(d.categorias, cargarInforme);
+        R.setCronologia(d);
+      } catch (e) { R.toast(e.message); }
+    }
+  }
+  // Con la ventana a la vista, se refresca (agrupado) cuando cambia algo en la partida.
+  function refrescarInforme() {
+    if (!informeVisible()) return;
+    clearTimeout(informe.temporizador);
+    informe.temporizador = setTimeout(cargarInforme, 800);
+  }
+  async function exportarInformeServidor() {
+    try {
+      const [res, cro] = await Promise.all([API.resultados(informe.partida).catch((e) => ({ bloqueado: e.message })),
+        API.cronologia({ partida: informe.partida })]);
+      descargarJSON("informe_" + (informe.partida || "partida") + "_", { exportado: new Date().toISOString(), resultados: res, cronologia: cro });
+    } catch (e) { R.toast(e.message); }
+  }
+  function abrirInforme(tab) {
+    informe.tab = tab || "resultados";
+    R.setTabInforme(informe.tab);
+    const icono = document.querySelector('[data-icono="resultados"]');
+    if (icono) icono.click(); else $("t-inf").scrollIntoView();
+    cargarInforme();
   }
 
   function elegirEquipo(rol) {
@@ -914,6 +965,23 @@
     $("correo-form").addEventListener("submit", (ev) => { ev.preventDefault(); enviarCorreo(); });
     $("bp-rojo").addEventListener("submit", (ev) => { ev.preventDefault(); lanzarAtaqueIA(); });
     $("bp-defender").addEventListener("click", usarDefensorIA);
+    document.querySelectorAll("[data-inf]").forEach((t) => t.addEventListener("click", () => {
+      informe.tab = t.dataset.inf;
+      R.setTabInforme(informe.tab);
+      cargarInforme();
+    }));
+    $("inf-sel-partida").addEventListener("change", (ev) => { informe.partida = ev.target.value; cargarInforme(); });
+    $("inf-actualizar").addEventListener("click", cargarInforme);
+    $("inf-exportar").addEventListener("click", exportarInformeServidor);
+    ["inf-equipo", "inf-nivel"].forEach((id) => $(id).addEventListener("change", cargarInforme));
+    $("inf-q").addEventListener("input", () => { clearTimeout(informe.temporizador); informe.temporizador = setTimeout(cargarInforme, 400); });
+    $("inf-filtros").addEventListener("submit", (ev) => { ev.preventDefault(); cargarInforme(); });
+    $("final-desglose").addEventListener("click", () => { R.cerrarResultado(); abrirInforme("resultados"); });
+    // Se carga al hacerse visible (abrir la ventana desde su icono, restaurarla o, en la vista clásica, al llegar a ella).
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) cargarInforme(); })
+        .observe(document.querySelector("section.panel.informe"));
+    }
     // Esc cierra el buzón solo cuando es un modal; como ventana del escritorio se cierra con su ✕.
     document.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape" && R.buzonEsModal() && R.buzonAbierto()) R.mostrarBuzon(false);
@@ -931,7 +999,7 @@
     R.setOllamaComprobando("def");
     actualizarOrigen();
 
-    document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => cambiarModo(t.dataset.modo)));
+    document.querySelectorAll(".tab[data-modo]").forEach((t) => t.addEventListener("click", () => cambiarModo(t.dataset.modo)));
     document.querySelectorAll("[data-refrescar]").forEach((b) => b.addEventListener("click", refrescarModelos));
     $("btn-main").addEventListener("click", iniciar);
     $("btn-stop").addEventListener("click", detener);

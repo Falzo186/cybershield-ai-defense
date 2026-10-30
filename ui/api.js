@@ -111,6 +111,12 @@ const API = (() => {
     lanzarAtaqueIA: (modelo, host, tecnica, intensidad) => req("POST", "/api/ia/ataque",
       { modelo, host, tecnica: tecnica || null, intensidad }),
     configurarDefensorIA: (modelo, host) => req("POST", "/api/ia/defensor", { modelo, host }),
+    // Fase G: resultados con fórmulas, cronología filtrable e historial de partidas (lectura)
+    partidas: () => req("GET", "/api/partidas"),
+    resultados: (partida) => req("GET", "/api/resultados" + (partida ? "?partida=" + encodeURIComponent(partida) : "")),
+    cronologia: (f) => req("GET", "/api/cronologia?" + new URLSearchParams(Object.entries(f || {})
+      .filter(([, v]) => v !== "" && v != null && !(Array.isArray(v) && !v.length))
+      .map(([k, v]) => [k, Array.isArray(v) ? v.join(",") : v])).toString()),
     // tipo "pdf_abierto" | "pdf_reportado" sobre el PDF adjunto del correo id -> {documento, regla, descarga|null}
     eventoPdf: (tipo, correoId) => req("POST", "/api/evento", { tipo, recurso: "correo:" + correoId }),
     completarMision: (id) => req("POST", "/api/misiones/" + encodeURIComponent(id) + "/completar", {}),
