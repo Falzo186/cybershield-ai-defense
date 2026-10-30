@@ -708,3 +708,30 @@ body.escritorio .informe { max-height: none; }
 .inf-ev .cat { font-size: 11px; letter-spacing: .04em; color: var(--texto-sec); text-transform: uppercase; }
 .inf-ev .niv-ALTO, .inf-ev .niv-CRITICO { color: var(--bad); font-weight: 700; } .inf-ev .niv-MEDIO { color: var(--warn); }
 @media (max-width: 600px) { .inf-ev { grid-template-columns: 48px minmax(0, 1fr); } .inf-ev .cat, .inf-ev .niv { display: none; } }
+
+/* ---------- aplicaciones por permiso y notificaciones (Fase B) ---------- */
+.app > .app-ventana { display: none; } /* solo existen como ventanas del escritorio: fuera de una ventana (vista clásica, o equipo sin esa aplicación) no se muestran */
+.app-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.app-lista:empty::before { content: attr(data-vacio); color: var(--texto-sec); }
+.app-item { background: var(--panel2); border: 1px solid var(--borde); border-left: 3px solid var(--borde); border-radius: 6px; padding: 8px 10px; display: grid; gap: 4px; }
+.app-item.riesgo-medio, .app-item.niv-MEDIO { border-left-color: var(--warn); }
+.app-item.niv-ALTO, .app-item.niv-CRITICO { border-left-color: var(--bad); }
+.app-item.niv-BAJO, .app-item.riesgo-bajo { border-left-color: var(--ok); }
+.app-fila { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.app-botones { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin-bottom: 6px; }
+.seg-caja { background: var(--panel2); border: 1px solid var(--borde); border-radius: 6px; padding: 8px 10px; font-size: 13px; display: grid; gap: 4px; }
+.seg-caja b.ok { color: var(--ok); } .seg-caja b.warn { color: var(--warn); } .seg-caja b.bad { color: var(--bad); }
+.seg-controles { grid-template-columns: auto auto auto auto; }
+.ayuda-cuerpo { font-size: 13px; display: grid; gap: 6px; }
+.ayuda-cuerpo ul { margin: 0; padding-left: 18px; }
+.notif-cuenta { background: var(--bad); color: #fff; border-radius: 10px; padding: 0 6px; font-size: 11px; }
+.notif-panel { position: fixed; top: 64px; right: 16px; width: min(380px, calc(100vw - 32px)); max-height: 60vh; overflow: auto; z-index: 15;
+  background: var(--panel); border: 1px solid var(--borde); border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .4); }
+.notif-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.notif-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.notif-lista:empty::before { content: attr(data-vacio); color: var(--texto-sec); }
+.notif-lista li { padding: 6px 8px; border-radius: 4px; background: var(--panel2); border-left: 3px solid var(--borde); }
+.notif-lista li.nueva { border-left-color: var(--def); }
+.notif-lista li.n-alerta { border-left-color: var(--bad); }
+.notif-lista .hora { color: var(--texto-sec); font-family: var(--mono); font-size: 11px; margin-right: 6px; }

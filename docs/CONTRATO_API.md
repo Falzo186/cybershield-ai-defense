@@ -237,6 +237,18 @@ Todo lo valida el servidor: sesión `azul` (salvo `GET /api/incidentes`, tambié
 - SIEM: `ataque_ia_lanzado`, `ataque_ia_resultado` (equipo `rojo`), `defensor_ia_configurado` (equipo `azul`); las denegaciones de las capas durante un ataque quedan como `autorizacion_denegada` con equipo `rojo`.
 - Cliente de Ollama: `generar` devuelve además `tokens_entrada` y `carga_ms` (`tokens` sigue siendo la salida).
 
+### Aplicaciones por permiso (Fase B)
+- `GET /api/apps?equipo=` (público) -> `{equipo, apps:[{id, titulo, icono, grupo, descripcion, permiso:"lectura"|"escritura"}], grupos:[{id, titulo}]}`. Con sesión, el equipo es el de la sesión y se ignora el parámetro. Sin sesión, vale el parámetro; si no se indica, `espectador`. El catálogo es `src/lab/apps.APPS`.
+- `GET /api/archivos` (aplicación `archivos`: rojo, azul y general; si no, 403 «Tu equipo no tiene la aplicación…»):
+  - Rojo -> `{vista:"rojo", catalogo:[{plantilla, nombre, adjunto}], enviados:[enviados_rojo con adjunto]}`, sin datos de reporte ni aislamiento;
+  - Azul y General -> `{vista, usuario, adjuntos:[{id, de, asunto, ts, adjunto, pdf_abierto, pdf_reportado, aislado, carpeta}], puede_actuar}`.
+  Las acciones siguen siendo las rutas de siempre (`/api/evento`, `/api/correo/{id}/aislar`), solo para Azul.
+- `GET /api/seguridad` (aplicación `seguridad`: azul y general) -> `{usuario, fase, riesgo, credencial, defensor:{modelo, host, ok, ts, error}, controles:{correos, reportados, enlaces_clicados, enlaces_contenidos, adjuntos_abiertos, adjuntos_reportados, adjuntos_aislados, incidentes_abiertos, incidentes_resueltos, ataques_ia_contenidos, ataques_ia_datos_expuestos}, recomendaciones:[{nivel, texto, accion}], puede_actuar}`. Las recomendaciones salen de `apps.recomendaciones`, de lo más grave a lo menos. Revocar sigue siendo `POST /api/credenciales/revocar` (solo Azul).
+- `GET /api/recursos` (público) -> `{roles, recursos:[{tabla, herramienta, descripcion, sensibilidad, acceso:{rol: "sí"|"con autorización"|"no"}}], nota}`, calculado con `permisos.evaluar_acceso`.
+- `GET /api/ayuda?equipo=` (público, equipo como en `/api/apps`) -> `{equipo, pasos, apps, reglas:[{evento, riesgo, completa_mision, explicacion}], puntos_rojo, puntos_azul, max_ataques_ia}`.
+- Rutas anteriores: `GET /api/incidentes` (azul y general), `GET /api/misiones` (azul), `GET /api/buzon` (azul) y `GET /api/correo/enviados` (rojo) ya coincidían con el catálogo. `server/test_apps.py` lo comprueba para cada equipo y sin sesión.
+- Notificaciones: no tienen ruta propia. La UI las deriva de los eventos SSE (`auditoria`, `ia_ataque`, `credenciales_cambio`, `partida_estado`) según la vista.
+
 ### Cronología, resultados y persistencia (Fase G)
 Las tres rutas son de lectura y públicas (también para el espectador sin sesión).
 - `GET /api/partidas` -> `{actual: Partida.publico(), finalizadas:[{partida, ts, motivo, ganador, puntos_rojo, puntos_azul, inicio, duracion_s}]}`.

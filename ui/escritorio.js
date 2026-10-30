@@ -59,6 +59,13 @@
       { id: "batalla", titulo: "Batalla de la partida", icono: "⚔️", sel: "section.panel.bpartida", abierta: ["rojo", "azul", "general", "espectador", ""] },
       // Resultados: flotante y más grande (tablas y cronología); se abre desde su icono o desde la pantalla final.
       { id: "resultados", titulo: "Resultados", icono: "📊", sel: "section.panel.informe", abierta: [], flotante: true, tam: [780, 540] },
+      // Fase B: aplicaciones por permiso (flotantes; empiezan cerradas). Qué equipo ve cada una lo dice /api/apps.
+      { id: "archivos", titulo: "Archivos", icono: "🗂️", sel: "section.panel.archivos", abierta: [], flotante: true, tam: [620, 480] },
+      { id: "seguridad", titulo: "Seguridad", icono: "🔐", sel: "section.panel.seguridad", abierta: [], flotante: true, tam: [700, 560] },
+      { id: "incidentes", titulo: "Incidentes", icono: "🚨", sel: "section.panel.incidentes-gen", abierta: [], flotante: true,
+        tam: [600, 460], roles: ["general", "espectador", ""] },
+      { id: "recursos", titulo: "Recursos", icono: "🏢", sel: "section.panel.recursos", abierta: [], flotante: true, tam: [720, 380] },
+      { id: "ayuda", titulo: "Ayuda", icono: "❓", sel: "section.panel.ayuda", abierta: [], flotante: true, tam: [760, 560] },
       { id: "auditoria", titulo: "Auditoría", icono: "📜", sel: "section.panel.aud", abierta: ["rojo", "azul", "general", "espectador", ""], minH: 100 },
       // Buzón: la MISMA tarjeta del modal (render.js delega abrir/cerrar en esta ventana con R.alojarBuzon).
       // Se abre desde el acceso «Correo/Buzón» (que carga los datos), nunca sola al recargar, y flota fuera del mosaico.
@@ -73,6 +80,10 @@
       { id: "misiones", titulo: "Misiones", icono: "🎯", roles: ["azul"],
         ayuda: "Ver el progreso de las misiones del Equipo Azul",
         accion: () => { if (pulsar("btn-buzon", "Tu vista aún no tiene token de equipo.")) clicEn('[data-azul="misiones"]'); } },
+      // Azul gestiona los incidentes en su buzón (pestaña Incidentes); General los supervisa en su propia ventana.
+      { id: "incidentes", titulo: "Incidentes", icono: "🚨", roles: ["azul"],
+        ayuda: "Abrir, investigar y resolver incidentes",
+        accion: () => { if (pulsar("btn-buzon", "Tu vista aún no tiene token de equipo.")) clicEn('[data-azul="incidentes"]'); } },
       { id: "finalizar", titulo: "Finalizar partida", icono: "🏁", roles: ["general"],
         ayuda: "Finalizar la partida: congela los puntajes y muestra el resultado",
         accion: () => pulsar("btn-finalizar", "Solo el árbitro puede finalizar, y solo con la partida en curso.") },
@@ -290,6 +301,7 @@
     }
 
     function abrirVentana(v) {
+      if (v.prohibida) return; // el catálogo del servidor no da esta aplicación a este equipo
       const estabaOculta = !v.abierta || v.minimizada || v.marco.hidden;
       if (v.minimizada) { v.minimizada = false; aplicar(v); }
       if (!v.abierta) {
@@ -423,11 +435,13 @@
     }
 
     // ---------- iconos y barra de tareas ----------
-    // Grupos de iconos por función, de arriba abajo, separados por una línea sutil.
-    const GRUPOS_ICONOS = [
-      ["Herramientas del equipo", ["atacante", "control", "defensor", "batalla"]],
-      ["Comunicación", ["correo"]],
-      ["Registro y seguimiento", ["auditoria", "resultados", "misiones", "finalizar"]],
+    // Grupos de iconos por función, de arriba abajo, separados por una línea sutil. Es el orden de RESERVA: lo normal
+    // es pintar el catálogo del servidor (/api/apps), que además quita lo que este equipo no tiene.
+    let GRUPOS_ICONOS = [
+      ["Herramientas de IA", ["atacante", "control", "defensor", "batalla"]],
+      ["Comunicación", ["correo", "archivos"]],
+      ["Seguridad", ["misiones", "incidentes", "seguridad"]],
+      ["Registro y seguimiento", ["recursos", "auditoria", "resultados", "ayuda", "finalizar"]],
     ];
     const botonesIcono = new Map();
 
@@ -447,6 +461,26 @@
       b.title = ayuda || "Abrir " + titulo; // tooltip con el nombre (y qué hace) al pasar el cursor
       b.addEventListener("click", alAbrir);
       botonesIcono.set(id, b);
+    }
+
+    // Catálogo del servidor: deja solo las aplicaciones de este equipo (las demás ventanas se cierran y no se pueden
+    // abrir) y pone en cada icono su descripción y su permiso. Si no llega, se usa el orden de reserva.
+    function aplicarCatalogo(c) {
+      if (c && Array.isArray(c.apps)) {
+        const permitidas = new Map(c.apps.map((a) => [a.id, a]));
+        GRUPOS_ICONOS = c.grupos.map((g) => [g.titulo, c.apps.filter((a) => a.grupo === g.id).map((a) => a.id)]);
+        botonesIcono.forEach((b, id) => {
+          const a = permitidas.get(id);
+          if (a) b.title = a.descripcion + (a.permiso === "lectura" ? " (solo lectura)" : "");
+        });
+        ventanas.forEach((v) => {
+          if (v.def.id === "buzon" || permitidas.has(v.def.id)) return;
+          v.prohibida = true;
+          if (v.abierta) cerrarVentana(v);
+        });
+      }
+      iconos.replaceChildren();
+      pintarIconos();
     }
 
     function pintarIconos() {
@@ -496,7 +530,8 @@
     ventanas.filter((v) => !v.def.sinIcono).forEach((v) => icono(v.def.titulo, v.def.icono, () => abrirVentana(v), v.def.id,
       "Abrir la ventana " + v.def.titulo));
     ACCESOS.filter((a) => a.roles.includes(rol)).forEach((a) => icono(a.titulo, a.icono, a.accion, a.id, a.ayuda));
-    pintarIconos();
+    fetch("/api/apps?equipo=" + encodeURIComponent(rol || "espectador"))
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null).then(aplicarCatalogo);
 
     const buzon = ventanas.find((v) => v.def.id === "buzon");
     if (buzon && typeof R !== "undefined" && R.alojarBuzon) {

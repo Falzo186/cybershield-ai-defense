@@ -396,6 +396,16 @@ def main(ver=False):
             ok = esperar(lambda: "Ataque IA #1" in toast(azul))
             chk("Azul recibe el aviso del ataque y su explicación", True, bool(ok))
             captura(rojo, "rojo_ataque_ia_datos_expuestos")
+            azul.click('[data-icono="seguridad"]')
+            ok = esperar(lambda: azul.locator("#seg-recos .app-item").count() > 0)
+            recos = azul.locator("#seg-recos .app-item").all_inner_texts()
+            nota("Seguridad (Azul): " + " | ".join(x.replace(chr(10), " ") for x in recos)[:400])
+            chk("la app Seguridad de Azul pone primero la credencial comprometida (CRÍTICA) y dice qué hacer", True,
+                bool(ok) and "credencial comprometida" in recos[0] and "Revócala" in recos[0])
+            chk("Seguridad muestra la credencial COMPROMETIDA con el botón para revocarla", True,
+                azul.locator("#seg-resumen button", has_text="Revocar").count() == 1)
+            captura(azul, "azul_seguridad")
+            azul.locator('[data-ventana="seguridad"] .ventana-cerrar').click()
 
             paso("3h. Azul abre un incidente desde el correo, revoca la credencial y lo resuelve")
             abrir_correo(azul, "Acción requerida", "sospechosos")
@@ -480,6 +490,43 @@ def main(ver=False):
             chk("General y Espectador ven el mismo marcador", vg, ve)
             nota(f"Marcador final antes de cerrar: {vg}")
             captura(espectador, "espectador_marcador")
+
+            # Aplicaciones por permiso (catálogo del servidor) y notificaciones
+            iconos = {r: set(pg.eval_on_selector_all(".esc-icono", "n => n.map(x => x.dataset.icono)"))
+                      for r, pg in (("general", general), ("rojo", rojo), ("azul", azul), ("espectador", espectador))}
+            nota("Iconos por vista: " + " · ".join(f"{r}: {', '.join(sorted(v))}" for r, v in iconos.items()))
+            chk("cada vista solo tiene sus aplicaciones (Rojo sin Seguridad ni Misiones; Espectador sin Correo ni Archivos; "
+                "solo General finaliza)", (False, False, False, False, True, False),
+                ("seguridad" in iconos["rojo"], "misiones" in iconos["rojo"], "correo" in iconos["espectador"],
+                 "archivos" in iconos["espectador"], "finalizar" in iconos["general"], "finalizar" in iconos["azul"]))
+            chk("todas tienen Ayuda, Recursos y Resultados", True,
+                all({"ayuda", "recursos", "resultados"} <= v for v in iconos.values()))
+            azul.click('[data-icono="archivos"]')
+            ok = esperar(lambda: azul.locator("#arch-lista .app-item").count() == 2)
+            arch = azul.inner_text("#arch-lista")
+            chk("Archivos (Azul): los 2 adjuntos, uno reportado y otro aislado, con acciones", True,
+                bool(ok) and "REPORTADO" in arch and "AISLADO" in arch and azul.locator("#arch-lista button").count() == 6)
+            captura(azul, "azul_archivos")
+            azul.locator('[data-ventana="archivos"] .ventana-cerrar').click()
+            general.click('[data-icono="incidentes"]')
+            ok = esperar(lambda: "RESUELTO" in general.inner_text("#incg-lista"))
+            chk("General supervisa los incidentes (solo lectura, con la resolución)", True,
+                bool(ok) and "Resolución" in general.inner_text("#incg-lista") and general.locator("#incg-lista button").count() == 0)
+            general.locator('[data-ventana="incidentes"] .ventana-cerrar').click()
+            ok = esperar(lambda: rojo.locator("#notif-cuenta").is_visible())
+            chk("Rojo tiene notificaciones sin leer", True, bool(ok))
+            rojo.click("#btn-notif")
+            lista = rojo.inner_text("#notif-lista")
+            nota("Notificaciones de Rojo: " + lista.replace(chr(10), " | ")[:400])
+            chk("Rojo fue notificado del clic, del adjunto abierto, de la credencial y de sus ataques", True,
+                all(x in lista for x in ("pulsó el enlace", "Abrieron uno de tus adjuntos", "Has obtenido una credencial",
+                                         "Ataque IA #1")))
+            chk("pero nunca de lo que hizo Azul (reportar, contener, revocar)", False,
+                any(x in lista.lower() for x in ("reportó", "reportado", "contuvo", "revocó", "revocada")))
+            captura(rojo, "rojo_notificaciones")
+            rojo.click("#notif-leidas")
+            chk("marcar como leídas quita el contador", True, esperar(lambda: rojo.locator("#notif-cuenta").is_hidden()))
+            rojo.keyboard.press("Escape")
             # Escritorio: maximizar la auditoría para mostrar el rastro de eventos, y restaurarla.
             general.locator('[data-ventana="auditoria"] .ventana-maximizar').click()
             general.wait_for_timeout(300)

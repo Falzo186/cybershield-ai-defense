@@ -1,8 +1,8 @@
 # Prueba de extremo a extremo — partida Rojo vs Azul
 
-Generado por `e2e/demo_partida.py` el 2026-10-30T09:26:07-06:00 en 24 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
+Generado por `e2e/demo_partida.py` el 2026-10-30T10:15:28-06:00 en 25 s, con un servidor y una BD temporales (Chromium headless, 1366×768, 4 navegadores aislados).
 
-**Resultado: 96/96 comprobaciones correctas.**
+**Resultado: 106/106 comprobaciones correctas.**
 
 ## 1. Preparación: cada participante entra con su nombre, entra un espectador y el árbitro inicia la partida
 
@@ -31,7 +31,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-30T09:26:07-06:00 en 24 s, con un 
 
 ## 2. Rojo envía 3 correos (uno sin adjunto y dos con PDF)
 
-- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Actualización de tu recibo de nómina (30/10/2026)» | ✓ Correo enviado a ana.perez: «Tu paquete no pudo ser entregado»
+- Avisos: ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Acción requerida: verificación de la cuenta de ana.perez» | ✓ Correo enviado a ana.perez: «Tu paquete no pudo ser entregado»
 - ✅ los 3 envíos se confirman: esperado `3`, observado `3`
 - ✅ el buzón de Azul se actualiza solo por SSE: esperado `3`, observado `3`
 
@@ -122,6 +122,7 @@ Generado por `e2e/demo_partida.py` el 2026-10-30T09:26:07-06:00 en 24 s, con un 
 - Identidad del atacante: 🔑 ana.perez (empleado) · credencial robada sin revocar
 - En curso (Azul): ⏳ Ataque #1 · esperando a la Ollama del atacante (Rojo) · falso-atacante · 0 s
 - Ataque #1: #1 · DATOS EXPUESTOS · ana.perez 🔑 credencial robada · técnica autoridad · intensidad 2 · lanzado por Rita Rojo · Rojo +10 · La IA de Rojo pidió datos con la credencial robada de ana.perez y el asistente se los entregó: para el sistema era una petición válida de esa cuenta. Datos INTERNA expuestos. Control que falló: la credencial comprometida seguía activa. Se evita revocándola en cuanto se detecta el phishing; lo ya filtrado no se recupera.
+- Seguridad (Azul): Hay una credencial comprometida sin revocar: Rojo puede usarla en la batalla y suma 15 puntos mientras siga activa. → Revócala (Incidentes o aquí mismo). | 1 enlace(s) clicado(s) sin contener: Rojo suma 10 puntos por cada uno. → Abre el correo y pulsa «Contener».
 - ✅ Rojo ve que su IA atacará como la cuenta robada: esperado `True`, observado `True`
 - ✅ todas las vistas ven la fase real del ataque (esperando a la Ollama…): esperado `True`, observado `True`
 - ✅ mientras dura, Rojo no puede lanzar otro: esperado `True`, observado `True`
@@ -130,9 +131,12 @@ Generado por `e2e/demo_partida.py` el 2026-10-30T09:26:07-06:00 en 24 s, con un 
 - ✅ tokens de entrada/salida tal como los informa Ollama: esperado `True`, observado `True`
 - ✅ marcador de la partida: Rojo 25 + 10 = 35; riesgo 35 + 20 = 55: esperado `(35, 55)`, observado `(35, 55)`
 - ✅ Azul recibe el aviso del ataque y su explicación: esperado `True`, observado `True`
+- ✅ la app Seguridad de Azul pone primero la credencial comprometida (CRÍTICA) y dice qué hacer: esperado `True`, observado `True`
+- ✅ Seguridad muestra la credencial COMPROMETIDA con el botón para revocarla: esperado `True`, observado `True`
 
 ![15_rojo_ataque_ia_en_curso.jpg](15_rojo_ataque_ia_en_curso.jpg)
 ![16_rojo_ataque_ia_datos_expuestos.jpg](16_rojo_ataque_ia_datos_expuestos.jpg)
+![17_azul_seguridad.jpg](17_azul_seguridad.jpg)
 
 ## 3h. Azul abre un incidente desde el correo, revoca la credencial y lo resuelve
 
@@ -152,8 +156,8 @@ Generado por `e2e/demo_partida.py` el 2026-10-30T09:26:07-06:00 en 24 s, con un 
 - ✅ resolver el incidente completa su misión: esperado `True`, observado `True`
 - ✅ marcador: Rojo 10 (la fuga), Azul 85 (40 + 10 incidente + 20 revocar + 15 resolver), riesgo 20: esperado `(10, 85, 20)`, observado `(10, 85, 20)`
 
-![17_azul_incidente_credencial.jpg](17_azul_incidente_credencial.jpg)
-![18_azul_incidente_resuelto.jpg](18_azul_incidente_resuelto.jpg)
+![18_azul_incidente_credencial.jpg](18_azul_incidente_credencial.jpg)
+![19_azul_incidente_resuelto.jpg](19_azul_incidente_resuelto.jpg)
 
 ## 3i. Con la credencial revocada, la IA de Rojo vuelve a atacar como invitado y el defensor lo contiene
 
@@ -164,21 +168,33 @@ Generado por `e2e/demo_partida.py` el 2026-10-30T09:26:07-06:00 en 24 s, con un 
 - ✅ marcador: Rojo 10, Azul 90: esperado `(10, 90)`, observado `(10, 90)`
 - ✅ el marcador de General resume la batalla IA: esperado `True`, observado `True`
 
-![19_general_batalla_partida.jpg](19_general_batalla_partida.jpg)
+![20_general_batalla_partida.jpg](20_general_batalla_partida.jpg)
 
 ## 4. Verificación: misiones, marcador en General y Espectador
 
-- Evidencia de «Revocar»: Completada por Beto Azul · 30/10/2026 09:26 · evidencia: credencial:ana.perez
+- Evidencia de «Revocar»: Completada por Beto Azul · 30/10/2026 10:15 · evidencia: credencial:ana.perez
 - Marcador final antes de cerrar: {'riesgo': 20, 'rojo': 10, 'azul': 90, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}
+- Iconos por vista: general: archivos, atacante, auditoria, ayuda, batalla, control, defensor, finalizar, incidentes, recursos, resultados, seguridad · rojo: archivos, atacante, auditoria, ayuda, batalla, control, correo, defensor, recursos, resultados · azul: archivos, atacante, auditoria, ayuda, batalla, control, correo, defensor, incidentes, misiones, recursos, resultados, seguridad · espectador: atacante, auditoria, ayuda, batalla, control, defensor, recursos, resultados
+- Notificaciones de Rojo: 10:15⚔ Ataque IA #2: CONTENIDO (Azul +5) | 10:15⚔ Ataque IA #1: DATOS EXPUESTOS (Rojo +10) | 10:15🔑 Has obtenido una credencial · correo 1 · ana.perez | 10:15🔗 Alguien pulsó el enlace de uno de tus correos · correo 1 · ana.perez | 10:15📎 Abrieron uno de tus adjuntos · recibo_nomina.pdf · correo 2 · ana.perez | 10:15🔗 Alguien pulsó el enlace de uno de tus correos · correo 3 · ana.perez | 10:15▶ La 
 - Líneas de auditoría en General: 50
 - ✅ misiones completadas: todas salvo la manual: esperado `[True, True, False, True, True, True, True, True]`, observado `[True, True, False, True, True, True, True, True]`
 - ✅ cada misión dice quién la completó y con qué evidencia: esperado `True`, observado `True`
 - ✅ General y Espectador ven el mismo marcador: esperado `{'riesgo': 20, 'rojo': 10, 'azul': 90, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}`, observado `{'riesgo': 20, 'rojo': 10, 'azul': 90, 'clics': 2, 'contenciones': 2, 'reportes': 2, 'pdf': 1}`
+- ✅ cada vista solo tiene sus aplicaciones (Rojo sin Seguridad ni Misiones; Espectador sin Correo ni Archivos; solo General finaliza): esperado `(False, False, False, False, True, False)`, observado `(False, False, False, False, True, False)`
+- ✅ todas tienen Ayuda, Recursos y Resultados: esperado `True`, observado `True`
+- ✅ Archivos (Azul): los 2 adjuntos, uno reportado y otro aislado, con acciones: esperado `True`, observado `True`
+- ✅ General supervisa los incidentes (solo lectura, con la resolución): esperado `True`, observado `True`
+- ✅ Rojo tiene notificaciones sin leer: esperado `True`, observado `True`
+- ✅ Rojo fue notificado del clic, del adjunto abierto, de la credencial y de sus ataques: esperado `True`, observado `True`
+- ✅ pero nunca de lo que hizo Azul (reportar, contener, revocar): esperado `False`, observado `False`
+- ✅ marcar como leídas quita el contador: esperado `True`, observado `True`
 - ✅ la auditoría de General registró la partida: esperado `True`, observado `True`
 
-![20_azul_misiones.jpg](20_azul_misiones.jpg)
-![21_espectador_marcador.jpg](21_espectador_marcador.jpg)
-![22_general_auditoria_maximizada.jpg](22_general_auditoria_maximizada.jpg)
+![21_azul_misiones.jpg](21_azul_misiones.jpg)
+![22_espectador_marcador.jpg](22_espectador_marcador.jpg)
+![23_azul_archivos.jpg](23_azul_archivos.jpg)
+![24_rojo_notificaciones.jpg](24_rojo_notificaciones.jpg)
+![25_general_auditoria_maximizada.jpg](25_general_auditoria_maximizada.jpg)
 
 ## 5. General finaliza la partida y se muestra el resultado
 
@@ -188,14 +204,14 @@ Generado por `e2e/demo_partida.py` el 2026-10-30T09:26:07-06:00 en 24 s, con un 
 - ✅ el Espectador también ve el resultado: esperado `True`, observado `True`
 - ✅ tras finalizar, Rojo ya no puede enviar (409): esperado `True`, observado `True`
 
-![23_general_resultado.jpg](23_general_resultado.jpg)
-![24_espectador_resultado.jpg](24_espectador_resultado.jpg)
-![25_rojo_tras_finalizar.jpg](25_rojo_tras_finalizar.jpg)
+![26_general_resultado.jpg](26_general_resultado.jpg)
+![27_espectador_resultado.jpg](27_espectador_resultado.jpg)
+![28_rojo_tras_finalizar.jpg](28_rojo_tras_finalizar.jpg)
 
 ## 6. Resultados con fórmulas y cronología filtrable (guardados en el servidor)
 
 - Batalla IA en el desglose: Riesgo final: 20/100 ·  · Cada evento suma o resta su riesgo fijo (REGLAS_EVENTO), en orden y acotado a 0-100 en cada paso: el riesgo nunca baja de 0 ni deja «saldo a favor», así que el final puede diferir de la suma sin acotar. ·  · CLIC_ENLACE: 2 × +15 = +30 · archivo_aislado: 1 × -5 = -5 · correo
-- Cronología filtrada: 00:00 BATALLA IA · AZUL Azul fijó su defensor IA (modelo:falso-defensor) BAJO | 00:08 BATALLA IA · ROJO La IA de Rojo lanzó un ataque (ataque_ia:1) como ana.perez: Rita Rojo · credencial_robada MEDIO | 00:10 BATALLA IA · ROJO Resultado del ataque IA (ataque_ia:1): DATOS_EXPUESTOS CRITICO | 00:13 BATALLA IA · ROJO La IA de Rojo lanzó un ataque (ataque_ia:2) como visita.demo: Rita Rojo · invitado MEDIO
+- Cronología filtrada: -00:01 BATALLA IA · AZUL Azul fijó su defensor IA (modelo:falso-defensor) BAJO | 00:08 BATALLA IA · ROJO La IA de Rojo lanzó un ataque (ataque_ia:1) como ana.perez: Rita Rojo · credencial_robada MEDIO | 00:10 BATALLA IA · ROJO Resultado del ataque IA (ataque_ia:1): DATOS_EXPUESTOS CRITICO | 00:13 BATALLA IA · ROJO La IA de Rojo lanzó un ataque (ataque_ia:2) como visita.demo: Rita Rojo · invitado MEDIO
 - ✅ desde la pantalla final, General abre el desglose: esperado `True`, observado `True`
 - ✅ los totales del desglose coinciden con el resultado final: esperado `('10 pts', '90 pts')`, observado `('10 pts', '90 pts')`
 - ✅ cada línea muestra su fórmula (fuga IA, misiones, ataques contenidos): esperado `True`, observado `True`
@@ -206,9 +222,9 @@ Generado por `e2e/demo_partida.py` el 2026-10-30T09:26:07-06:00 en 24 s, con un 
 - ✅ tras finalizar, Rojo también ve el desglose: esperado `True`, observado `True`
 - ✅ sin errores de consola inesperados en ninguna vista: esperado `[]`, observado `[]`
 
-![26_general_desglose.jpg](26_general_desglose.jpg)
-![27_general_cronologia_filtrada.jpg](27_general_cronologia_filtrada.jpg)
-![28_rojo_desglose.jpg](28_rojo_desglose.jpg)
+![29_general_desglose.jpg](29_general_desglose.jpg)
+![30_general_cronologia_filtrada.jpg](30_general_cronologia_filtrada.jpg)
+![31_rojo_desglose.jpg](31_rojo_desglose.jpg)
 
 ## Eventos escritos en eventos.jsonl (formato para Wazuh)
 

@@ -25,6 +25,7 @@
       <div class="hdr-grupo hdr-acciones">
         <a id="lnk-equipo" class="lnk" href="?cambiar=1">⇄ Cambiar de equipo</a>
         <button type="button" id="btn-buzon" class="btn btn-mini" aria-haspopup="dialog">✉ CORREOS</button>
+        <button type="button" id="btn-notif" class="btn btn-mini" aria-haspopup="dialog" aria-expanded="false" aria-controls="notif-panel" title="Notificaciones de la partida">🔔 <b id="notif-cuenta" class="notif-cuenta" hidden></b></button>
         <label id="duracion-wrap" class="rondas" title="Duración de la partida (la cuenta el servidor)">Duración
           <select id="sel-duracion" class="sel" aria-label="Duración de la partida">
             <option value="5">5 min</option>
@@ -242,6 +243,34 @@
     </div>
   </section>
 
+  <!-- Fase B: aplicaciones del escritorio por permiso (solo en la vista escritorio; el catálogo lo da el servidor) -->
+  <section class="panel app-ventana archivos" aria-labelledby="t-arch">
+    <h2 id="t-arch">🗂️ ARCHIVOS <span id="arch-permiso" class="badge"></span></h2>
+    <p id="arch-info" class="muted"></p>
+    <ul id="arch-lista" class="app-lista" data-vacio="No hay adjuntos en esta partida."></ul>
+  </section>
+  <section class="panel app-ventana seguridad" aria-labelledby="t-seg">
+    <h2 id="t-seg">🔐 SEGURIDAD <span id="seg-permiso" class="badge"></span></h2>
+    <div id="seg-resumen" class="seg-resumen"></div>
+    <h3>QUÉ FALTA (DE LO MÁS GRAVE A LO MENOS)</h3>
+    <ul id="seg-recos" class="app-lista" data-vacio="Nada pendiente."></ul>
+    <h3>CONTROLES APLICADOS</h3>
+    <dl id="seg-controles" class="det seg-controles"></dl>
+  </section>
+  <section class="panel app-ventana incidentes-gen" aria-labelledby="t-incg">
+    <h2 id="t-incg">🚨 INCIDENTES <span class="badge">SUPERVISIÓN · SOLO LECTURA</span></h2>
+    <ul id="incg-lista" class="app-lista" data-vacio="No hay incidentes en esta partida."></ul>
+  </section>
+  <section class="panel app-ventana recursos" aria-labelledby="t-rec">
+    <h2 id="t-rec">🏢 RECURSOS DE LA EMPRESA</h2>
+    <p id="rec-nota" class="muted"></p>
+    <table id="rec-tabla" class="inf-tabla"></table>
+  </section>
+  <section class="panel app-ventana ayuda" aria-labelledby="t-ayu">
+    <h2 id="t-ayu">❓ AYUDA</h2>
+    <div id="ayuda-cuerpo" class="ayuda-cuerpo"></div>
+  </section>
+
   <section class="panel aud" aria-labelledby="t-aud">
     <div class="aud-head">
       <h2 id="t-aud">AUDITORÍA</h2>
@@ -266,6 +295,10 @@
   </div>
 </div>
 
+<div id="notif-panel" class="notif-panel" hidden role="dialog" aria-labelledby="notif-t">
+  <div class="notif-cab"><b id="notif-t">NOTIFICACIONES</b><button type="button" id="notif-leidas" class="btn btn-mini">Marcar como leídas</button></div>
+  <ol id="notif-lista" class="notif-lista" data-vacio="Sin notificaciones todavía."></ol>
+</div>
 <div id="reto-espera" class="espera" hidden role="status"></div>
 
 <div id="reto-modal" class="modal reto" hidden role="alertdialog" aria-modal="true" aria-labelledby="reto-t">

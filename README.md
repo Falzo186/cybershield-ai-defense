@@ -167,6 +167,35 @@ una ventana más, que se abre con su icono 📬 (o 🎯 Misiones en Azul); Gener
 - *☰ Vista clásica* en la cabecera vuelve al diseño anterior (también `?vista=clasica`); en pantallas de menos
   de 760 px se usa siempre la vista clásica apilada.
 
+### Aplicaciones por permiso y notificaciones (Fase B)
+
+El **servidor** decide qué aplicaciones tiene cada equipo y con qué permiso (`src/lab/apps.py`, `GET /api/apps`). El
+escritorio pinta solo esas, agrupadas en *Herramientas de IA*, *Comunicación*, *Seguridad* y *Registro y
+seguimiento*. Las rutas de cada aplicación aplican el mismo catálogo, y una prueba lo comprueba equipo por equipo.
+
+| Aplicación | Rojo | Azul | General | Espectador |
+|---|---|---|---|---|
+| IA Atacante · Centro de control · IA Defensora · Batalla de la partida | ✓ | ✓ | ✓ | lectura |
+| Correo | enviar y seguir la campaña | buzón | — | — |
+| 🗂️ Archivos | lectura: adjuntos que puede enviar y si se abrieron | adjuntos recibidos: previsualizar, reportar, aislar | lectura | — |
+| 🎯 Misiones | — | ✓ | — | — |
+| 🚨 Incidentes | — | gestionar (en el buzón) | supervisar (lectura) | — |
+| 🔐 Seguridad | — | ✓ (incluye revocar) | lectura | — |
+| 🏢 Recursos · 📜 Auditoría · 📊 Resultados · ❓ Ayuda | lectura | lectura | lectura | lectura |
+| 🏁 Finalizar partida | — | — | ✓ | — |
+
+- **Seguridad** reúne la credencial, el defensor IA y los controles aplicados. Incluye una lista **determinista** de
+  lo que falta, de lo más grave a lo menos, con la acción que lo arregla (p. ej. «Hay una credencial comprometida
+  sin revocar… → Revócala»).
+- **Recursos** muestra los datos de la empresa ficticia, su sensibilidad y qué rol puede leerlos. Se calcula con la
+  misma regla que aplican las capas.
+- **Ayuda** explica qué hace cada equipo, sus aplicaciones y permisos, los puntos y todas las reglas con su
+  consecuencia.
+- **🔔 Notificaciones** (cabecera): lo que pasa en la partida y le importa a esa vista, con contador de no leídas.
+  Rojo recibe lo que mediría una campaña real (clics, adjuntos abiertos, credenciales, sus ataques), nunca lo que
+  hizo Azul. Se guardan en el navegador, por vista y partida (las 50 últimas): son una comodidad, no un registro.
+- Las aplicaciones nuevas solo existen en la vista escritorio; la vista clásica conserva los paneles de siempre.
+
 ## Red Team vs Blue Team
 
 Además de la batalla IA vs IA, el laboratorio tiene una **partida entre personas**: el 🔴 **Equipo Rojo** envía
@@ -342,9 +371,10 @@ está listo para leerse con un `<localfile>` y `log_format json` cuando se conec
 4. **General:** sigue el marcador y pulsa *🏁 Finalizar partida* para declarar el resultado.
 
 Pruebas: `python -m src.lab.test_correos`, `test_reglas`, `test_misiones`, `test_documentos`, `test_eventos`,
-`test_puntaje`, `test_cliente`, `test_incidentes`, `test_ataque_ia`, `test_informe` (con `python -m src.lab.<nombre>`),
-`python server/test_app.py` (servidor completo, BD en memoria), `python server/test_resultados.py` (cronología,
-resultados y persistencia) y `python server/test_batalla_partida.py` (batalla de la
+`test_puntaje`, `test_cliente`, `test_incidentes`, `test_ataque_ia`, `test_informe`, `test_apps` (con
+`python -m src.lab.<nombre>`), `python server/test_app.py` (servidor completo, BD en memoria),
+`python server/test_resultados.py` (cronología, resultados y persistencia), `python server/test_apps.py`
+(aplicaciones por permiso) y `python server/test_batalla_partida.py` (batalla de la
 partida contra un **Ollama falso**, `e2e/ollama_falso.py`, con respuestas fijas: prueba el camino, no la calidad de un modelo). La partida completa en navegadores reales: `python e2e/demo_partida.py` (requiere
 `pip install playwright` y `playwright install chromium`; escribe las capturas en `docs/capturas_demo/`).
 Guion para la exposición: [`docs/GUION_DEMO.md`](docs/GUION_DEMO.md).
