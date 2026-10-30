@@ -341,3 +341,76 @@ servidor. Propuesta:
 - **Riesgos de regresión:** medios. Cambian los puntos de Azul (más misiones) y la forma de `misiones()`; lo cubren
   todas las suites. El servidor en marcha debe reiniciarse para migrar la BD.
 - **Avance estimado:** ~60 % del plan (A, C, D y E hechas; B parcial; F, G y H pendientes).
+
+## 14. Informe de la Fase F — batalla integrada en la partida (rama `feature/fase-f-batalla-integrada`)
+
+- **Objetivo:** que la batalla IA forme parte de la partida Rojo/Azul (Rojo decide cuándo atacar, defensor siempre
+  activo), con tokens de entrada y salida reales, estados de inferencia honestos y fallo seguro.
+- **Estado inicial:** la batalla IA vs IA era un mundo aparte (reto con aceptación, «mejor de N», marcador propio y
+  estado en el cliente). Solo se guardaban los tokens de salida; no había fases intermedias reales (el atacante y el
+  defensor corrían en una sola llamada) y nada de la batalla llegaba al marcador de la partida.
+- **Decisiones aprobadas:** la batalla «mejor de N» se conserva como **práctica**, solo fuera de una partida en curso;
+  la IA de Rojo ataca con la identidad **que haya robado** (invitado por defecto; la cuenta de una credencial
+  comprometida sin revocar).
+- **Archivos:**
+  - nuevos: `src/lab/ataque_ia.py` (identidad, clasificación, puntos, explicaciones), `e2e/ollama_falso.py`,
+    `src/lab/test_ataque_ia.py`, `server/test_batalla_partida.py`;
+  - `src/lab/cliente_ollama.py` (`tokens_entrada`, `carga_ms`), `atacante.py` (técnica elegida por el jugador),
+    `defensor.py`, `motor.py`, `sesion.py` (4 reglas), `schema.py` (tabla `ataques_ia`), `repositorio.py`;
+  - `server/app.py` (endpoints `/api/ia/*`, fases por SSE, práctica bloqueada durante la partida, marcador);
+  - `ui/index.html`, `render.js`, `app.js`, `api.js`, `escritorio.js`, `styles.css` (ventana ⚔ *Batalla de la
+    partida*); `e2e/demo_partida.py`; `server/test_app.py` y `src/lab/test_cliente.py` (ampliados);
+  - `README.md`, `docs/CONTRATO_API.md`, `docs/GUION_DEMO.md`.
+- **Cambios:**
+  - **Rojo lanza ataques** de uno en uno, eligiendo técnica e intensidad, con un tope de 8 por partida. El modelo del
+    atacante se comprueba contra su Ollama antes de gastar el ataque.
+  - **Defensor siempre activo:** Azul lo fija una vez y el servidor lo comprueba de verdad; desde entonces responde
+    a cada ataque sin reto ni aceptación. Todas las vistas ven su estado (verificado, error real o sin configurar).
+  - **Identidad robada:** con una credencial comprometida sin revocar, la petición es válida para esa cuenta y el
+    asistente entrega datos internos: **datos expuestos**, permanentes. Revocar devuelve a Rojo a invitado.
+  - **Fases honestas:** el servidor difunde la fase real (validando → atacante → defensor) con el tiempo
+    transcurrido calculado por él; la UI cuenta segundos sin porcentajes. Al terminar se ven tokens de entrada y de
+    salida y la carga del modelo tal como los informa Ollama, o «—» si no los envía.
+  - **Fallo seguro:** si el defensor no da una decisión válida no se ejecuta nada y no puntúa nadie. Un fallo del
+    atacante gasta el ataque sin llegar al defensor, y un ataque a medias al finalizar queda cancelado.
+  - **Marcador único:** puntos de Rojo = buzón + IA; puntos de Azul = misiones + IA, con desglose. El resultado
+    final y la pantalla de General incluyen la batalla.
+  - Cada ataque se **persiste** (`ataques_ia`, con métricas por inferencia) y deja auditoría y eventos SIEM. Es lo
+    mínimo para puntuar desde el estado; la cronología filtrable y el panel de resultados siguen en la Fase G.
+- **Pruebas (resultados reales, batería completa en verde):**
+  - `test_ataque_ia` 22/22 (nuevo); `test_cliente` 18/18 (antes 14: métricas de Ollama, suma con reintento JSON,
+    `None` si faltan, técnica elegida); el resto de suites unitarias sin cambios en verde;
+  - `server/test_batalla_partida.py` 43/43 (nuevo, con un Ollama **falso** por HTTP): permisos (solo Rojo ataca,
+    solo Azul fija el defensor, espectador de solo lectura), 409 fuera de la partida, fases reales observadas,
+    tokens y carga transmitidos exactamente, contenido, datos expuestos con credencial robada, revocación, IA engañada
+    frenada por la capa de permisos, fallo seguro (HTTP 500 y defensor sin configurar), error del atacante, tope de
+    8, auditoría, resultado final, práctica bloqueada y desbloqueada, y cancelación al finalizar a mitad de un ataque;
+  - `server/test_app.py` 157/157 y `server/test_partida.py` 30/30;
+  - `e2e/demo_partida.py` **87/87** en Chromium real (antes 69), con pasos nuevos 3g' (ataque con credencial
+    robada: fase visible en las 4 vistas, datos expuestos, tokens) y 3i (tras revocar, ataque como invitado
+    contenido). Resultado: **Rojo 10 — Azul 90**. La primera pasada falló en una comprobación y destapó un fallo real:
+    al revocar la credencial, la vista de Rojo seguía diciendo «credencial robada» hasta el siguiente ataque. Ahora
+    el servidor difunde el estado de la batalla al comprometer o revocar una credencial, y una prueba del servidor
+    lo comprueba;
+  - **Ollama real** (30/10/2026, CPU local, Ollama 0.40): 2 ataques de `llama3.2:3b` contra `qwen3:4b` por el
+    servidor completo. Los dos quedaron **contenidos** (el defensor pidió autorización). Fases observadas:
+    atacante → defensor. Atacante 19,1 s y 4,6 s, defensor 27,3 s y 15,6 s. Tokens de entrada/salida:
+    atacante 341/59 y 343/38, defensor 446/73 y 504/73. La primera llamada de cada modelo incluyó unos 7 s de carga
+    (7 230 y 7 688 ms) y la segunda 14 y 33 ms. No se probó con modelos reales un ataque con credencial robada.
+- **Vistas:** `capturas_vistas.py` sin datos: a 1920×1080 sin scroll interno; a 1366×768 solo General (+16 px en
+  Centro de control, como antes). Azul ya no lo tiene porque el mosaico cambió con la ventana nueva. Con ataques en
+  la lista, la ventana de la batalla tiene scroll propio (es una lista que crece).
+- **Decisiones tomadas (reversibles; revísalas):**
+  - **puntos:** datos expuestos +10/+20/+30 según sensibilidad (permanentes); IA engañada +5 para Rojo; contenido
+    +5 para Azul; fallo seguro 0/0;
+  - **tope:** 8 ataques por partida, que cuentan aunque fallen (incluido el error del atacante);
+  - **fallo seguro:** no penaliza a Azul. Sin defensor no gana nada, pero tampoco pierde;
+  - el Ollama falso solo sirve para pruebas y nunca se usa en el servidor real.
+- **Pendiente:**
+  - la cabecera sigue mostrando el marcador de la práctica «BATALLA IA vs IA 0 — 0», que puede confundir durante una
+    partida;
+  - el árbitro no tiene un botón para cancelar un ataque colgado (lo corta el tope de 300 s o finalizar);
+  - cronología, filtros y panel de resultados de la batalla → Fase G.
+- **Riesgos de regresión:** medios. Cambian los puntos de la partida (la batalla suma) y la práctica queda bloqueada
+  durante la partida. Lo cubren todas las suites. El servidor en marcha debe reiniciarse para crear la tabla nueva.
+- **Avance estimado:** ~70 % del plan (A, C, D, E y F hechas; B parcial; G y H pendientes).

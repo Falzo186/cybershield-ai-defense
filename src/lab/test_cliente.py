@@ -118,6 +118,28 @@ def main():
                                                             '"categoria":"autoridad"}'}, enviados)
         a = atacante.generar_ataque(HOST, "llama3.2:3b", "empleado")
         chk("un ataque válido sigue funcionando", a["ok"] and a["parse_ok"] and a["categoria"] == "autoridad")
+        # --- Fase F: métricas reales de Ollama (entrada, salida, carga) sin estimar nada ---
+        urllib.request.urlopen = _con_respuesta({"content": '{"ok": 1}'}, enviados, prompt_eval_count=300,
+                                                load_duration=2_500_000_000)
+        r = cliente_ollama.generar(HOST, "m", "s", "u")
+        chk("tokens de entrada (prompt_eval_count), de salida (eval_count) y carga (load_duration) tal cual",
+            (r["tokens_entrada"], r["tokens"], r["carga_ms"]) == (300, 12, 2500))
+        urllib.request.urlopen = _con_respuesta({"content": '{"ok": 1}'}, enviados)
+        r = cliente_ollama.generar(HOST, "m", "s", "u")
+        chk("si Ollama no informa la entrada o la carga, quedan en None (no se estiman)",
+            (r["tokens_entrada"], r["carga_ms"], r["tokens"]) == (None, None, 12))
+        respuestas = iter([{"content": "no es json"}, {"content": '{"prompt":"x"}'}])
+        urllib.request.urlopen = lambda req, timeout=None: _Respuesta(
+            {"message": next(respuestas), "eval_count": 10, "prompt_eval_count": 100, "load_duration": 1_000_000})
+        r = cliente_ollama.generar_json(HOST, "m", "s", "u", ("prompt",), "prueba")
+        chk("con reintento JSON se suman los dos intentos (entrada, salida y carga)",
+            (r["intentos"], r["tokens_entrada"], r["tokens"], r["carga_ms"]) == (2, 200, 20, 2))
+        urllib.request.urlopen = _con_respuesta({"content": '{"prompt":"Soy el nuevo jefe de ventas","categoria":"autoridad"}'},
+                                                enviados, prompt_eval_count=250)
+        a = atacante.generar_ataque(HOST, "llama3.2:3b", "invitado", tecnica="rol_falso")
+        chk("el atacante propaga las métricas y respeta la técnica elegida por el jugador",
+            a["ok"] and a["categoria"] == "rol_falso" and a["tokens_entrada"] == 250
+            and "rol_falso" in enviados[-1]["messages"][1]["content"])
     finally:
         urllib.request.urlopen = original
 

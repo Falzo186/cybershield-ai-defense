@@ -1,6 +1,7 @@
 """Prueba de extremo a extremo: una partida Rojo vs Azul completa, sin intervención humana.
 
-Arranca su propio servidor (puerto libre, BD temporal: no toca data/lab.db ni data/eventos.jsonl), abre cuatro
+Arranca su propio servidor (puerto libre, BD temporal: no toca data/lab.db ni data/eventos.jsonl) y un Ollama FALSO
+(e2e/ollama_falso.py: respuestas fijas, solo para probar el camino de la batalla, no la calidad de un modelo), abre cuatro
 navegadores aislados (General, Rojo, Azul, Espectador) con Playwright y recorre la partida guardando capturas en
 docs/capturas_demo/ y un resumen con lo observado en docs/capturas_demo/RESUMEN.md.
 
@@ -22,6 +23,8 @@ from datetime import datetime
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
+
+import ollama_falso  # mismo directorio
 
 RAIZ = Path(__file__).resolve().parents[1]
 SALIDA = RAIZ / "docs" / "capturas_demo"
@@ -130,6 +133,7 @@ def main(ver=False):
     for viejo in SALIDA.glob("*.jpg"):
         viejo.unlink()
     proc, base, tmp = arrancar_servidor()
+    falso, url_falso = ollama_falso.iniciar(retardo=1.0)  # cada inferencia tarda 1 s: se ven las fases
     inicio = time.time()
     try:
         with sync_playwright() as p:
@@ -173,6 +177,24 @@ def main(ver=False):
             chk("antes de iniciar, Rojo no puede enviar (409)", True, "no ha empezado" in t)
             rojo.locator('[data-ventana="buzon"] .ventana-cerrar').click()
             captura(general, "general_preparacion")
+            # Batalla de la partida: cada equipo apunta a su Ollama (aquí, el falso) y Azul fija su defensor IA.
+            for pg, lado in ((rojo, "atq"), (azul, "def")):
+                pg.fill(f"#host-{lado}", url_falso)
+                pg.dispatch_event(f"#host-{lado}", "change")
+                pg.click(f'[data-probar="{lado}"]')
+                esperar(lambda pg=pg, lado=lado: pg.locator(f"#sel-{lado} option").count() > 1)
+            rojo.select_option("#sel-atq", "falso-atacante")
+            azul.select_option("#sel-def", "falso-defensor")
+            azul.click("#bp-defender")
+            t = esperar(lambda: "verificado" in toast(azul) and toast(azul)) or toast(azul)
+            chk("Azul fija su defensor IA y el servidor lo comprueba contra su Ollama", True, "verificado" in t)
+            chk("todas las vistas ven el defensor de Azul verificado", [True] * 4,
+                ["falso-defensor" in pg.inner_text("#bp-defensor") and "verificado" in pg.inner_text("#bp-defensor")
+                 for pg in (general, rojo, azul, espectador)])
+            chk("solo Rojo ve el formulario de ataque y solo Azul el de defensor", (True, False, False, True),
+                (rojo.locator("#bp-rojo").is_visible(), azul.locator("#bp-rojo").is_visible(),
+                 rojo.locator("#bp-azul").is_visible(), azul.locator("#bp-azul").is_visible()))
+            chk("antes de iniciar, el botón de ataque está desactivado", True, rojo.locator("#bp-lanzar").is_disabled())
             general.select_option("#sel-duracion", "5")
             general.click("#btn-iniciar-partida")
             ok = esperar(lambda: all(pg.inner_text("#partida-estado").startswith("⏱") for pg in (general, rojo, azul, espectador)))
@@ -185,6 +207,8 @@ def main(ver=False):
             chk("el espectador no tiene token ni botones de acción", True,
                 espectador.locator("#main-wrap").is_hidden() and espectador.locator("#btn-finalizar").is_hidden())
             chk("marcador inicial en General", {"riesgo": 0, "rojo": 0, "azul": 0}, {k: valores(general)[k] for k in ("riesgo", "rojo", "azul")})
+            chk("durante la partida la práctica queda en pausa (botón desactivado y explicado)", (True, True),
+                (rojo.locator("#btn-main").is_disabled(), "pausa" in (rojo.get_attribute("#main-wrap", "title") or "")))
             captura(general, "general_inicio")
             captura(rojo, "rojo_inicio")
             captura(azul, "azul_inicio")
@@ -346,6 +370,31 @@ def main(ver=False):
             ok = esperar(lambda: "COMPROMETIDA" in toast(azul))
             chk("Azul recibe el aviso de credencial comprometida", True, bool(ok))
 
+            paso("3g'. Batalla de la partida: la IA de Rojo ataca con la credencial robada")
+            ok = esperar(lambda: "credencial robada" in rojo.inner_text("#bp-identidad"))
+            chk("Rojo ve que su IA atacará como la cuenta robada", True, bool(ok))
+            nota("Identidad del atacante: " + rojo.inner_text("#bp-identidad"))
+            rojo.select_option("#bp-tecnica", "autoridad")
+            rojo.click("#bp-lanzar")
+            ok = esperar(lambda: "esperando a la Ollama" in azul.inner_text("#bp-encurso"))
+            chk("todas las vistas ven la fase real del ataque (esperando a la Ollama…)", True, bool(ok))
+            nota("En curso (Azul): " + azul.inner_text("#bp-encurso").splitlines()[0])
+            chk("mientras dura, Rojo no puede lanzar otro", True, rojo.locator("#bp-lanzar").is_disabled())
+            captura(rojo, "rojo_ataque_ia_en_curso")
+            ok = esperar(lambda: "DATOS EXPUESTOS" in rojo.inner_text("#bp-lista"), timeout=15)
+            chk("el defensor atiende una petición válida para esa cuenta: DATOS EXPUESTOS", True, bool(ok))
+            item = rojo.locator("#bp-lista .bp-ataque").first.inner_text()
+            nota("Ataque #1: " + " · ".join(item.splitlines()[:6]))
+            chk("Rojo +10 (datos INTERNA) y la explicación nombra la credencial sin revocar", True,
+                "Rojo +10" in item and "credencial" in item and "revocándola" in item)
+            chk("tokens de entrada/salida tal como los informa Ollama", True,
+                f"{ollama_falso.TOKENS_ENTRADA} entrada / {ollama_falso.TOKENS_SALIDA} salida" in item)
+            v = esperar(lambda: valores(general)["rojo"] == 35 and valores(general)) or valores(general)
+            chk("marcador de la partida: Rojo 25 + 10 = 35; riesgo 35 + 20 = 55", (35, 55), (v["rojo"], v["riesgo"]))
+            ok = esperar(lambda: "Ataque IA #1" in toast(azul))
+            chk("Azul recibe el aviso del ataque y su explicación", True, bool(ok))
+            captura(rojo, "rojo_ataque_ia_datos_expuestos")
+
             paso("3h. Azul abre un incidente desde el correo, revoca la credencial y lo resuelve")
             abrir_correo(azul, "Acción requerida", "sospechosos")
             azul.locator("#buzon-detalle button", has_text="Abrir incidente").click()
@@ -367,8 +416,8 @@ def main(ver=False):
             t = esperar(lambda: "revocada" in toast(azul) and toast(azul)) or toast(azul)
             nota("Aviso: " + t)
             chk("revocar completa su misión (desbloqueada por el incidente)", True, "Revocar una credencial" in t)
-            v = esperar(lambda: valores(general)["rojo"] == 10 and valores(general)) or valores(general)
-            chk("Rojo pierde los 15 de la credencial (le quedan los 10 del clic)", 10, v["rojo"])
+            v = esperar(lambda: valores(general)["rojo"] == 20 and valores(general)) or valores(general)
+            chk("Rojo pierde los 15 de la credencial (le quedan 10 del clic y 10 de la fuga, que no se recupera)", 20, v["rojo"])
             esperar(lambda: azul.locator("#incidentes-lista button", has_text="Investigar").count() == 1)
             azul.locator("#incidentes-lista button", has_text="Investigar").click()
             esperar(lambda: azul.locator("#incidentes-lista textarea").count() == 1)
@@ -394,9 +443,24 @@ def main(ver=False):
             nota("Aviso: " + t)
             chk("resolver el incidente completa su misión", True, "Resolver el incidente" in t)
             v = esperar(lambda: valores(general)["azul"] == 85 and valores(general)) or valores(general)
-            chk("marcador: Rojo 0, Azul 85 (40 + 10 incidente + 20 revocar + 15 resolver), riesgo 0",
-                (0, 85, 0), (v["rojo"], v["azul"], v["riesgo"]))
+            chk("marcador: Rojo 10 (la fuga), Azul 85 (40 + 10 incidente + 20 revocar + 15 resolver), riesgo 20",
+                (10, 85, 20), (v["rojo"], v["azul"], v["riesgo"]))
             captura(azul, "azul_incidente_resuelto")
+
+            paso("3i. Con la credencial revocada, la IA de Rojo vuelve a atacar como invitado y el defensor lo contiene")
+            ok = esperar(lambda: "sin credencial robada" in rojo.inner_text("#bp-identidad"))
+            chk("revocar devolvió a Rojo a invitado", True, bool(ok))
+            rojo.click("#bp-lanzar")
+            ok = esperar(lambda: "CONTENIDO" in rojo.inner_text("#bp-lista"), timeout=15)
+            chk("el defensor IA rechaza: CONTENIDO", True, bool(ok))
+            item = rojo.locator("#bp-lista .bp-ataque").first.inner_text()
+            nota("Ataque #2: " + " · ".join(item.splitlines()[:6]))
+            chk("Azul +5 y la propuesta de la IA fue RECHAZAR", True, "Azul +5" in item and "RECHAZAR" in item)
+            v = esperar(lambda: valores(general)["azul"] == 90 and valores(general)) or valores(general)
+            chk("marcador: Rojo 10, Azul 90", (10, 90), (v["rojo"], v["azul"]))
+            chk("el marcador de General resume la batalla IA", True,
+                "2 · Rojo +10 / Azul +5" in general.inner_text("#marcador-partida"))
+            captura(general, "general_batalla_partida")
 
             # ---------------------------------------------------------------------------------------------
             paso("4. Verificación: misiones, marcador en General y Espectador")
@@ -429,7 +493,7 @@ def main(ver=False):
             ok = esperar(lambda: general.locator("#final-modal").is_visible())
             chk("General ve la pantalla de resultado", True, bool(ok))
             chk("ganador", "GANA EL EQUIPO AZUL", general.inner_text("#final-ganador"))
-            chk("puntajes finales (Rojo — Azul)", ("0", "85"),
+            chk("puntajes finales (Rojo — Azul)", ("10", "90"),
                 (general.inner_text("#final-rojo"), general.inner_text("#final-azul")))
             captura(general, "general_resultado")
             ok = esperar(lambda: espectador.locator("#final-modal").is_visible())
@@ -445,6 +509,7 @@ def main(ver=False):
             nav.close()
     finally:
         proc.terminate()
+        falso.shutdown()
 
     eventos = [json.loads(x) for x in (tmp / "eventos.jsonl").read_text(encoding="utf-8").splitlines()] \
         if (tmp / "eventos.jsonl").exists() else []

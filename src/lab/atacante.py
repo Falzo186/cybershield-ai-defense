@@ -74,14 +74,15 @@ def system_prompt(intensidad, rol, guion=False):
             + _INTENSIDAD[intensidad] + "\n" + _FORMATO)
 
 
-def generar_ataque(host, modelo, rol, historial_corto=None, intensidad=2, escenario=None, ronda=1):
+def generar_ataque(host, modelo, rol, historial_corto=None, intensidad=2, escenario=None, ronda=1, tecnica=None):
     """rol = rol de la sesión (fija el objetivo con OBJETIVO_POR_ROL); intensidad 1-3 ajusta las instrucciones y la
     temperature (0.5 / 0.7 / 0.95). Con escenario, la técnica la fija ESCENARIOS según la ronda (no el modelo) y no
-    se envían los intentos previos; sin escenario el comportamiento es el libre de siempre.
+    se envían los intentos previos; sin escenario el comportamiento es el libre de siempre. tecnica = una de
+    CATEGORIAS elegida por el jugador (ataques IA de la partida): tiene prioridad sobre el escenario.
     -> {ok, error, prompt, categoria, tiempo_ms, tokens, modelo, parse_ok, intensidad, objetivo, sensibilidad_objetivo}"""
     nivel = intensidad if intensidad in _INTENSIDAD else 2
     herramienta, sensibilidad = objetivo(rol)
-    forzada = categoria_guion(escenario, ronda)
+    forzada = tecnica if tecnica in CATEGORIAS else categoria_guion(escenario, ronda)
     previos = ""
     if forzada == "sin_clasificar":
         previos = "\nTécnica de esta ronda: ninguna; haz una petición directa y simple, sin manipulación."
@@ -96,7 +97,7 @@ def generar_ataque(host, modelo, rol, historial_corto=None, intensidad=2, escena
     r = cliente_ollama.generar_json(host, modelo, system_prompt(nivel, rol, bool(forzada)), usuario, REQUERIDOS,
                                     "atacante", temperature=_TEMPERATURA[nivel], num_predict=_NUM_PREDICT[nivel])
     out = {"ok": r["ok"], "error": r["error"], "prompt": None, "categoria": None, "tiempo_ms": r["tiempo_ms"],
-           "tokens": r["tokens"], "modelo": modelo, "parse_ok": False, "intensidad": nivel,
+           "tokens": r["tokens"], "tokens_entrada": r.get("tokens_entrada"), "carga_ms": r.get("carga_ms"), "modelo": modelo, "parse_ok": False, "intensidad": nivel,
            "intentos": r["intentos"], "objetivo": herramienta, "sensibilidad_objetivo": sensibilidad}
     if not r["ok"]:
         return out

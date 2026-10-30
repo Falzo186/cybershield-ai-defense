@@ -190,6 +190,29 @@
     </section>
   </main>
 
+  <!-- Fase F: batalla integrada en la partida. Rojo lanza ataques IA cuando quiere; el defensor de Azul responde siempre. -->
+  <section class="panel bpartida" aria-labelledby="t-bp">
+    <h2 id="t-bp">⚔ BATALLA DE LA PARTIDA <span id="bp-cupo" class="badge">0/8 ataques</span></h2>
+    <div class="bp-cab">
+      <div class="kv">Defensor IA de Azul <b id="bp-defensor">—</b></div>
+      <div class="kv">La IA de Rojo ataca como <b id="bp-identidad">—</b></div>
+      <div class="kv">Puntos de la batalla <b id="bp-puntos">Rojo 0 · Azul 0</b></div>
+    </div>
+    <form id="bp-rojo" class="bp-form" hidden autocomplete="off">
+      <label>Técnica <select id="bp-tecnica" class="sel" aria-label="Técnica del ataque IA"><option value="">Libre (elige la IA)</option></select></label>
+      <label>Intensidad <select id="bp-intensidad" class="sel" aria-label="Intensidad del ataque IA">
+        <option value="1">1 · directo</option><option value="2" selected>2 · contexto y rol</option><option value="3">3 · sofisticado</option>
+      </select></label>
+      <button type="submit" id="bp-lanzar" class="btn btn-primary btn-mini" title="Usa el modelo y la Ollama de la ventana IA Atacante">⚔ LANZAR ATAQUE IA</button>
+    </form>
+    <div id="bp-azul" class="bp-form" hidden>
+      <button type="button" id="bp-defender" class="btn btn-mini" title="Usa el modelo y la Ollama de la ventana IA Defensora; el servidor comprueba que existen">🛡 USAR MI MODELO COMO DEFENSOR</button>
+      <span class="muted">El defensor responde solo a cada ataque: no hay que aceptar nada.</span>
+    </div>
+    <div id="bp-encurso" class="bp-encurso" role="status" aria-live="polite"><span class="muted">Sin ataque en curso.</span></div>
+    <ol id="bp-lista" class="bp-lista" data-vacio="Aún no hay ataques IA en esta partida."></ol>
+  </section>
+
   <section class="panel aud" aria-labelledby="t-aud">
     <div class="aud-head">
       <h2 id="t-aud">AUDITORÍA</h2>

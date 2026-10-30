@@ -52,6 +52,18 @@ REGLAS_EVENTO = {
         "Abrir un incidente deja constancia de qué pasó y coordina la respuesta del equipo.")},
     "incidente_resuelto": {"riesgo": -5, "mision": True, "explicacion": (
         "El incidente se cerró con la amenaza contenida y su resolución documentada.")},
+    # Fase F: ataques de la IA de Rojo contra el asistente de la BD, dentro de la partida (ver ataque_ia.py)
+    "ia_datos_expuestos": {"riesgo": +20, "mision": False, "explicacion": (
+        "La IA de Rojo obtuvo datos no públicos del asistente de la base de datos. Si usó una credencial robada, el "
+        "control que falló es no haberla revocado a tiempo; lo filtrado ya no se recupera.")},
+    "ia_enganada": {"riesgo": +5, "mision": False, "explicacion": (
+        "La IA defensora propuso un acceso indebido y una capa determinista lo frenó: no salió ningún dato, pero el "
+        "modelo defensor se dejó convencer.")},
+    "ia_contenida": {"riesgo": 0, "mision": False, "explicacion": (
+        "El defensor del Equipo Azul rechazó la solicitud de la IA de Rojo: no salió ningún dato.")},
+    "ia_fallo_seguro": {"riesgo": 0, "mision": False, "explicacion": (
+        "El defensor IA no dio una decisión válida y la solicitud se denegó por defecto (fallo seguro). No hubo "
+        "fuga, pero tampoco una defensa real: Azul debe mantener su defensor disponible.")},
 }
 
 # Puntaje de Rojo (determinista). Se CALCULA del estado de la partida en cada momento, no se otorga y se quita:

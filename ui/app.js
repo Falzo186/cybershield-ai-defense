@@ -118,9 +118,13 @@
     return $("host-" + (rol === "def" ? "def" : "atq")).value.trim() || HOST_DEFECTO;
   }
 
+  // Durante una partida en curso la práctica (simulación, manual, batalla «mejor de N») queda en pausa: el servidor
+  // la rechaza con 409 y aquí el botón lo explica. La batalla de la partida está en su propia ventana.
   function aplicarControles() {
+    const enPartida = !!(estado.partida && estado.partida.fase === "en_curso");
     const sinOllama = usaOllama() && !ollamaListo();
-    R.setCorriendo(estado.corriendo, sinOllama, "Inicie Ollama");
+    R.setCorriendo(estado.corriendo, sinOllama || enPartida,
+      enPartida ? "Práctica en pausa durante la partida: usa «Batalla de la partida»" : "Inicie Ollama");
   }
 
   function setCorriendo(c) {
@@ -501,6 +505,16 @@
       if (d.estado === "comprometida") R.toast("⚠ La credencial de " + d.usuario + " está COMPROMETIDA: revócala en Incidentes");
       cargarIncidentes();
     },
+    // Fase F: batalla de la partida
+    ia_estado(d) { pintarBatalla(d); },
+    ia_ataque(d) {
+      R.setIaEnCurso(d.en_curso);
+      const a = d.terminado;
+      if (a) {
+        const pts = [a.puntos_rojo && "Rojo +" + a.puntos_rojo, a.puntos_azul && "Azul +" + a.puntos_azul].filter(Boolean).join(" · ");
+        R.toast("⚔ Ataque IA #" + a.n + ": " + a.titulo + (pts ? " (" + pts + ")" : "") + " — " + a.explicacion);
+      }
+    },
     metricas(d) { aplicarMetricas(d); },
     fin(d) {
       if (d.modo !== "manual") setCorriendo(false);
@@ -799,13 +813,39 @@
   // Estado de la partida (SSE al conectar, cada cambio y cada 15 s). Una partida nueva (otro id) limpia la vista.
   function aplicarPartida(p) {
     const nueva = estado.partida && estado.partida.id !== p.id;
+    const cambioFase = !estado.partida || estado.partida.fase !== p.fase;
     estado.partida = p;
     R.setPartida(p);
+    if (cambioFase) aplicarControles();
+    if (estado.batalla && estado.batalla.fase_partida !== p.fase && !nueva) pintarBatalla({ ...estado.batalla, fase_partida: p.fase });
     if (nueva) {
       estado.finalMostrado = false;
       R.cerrarResultado();
       if (estado.rol === "azul" && API.tieneToken()) { cargarBuzon(); cargarMisiones(); }
     }
+  }
+
+  // ---------- batalla de la partida (Fase F) ----------
+  function pintarBatalla(e) {
+    estado.batalla = e;
+    R.setBatallaPartida(e, { rol: estado.rol, conToken: API.tieneToken() });
+  }
+
+  async function lanzarAtaqueIA() {
+    const modelo = R.valorSelect("sel-atq");
+    if (!modelo) { R.toast("Elige primero el modelo del atacante en la ventana IA Atacante."); return; }
+    try {
+      await API.lanzarAtaqueIA(modelo, hostDe("atq"), R.valorSelect("bp-tecnica"), Number(R.valorSelect("bp-intensidad")));
+    } catch (e) { R.toast(e.message); } // el progreso y el resultado llegan por SSE
+  }
+
+  async function usarDefensorIA() {
+    const modelo = R.valorSelect("sel-def");
+    if (!modelo) { R.toast("Elige primero el modelo del defensor en la ventana IA Defensora."); return; }
+    try {
+      await API.configurarDefensorIA(modelo, hostDe("def"));
+      R.toast("🛡 Defensor IA activo y verificado: " + modelo);
+    } catch (e) { R.toast(e.message); }
   }
 
   function elegirEquipo(rol) {
@@ -872,6 +912,8 @@
     }));
     $("incidente-form").addEventListener("submit", (ev) => { ev.preventDefault(); abrirIncidente(); });
     $("correo-form").addEventListener("submit", (ev) => { ev.preventDefault(); enviarCorreo(); });
+    $("bp-rojo").addEventListener("submit", (ev) => { ev.preventDefault(); lanzarAtaqueIA(); });
+    $("bp-defender").addEventListener("click", usarDefensorIA);
     // Esc cierra el buzón solo cuando es un modal; como ventana del escritorio se cierra con su ✕.
     document.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape" && R.buzonEsModal() && R.buzonAbierto()) R.mostrarBuzon(false);
@@ -922,6 +964,7 @@
     R.setPermisos(false, estado.rol); // acciones ocultas hasta tener token
     prepararToken(estado.rol).then((conToken) => {
       R.setPermisos(conToken, estado.rol);
+      if (estado.batalla) pintarBatalla(estado.batalla); // ya con token: muestra los controles del equipo
       if (conToken) cargarUsuarios();
       if (conToken && estado.rol === "azul") cargarBuzon(); // contador inicial del botón ✉ BUZÓN (n)
       API.conectar(handlers, (est) => {

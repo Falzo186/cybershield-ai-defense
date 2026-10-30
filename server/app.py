@@ -11,6 +11,7 @@ import os
 import secrets
 import socket
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -26,7 +27,7 @@ from pydantic import BaseModel, Field  # noqa: E402
 
 import mock_server as ms  # noqa: E402
 import partida as pt  # noqa: E402
-from src.lab import atacante, cliente_ollama, correos, documentos, motor, repositorio, sesion  # noqa: E402
+from src.lab import ataque_ia, atacante, cliente_ollama, correos, documentos, motor, repositorio, sesion  # noqa: E402
 
 app = ms.app
 HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -55,13 +56,14 @@ RESTO = ["politicas", "autorizacion", "herramienta", "bd"]
 # anónimo) solo se puede hacer GET a RUTAS_PUBLICAS; una sesión de espectador tampoco puede modificar nada.
 CODIGO_ARBITRO = os.getenv("CS_CODIGO_ARBITRO") or f"{secrets.randbelow(10 ** 6):06d}"
 SALA = pt.Sala(CODIGO_ARBITRO)
-RUTAS_PUBLICAS = ("/api/eventos", "/api/estado")
+RUTAS_PUBLICAS = ("/api/eventos", "/api/estado", "/api/ia/estado")
 RUTA_SESION = "/api/sesion"
 # Rutas reservadas a UN equipo (además de exigir sesión). Detener, iniciar y cerrar la partida es cosa del árbitro;
 # Rojo envía correos de entrenamiento y Azul los lee en su buzón.
 SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul",
                "/api/evento": "azul", "/api/partida/finalizar": "general", "/api/partida/iniciar": "general",
-               "/api/partida/nueva": "general", "/api/correo/enviados": "rojo"}
+               "/api/partida/nueva": "general", "/api/correo/enviados": "rojo", "/api/ia/ataque": "rojo",
+               "/api/ia/defensor": "azul"}
 # Partida con fases (preparación -> en curso -> finalizada) y temporizador en el servidor. Los correos, misiones y
 # eventos se guardan con PARTIDA_ID; «nueva partida» empieza otra sin reiniciar el proceso.
 PARTIDA = pt.Partida()
@@ -151,6 +153,8 @@ async def _verificar_sesion(request: Request, call_next):
     dueno = SOLO_EQUIPO.get(ruta)
     if dueno and request.state.equipo != dueno:
         return _prohibido(f"Solo el equipo {dueno} puede usar {ruta}.")
+    if request.method == "POST" and ruta in RUTAS_PRACTICA and (err := _practica_bloqueada()):
+        return err
     return await call_next(request)
 
 
@@ -254,17 +258,19 @@ def _vencer_si_toca():
 async def nueva_partida():
     """Solo el árbitro y con la partida finalizada: empieza otra en preparación, sin reiniciar el servidor. Las
     sesiones de los participantes se conservan; correos, misiones, riesgo y marcador empiezan de cero."""
-    global PARTIDA, PARTIDA_ID, ESTADO_PARTIDA, RESULTADO_FINAL
+    global PARTIDA, PARTIDA_ID, ESTADO_PARTIDA, RESULTADO_FINAL, ESTADO_IA
     if PARTIDA.fase != "finalizada":
         return _prohibido("Solo se puede empezar una partida nueva cuando la actual ha finalizado.", 409)
     PARTIDA = pt.Partida()
     PARTIDA_ID = PARTIDA.id
     repositorio.PARTIDA = PARTIDA_ID
     ESTADO_PARTIDA = sesion.EstadoSesion()
+    ESTADO_IA = sesion.EstadoSesion()
     RESULTADO_FINAL = None
     ms.emitir("auditoria", ms.aud("SYSTEM", "PARTIDA_NUEVA", PARTIDA_ID, "PREPARACIÓN", "BAJO"))
     _emitir_partida()
     _emitir_marcador()
+    _emitir_ia()
     return _estado_partida()
 
 
@@ -417,6 +423,8 @@ def _aplicar_regla(evento, usuario, request=None, evidencia=None):
     ms.emitir("auditoria", ms.aud("SYSTEM", "REGLA", f"{evento} → riesgo {r['riesgo']:+d}",
                                   f"riesgo partida {int(r['riesgo_acumulado'])}/100", "BAJO"))
     _emitir_marcador()
+    if evento in ("credencial_comprometida", "credencial_revocada"):
+        _emitir_ia()  # cambia la identidad con la que atacaría la IA de Rojo
     return r
 
 
@@ -438,8 +446,12 @@ def _marcador():
     vistos = ESTADO_PARTIDA.eventos_vistos
     rojo = repo.logros_rojo(PARTIDA_ID)
     incidentes = repo.incidentes(PARTIDA_ID)
-    return {"usuario_azul": usuario, "puntos_azul": sum(m["puntos_obtenidos"] or 0 for m in hechas),
-            "puntos_rojo": sesion.puntaje_rojo(**rojo),
+    ia = repo.puntos_ia(PARTIDA_ID)
+    azul_misiones, rojo_buzon = sum(m["puntos_obtenidos"] or 0 for m in hechas), sesion.puntaje_rojo(**rojo)
+    return {"usuario_azul": usuario, "puntos_azul": azul_misiones + ia["azul"], "puntos_rojo": rojo_buzon + ia["rojo"],
+            "puntos_azul_misiones": azul_misiones, "puntos_azul_ia": ia["azul"],
+            "puntos_rojo_buzon": rojo_buzon, "puntos_rojo_ia": ia["rojo"],
+            "ataques_ia": ia["lanzados"], "ia_datos_expuestos": ia["datos_expuestos"], "ia_contenidos": ia["contenidos"],
             "rojo_enlaces_sin_contener": rojo["enlaces_sin_contener"], "rojo_pdfs_sin_reportar": rojo["pdfs_sin_reportar"],
             "rojo_credenciales_sin_revocar": rojo["credenciales_sin_revocar"],
             "incidentes_abiertos": sum(i["estado"] != "resuelto" for i in incidentes),
@@ -473,6 +485,7 @@ def _cerrar_partida(motivo):
     """Congela los puntajes de Rojo y Azul, declara ganador o empate y lo difunde. motivo: "arbitro" | "tiempo"."""
     global RESULTADO_FINAL
     PARTIDA.finalizar(motivo)  # ErrorSesion si no está en curso
+    _cancelar_ataque_ia()  # un ataque IA a medias no cuenta para nadie
     m = _marcador()
     rojo, azul = m["puntos_rojo"], m["puntos_azul"]
     ganador = "rojo" if rojo > azul else "azul" if azul > rojo else "empate"
@@ -497,7 +510,8 @@ async def _hook_marcador():
     """Al conectar el SSE (también un espectador sin token) llegan el estado de la partida y el marcador actual."""
     _vencer_si_toca()
     return ("event: partida_estado\ndata: " + json.dumps(_estado_partida(), ensure_ascii=False) + "\n\n"
-            "event: marcador_partida\ndata: " + json.dumps(_marcador(), ensure_ascii=False) + "\n\n")
+            "event: marcador_partida\ndata: " + json.dumps(_marcador(), ensure_ascii=False) + "\n\n"
+            "event: ia_estado\ndata: " + json.dumps(_estado_ia(), ensure_ascii=False) + "\n\n")
 
 
 ms.ON_CONEXION.insert(0, _hook_marcador)  # primero: el de Ollama puede tardar segundos si Ollama no responde
@@ -909,7 +923,9 @@ async def enviar_credenciales(enlace_id: str):
 async def iniciar_real(body: BatallaRealIn, request: Request):
     if err := _rol_no_coincide(request, body.de_rol):
         return err
-    if ms.ESTADO["corriendo"] or RETO is not None:
+    if err := _practica_bloqueada():
+        return err
+    if ms.ESTADO["corriendo"] or RETO is not None or ATAQUE_IA is not None:
         return JSONResponse({"error": "Ya hay una ejecución en curso.", "mensaje": "Ya hay una ejecución en curso."},
                             status_code=409)
     ms.ESTADO["corriendo"] = True  # reserva inmediata (evita doble inicio durante las comprobaciones)
@@ -1316,6 +1332,234 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
         ms.ESTADO.update(corriendo=False, modelo_atq=previo[0], modelo_def=previo[1])
 
 
+# ---------- batalla integrada en la partida (Fase F) ----------
+# Rojo decide CUÁNDO lanza cada ataque IA (uno a la vez, como máximo ataque_ia.MAX_ATAQUES por partida); el defensor
+# IA de Azul responde siempre, sin reto ni aceptación. Cada ataque son dos inferencias reales (atacante y defensor)
+# seguidas de las capas deterministas; su resultado suma al marcador de la PARTIDA. Las fases que se difunden son
+# las reales («esperando a la Ollama del atacante/defensor»): no hay barras de progreso inventadas.
+ATAQUE_IA = None          # ataque en curso: {"ataque": fila, "fase": str, "modelo": str, "desde": monotonic, "tarea"}
+ESTADO_IA = sesion.EstadoSesion()  # patrón de los ataques IA de esta partida (contexto del defensor y circuito)
+DEFENSOR_IA = {"ok": None, "ts": None, "error": None}  # última comprobación REAL del defensor de Azul
+# Rutas de práctica (simulación, prueba manual y batalla «mejor de N»): solo fuera de una partida en curso.
+RUTAS_PRACTICA = ("/api/simulacion/iniciar", "/api/batalla/iniciar", "/api/manual")
+
+
+class AtaqueIAIn(BaseModel):
+    modelo: str = Field(..., min_length=1, max_length=100)    # modelo del atacante (Ollama del equipo rojo)
+    host: str | None = Field(None, max_length=200)
+    tecnica: str | None = Field(None, pattern="^(" + "|".join(atacante.CATEGORIAS) + ")$")  # None = libre
+    intensidad: int = Field(2, ge=1, le=3)
+
+
+class DefensorIAIn(BaseModel):
+    modelo: str = Field(..., min_length=1, max_length=100)
+    host: str | None = Field(None, max_length=200)
+
+
+def _practica_bloqueada():
+    if PARTIDA.fase == "en_curso":
+        return _prohibido("Durante la partida la batalla es por ataques IA: Rojo los lanza cuando quiere y el defensor "
+                          "de Azul responde siempre. La simulación, la prueba manual y la batalla «mejor de N» son "
+                          "práctica: úsalas antes de iniciar o después de finalizar.", 409)
+    return None
+
+
+def _publico_ataque(a):
+    return {k: v for k, v in a.items() if k != "partida"} | {"titulo": ataque_ia.TITULO.get(a.get("resultado"))}
+
+
+def _en_curso_ia():
+    if ATAQUE_IA is None:
+        return None
+    a = ATAQUE_IA["ataque"]
+    return {"id": a["id"], "n": a["n"], "usuario": a["usuario"], "origen_identidad": a["origen_identidad"],
+            "tecnica": a["tecnica"], "intensidad": a["intensidad"], "lanzado_por": a["lanzado_por"],
+            "fase": ATAQUE_IA["fase"], "modelo": ATAQUE_IA["modelo"], "prompt": ATAQUE_IA.get("prompt"),
+            "transcurrido_ms": int((time.monotonic() - ATAQUE_IA["desde"]) * 1000)}
+
+
+def _estado_ia():
+    """Todo lo que la UI necesita de la batalla de la partida (sin secretos: los ataques y prompts son ficticios)."""
+    repo = repositorio.por_defecto()
+    usuario, origen = repo.identidad_atacante(PARTIDA_ID)
+    ataques = repo.ataques_ia(PARTIDA_ID)
+    d, a = CONFIG_ROL["azul"], CONFIG_ROL["rojo"]
+    return {"partida": PARTIDA_ID, "fase_partida": PARTIDA.fase, "max_ataques": ataque_ia.MAX_ATAQUES,
+            "lanzados": len(ataques), "restantes": max(0, ataque_ia.MAX_ATAQUES - len(ataques)),
+            "identidad": {"usuario": usuario, "origen": origen, "rol": repo.identidad(usuario).rol},
+            "defensor": {"modelo": d["modelo"] if d else None, "host": d["host"] if d else None, **DEFENSOR_IA},
+            "atacante": {"modelo": a["modelo"] if a else None, "host": a["host"] if a else None},
+            "en_curso": _en_curso_ia(), "ataques": [_publico_ataque(x) for x in ataques],
+            "puntos": repo.puntos_ia(PARTIDA_ID), "tecnicas": list(atacante.CATEGORIAS)}
+
+
+def _emitir_ia():
+    ms.emitir("ia_estado", _estado_ia())
+
+
+@app.get("/api/ia/estado")
+async def estado_ia():
+    return _estado_ia()
+
+
+@app.post("/api/ia/defensor")
+async def configurar_defensor(body: DefensorIAIn, request: Request):
+    """Solo Azul (SOLO_EQUIPO): elige el modelo de su defensor IA y comprueba de verdad que su Ollama lo tiene."""
+    err = await _registrar_lado("azul", body.modelo.strip(), body.host)
+    DEFENSOR_IA.update(ok=err is None, ts=pt.ahora_iso(), error=err)
+    if err is None:
+        repositorio.por_defecto().registrar(None, "DEFENSOR_IA_CONFIGURADO", f"modelo:{body.modelo}",
+                                            _participante(request) or "azul", "BAJO")
+        ms.emitir("auditoria", ms.aud("DEFENDER", "CONFIGURADO", f"{CONFIG_ROL['azul']['modelo']} @ "
+                                      f"{CONFIG_ROL['azul']['host']}", "OK", "BAJO"))
+    _emitir_ia()
+    return _prohibido(err, 409) if err else _estado_ia()
+
+
+@app.post("/api/ia/ataque")
+async def lanzar_ataque_ia(body: AtaqueIAIn, request: Request):
+    """Solo Rojo (SOLO_EQUIPO) y con la partida en curso: lanza UN ataque IA. Responde enseguida (202 lógico) y el
+    progreso llega por SSE (ia_ataque / ia_estado); el resultado suma al marcador de la partida."""
+    global ATAQUE_IA
+    if err := _partida_cerrada():
+        return err
+    if ATAQUE_IA is not None:
+        return _prohibido("Ya hay un ataque IA en curso: espera a que el defensor responda.", 409)
+    if ms.ESTADO["corriendo"] or RETO is not None:
+        return _prohibido("Hay una ejecución de práctica en curso: el árbitro debe detenerla antes.", 409)
+    repo = repositorio.por_defecto()
+    if len(repo.ataques_ia(PARTIDA_ID)) >= ataque_ia.MAX_ATAQUES:
+        return _prohibido(f"Ya lanzaste los {ataque_ia.MAX_ATAQUES} ataques IA de esta partida.", 409)
+    ATAQUE_IA = {"ataque": None, "fase": "validando", "modelo": body.modelo, "desde": time.monotonic()}  # reserva
+    err = await _registrar_lado("rojo", body.modelo.strip(), body.host)
+    if err or PARTIDA.fase != "en_curso":
+        ATAQUE_IA = None
+        return _prohibido(err or "La partida ya no está en curso.", 409)
+    usuario, origen = repo.identidad_atacante(PARTIDA_ID)
+    dfn = CONFIG_ROL["azul"]
+    a = repo.crear_ataque_ia(PARTIDA_ID, _participante(request), usuario, origen, body.tecnica, body.intensidad,
+                             CONFIG_ROL["rojo"]["modelo"], dfn["modelo"] if dfn else None)
+    if a is None:
+        ATAQUE_IA = None
+        return _prohibido(f"Ya lanzaste los {ataque_ia.MAX_ATAQUES} ataques IA de esta partida.", 409)
+    ATAQUE_IA = {"ataque": a, "fase": "atacante", "modelo": CONFIG_ROL["rojo"]["modelo"], "desde": time.monotonic()}
+    ATAQUE_IA["tarea"] = asyncio.create_task(_correr_ataque_ia(PARTIDA, a, dict(CONFIG_ROL["rojo"]),
+                                                               dict(dfn) if dfn else None))
+    ms.emitir("auditoria", ms.aud("ATTACKER", "ATAQUE_IA", f"#{a['n']} · {usuario} ({origen})",
+                                  f"técnica {body.tecnica or 'libre'} · intensidad {body.intensidad}", "MEDIO"))
+    _emitir_ia()
+    return {"ataque": _en_curso_ia()}
+
+
+def _emitir_fase_ia():
+    ms.emitir("ia_ataque", {"en_curso": _en_curso_ia()})
+
+
+def _fase_ia(fase, modelo, prompt=None):
+    ATAQUE_IA.update(fase=fase, modelo=modelo, desde=time.monotonic())
+    if prompt is not None:
+        ATAQUE_IA["prompt"] = prompt
+    _emitir_fase_ia()
+
+
+async def _inferencia(fn):
+    """Una llamada bloqueante a Ollama en un hilo, con el tope de TIMEOUT_RONDA. -> resultado o None si se agotó."""
+    try:
+        return await asyncio.wait_for(asyncio.get_running_loop().run_in_executor(None, fn), TIMEOUT_RONDA)
+    except asyncio.TimeoutError:
+        return None
+
+
+def _metricas(prefijo, x):
+    x = x or {}
+    return {f"{prefijo}_ms": x.get("tiempo_ms"), f"{prefijo}_tokens_entrada": x.get("tokens_entrada"),
+            f"{prefijo}_tokens_salida": x.get("tokens"), f"{prefijo}_carga_ms": x.get("carga_ms")}
+
+
+async def _correr_ataque_ia(partida, a, atq, dfn):
+    """Atacante IA -> defensor IA -> capas -> clasificación y puntos. Nunca deja el ataque a medias: termina en
+    «terminado» (con resultado) o «cancelado» (la partida acabó antes)."""
+    global ATAQUE_IA
+    repo = repositorio.por_defecto()
+    ident = repo.identidad(a["usuario"])
+    try:
+        historial = [{"categoria": x["categoria"], "resultado": x["veredicto"]}
+                     for x in repo.ataques_ia(partida.id) if x["estado"] == "terminado" and x["categoria"]]
+        at = await _inferencia(lambda: atacante.generar_ataque(atq["host"], atq["modelo"], ident.rol, historial,
+                                                               a["intensidad"], None, a["n"], a["tecnica"]))
+        if at is None:
+            at = {"ok": False, "error": f"timeout ({TIMEOUT_RONDA} s)"}
+        campos = {**_metricas("atq", at), "objetivo": at.get("objetivo"),
+                  "sensibilidad_objetivo": at.get("sensibilidad_objetivo"), "categoria": at.get("categoria"),
+                  "prompt": at.get("prompt")}
+        if not at["ok"]:
+            res = {"resultado": "error_atacante", "puntos_rojo": 0, "puntos_azul": 0, "sensibilidad_expuesta": None}
+            p, error = None, "atacante: " + str(at["error"])
+        else:
+            if dfn is None:
+                p = {"veredicto": "ERROR", "error": "defensor: el Equipo Azul no ha configurado su defensor IA",
+                     "defensa": None, "ejecucion": None}
+            else:
+                _fase_ia("defensor", dfn["modelo"], at["prompt"])
+                p = await _inferencia(lambda: motor.procesar_defensa(
+                    dfn["host"], dfn["modelo"], at["prompt"], ident, repo, ESTADO_IA.riesgo_acumulado,
+                    ESTADO_IA.resumen(), "rojo"))
+                if p is None:
+                    p = {"veredicto": "ERROR", "error": f"defensor: timeout ({TIMEOUT_RONDA} s)", "defensa": None,
+                         "ejecucion": None}
+            res = ataque_ia.clasificar(p, a["origen_identidad"])
+            error = p.get("error") if p["veredicto"] == "ERROR" else None
+        if partida is not PARTIDA or partida.fase != "en_curso":
+            raise asyncio.CancelledError  # la partida terminó mientras se esperaba al modelo: no cuenta
+        df, ej = (p or {}).get("defensa") or {}, (p or {}).get("ejecucion") or {}
+        filtro = (p or {}).get("origen_decision") == "filtro_rapido"
+        if res["resultado"] != "error_atacante":  # la solicitud llegó al defensor: su estado real queda anotado
+            falla = res["resultado"] == "fallo_seguro"
+            DEFENSOR_IA.update(ok=not falla, ts=pt.ahora_iso(), error=error if falla else None)
+        if p and p["veredicto"] != "ERROR":
+            efectiva = "SOLICITAR_AUTORIZACION" if p.get("circuito_sesion") else df.get("decision")
+            ESTADO_IA.registrar(at.get("categoria"), p["veredicto"], efectiva)
+        capa = "circuito de sesión" if (p or {}).get("circuito_sesion") else ej.get("capa_bloqueo")
+        fila = repo.cerrar_ataque_ia(
+            a["id"], estado="terminado", resultado=res["resultado"], veredicto=(p or {}).get("veredicto"),
+            decision_ia=df.get("decision"), origen_decision="filtro_rapido" if filtro else ("ia" if df else None),
+            capa_bloqueo=capa, herramienta=ej.get("herramienta"), motivo=df.get("motivo"), error=error,
+            sensibilidad_expuesta=res["sensibilidad_expuesta"], puntos_rojo=res["puntos_rojo"],
+            puntos_azul=res["puntos_azul"],
+            explicacion=ataque_ia.explicar(res["resultado"], a["usuario"], a["origen_identidad"],
+                                           res["sensibilidad_expuesta"], capa, error, filtro),
+            **campos, **_metricas("def", df if df and not filtro else None))
+        ATAQUE_IA = None
+        ms.emitir("ia_ataque", {"en_curso": None, "terminado": _publico_ataque(fila)})
+        ms.emitir("auditoria", ms.aud("SYSTEM", "ATAQUE_IA_RESULTADO", f"#{fila['n']} · {fila['usuario']}",
+                                      ataque_ia.TITULO[fila["resultado"]],
+                                      "CRITICO" if fila["resultado"] == "datos_expuestos" else "BAJO"))
+        evento = ataque_ia.EVENTO.get(res["resultado"])
+        if evento:
+            _aplicar_regla(evento, None)  # riesgo + explicación + marcador
+        else:
+            _emitir_marcador()
+    except asyncio.CancelledError:
+        repo.cerrar_ataque_ia(a["id"], estado="cancelado", resultado="cancelado",
+                              explicacion=ataque_ia.explicar("cancelado", a["usuario"], a["origen_identidad"]))
+        ms.emitir("ia_ataque", {"en_curso": None, "cancelado": a["n"]})
+    except Exception as exc:  # noqa: BLE001 - un fallo interno nunca deja el ataque «en curso» para siempre
+        repo.cerrar_ataque_ia(a["id"], estado="terminado", resultado="fallo_seguro", error=f"interno: {exc}",
+                              explicacion=ataque_ia.explicar("fallo_seguro", a["usuario"], a["origen_identidad"],
+                                                             error=f"error interno: {exc}"))
+        ms.emitir("error", {"mensaje": f"Error interno del ataque IA: {exc}"})
+    finally:
+        if ATAQUE_IA is not None and ATAQUE_IA.get("ataque") and ATAQUE_IA["ataque"]["id"] == a["id"]:
+            ATAQUE_IA = None
+        _emitir_ia()
+
+
+def _cancelar_ataque_ia():
+    """Al cerrar la partida, el ataque en curso se cancela (su hilo de Ollama termina solo y se descarta)."""
+    if ATAQUE_IA is not None and ATAQUE_IA.get("tarea"):
+        ATAQUE_IA["tarea"].cancel()
+
+
 # ---------- manual REAL ----------
 class ManualRealIn(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=2000)
@@ -1353,7 +1597,9 @@ async def _manual_real(body, ident, host_def):
 
 @app.post("/api/manual/real")
 async def manual_real(body: ManualRealIn):
-    if ms.ESTADO["corriendo"]:
+    if err := _practica_bloqueada():
+        return err
+    if ms.ESTADO["corriendo"] or ATAQUE_IA is not None:
         return JSONResponse({"error": "Ya hay una ejecución en curso.", "mensaje": "Ya hay una ejecución en curso."},
                             status_code=409)
     ms.ESTADO["corriendo"] = True  # reserva inmediata

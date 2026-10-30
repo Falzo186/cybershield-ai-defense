@@ -139,9 +139,14 @@ def registrar_fallo_parseo(origen, modelo, texto):
         pass
 
 
+def _sumar(a, b):
+    """Suma dos métricas de Ollama; si falta alguna (None), el total es desconocido, no la mitad."""
+    return a + b if isinstance(a, int) and isinstance(b, int) else None
+
+
 def generar_json(host, modelo, system, user, requeridos, origen, **kw):
     """generar + extraer_json con UN solo reintento si la respuesta no es JSON válido con los campos requeridos.
-    -> resultado de generar + {obj: dict|None, intentos: 1|2}. Tiempos y tokens suman ambos intentos."""
+    -> resultado de generar + {obj: dict|None, intentos: 1|2}. Tiempos, tokens y carga suman ambos intentos."""
     r = generar(host, modelo, system, user, formato="json", **kw)
     r.update(obj=None, intentos=1)
     if not r["ok"]:
@@ -152,8 +157,8 @@ def generar_json(host, modelo, system, user, requeridos, origen, **kw):
     registrar_fallo_parseo(f"{origen} (intento 1)", modelo, r["contenido"])
     r2 = generar(host, modelo, system, MENSAJE_REINTENTO + "\n\n" + user, formato="json", **kw)
     r2["tiempo_ms"] += r["tiempo_ms"]
-    if isinstance(r["tokens"], int) and isinstance(r2["tokens"], int):
-        r2["tokens"] += r["tokens"]
+    for k in ("tokens", "tokens_entrada", "carga_ms"):
+        r2[k] = _sumar(r.get(k), r2.get(k))
     r2.update(obj=None, intentos=2)
     if not r2["ok"]:
         return r2
@@ -167,12 +172,20 @@ def generar_json(host, modelo, system, user, requeridos, origen, **kw):
 # lo carga en memoria/VRAM (y más aún por LAN); las llamadas siguientes son rápidas. Antes de iniciar una
 # batalla conviene usar «Probar modelo» (GET /api/ollama/probar) para forzar esa carga inicial.
 def generar(host, modelo, system, user, formato=None, timeout=120, temperature=0.7, num_predict=300):
-    """-> {ok, contenido, tiempo_ms, tokens, error}"""
+    """-> {ok, contenido, tiempo_ms, tokens, tokens_entrada, carga_ms, error}
+
+    tiempo_ms: reloj de pared medido aquí (petición completa). tokens = tokens de SALIDA (eval_count),
+    tokens_entrada = prompt_eval_count y carga_ms = load_duration, tal como los informa Ollama; si Ollama no los
+    envía (o la llamada falla) quedan en None: nunca se estiman."""
     t0 = time.perf_counter()
 
-    def resultado(ok, contenido=None, tokens=None, error=None):
+    def resultado(ok, contenido=None, datos=None, error=None):
+        datos = datos or {}
+        entero = lambda k: datos.get(k) if isinstance(datos.get(k), int) and not isinstance(datos.get(k), bool) else None  # noqa: E731
+        carga = entero("load_duration")
         return {"ok": ok, "contenido": contenido, "tiempo_ms": int((time.perf_counter() - t0) * 1000),
-                "tokens": tokens, "error": error}
+                "tokens": entero("eval_count"), "tokens_entrada": entero("prompt_eval_count"),
+                "carga_ms": carga // 1_000_000 if carga is not None else None, "error": error}
 
     # think: False -> los modelos 'thinking' (qwen3, deepseek-r1…) responden sin razonar. Ollama ya no pone el
     # razonamiento en <think> dentro de content sino en message.thinking, y ese razonamiento agotaba num_predict:
@@ -203,5 +216,4 @@ def generar(host, modelo, system, user, formato=None, timeout=120, temperature=0
     if not contenido:
         return resultado(False, error="modelo devolvió respuesta vacía (posible modelo 'thinking'); "
                                       "prueba con qwen2.5 o llama3.2")
-    tokens = datos.get("eval_count")
-    return resultado(True, contenido, tokens if isinstance(tokens, int) else None)
+    return resultado(True, contenido, datos)

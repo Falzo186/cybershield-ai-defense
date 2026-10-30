@@ -236,7 +236,7 @@ def main():
     sse = asyncio.run(srv._hook_marcador())
     sse = sse[sse.index("event: marcador_partida\n"):]  # el mismo hook envía antes el estado de la partida
     chk("el SSE entrega el marcador al conectar (también a espectadores)",
-        sse.startswith("event: marcador_partida\n") and json.loads(sse.split("data: ", 1)[1])["puntos_azul"] == 40)
+        sse.startswith("event: marcador_partida\n") and json.loads(sse.split("data: ", 1)[1].split(chr(10), 1)[0])["puntos_azul"] == 40)
     eventos = []
     original = srv.ms.emitir
     srv.ms.emitir = lambda tipo, datos: eventos.append((tipo, datos))

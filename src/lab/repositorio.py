@@ -11,7 +11,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from . import correos, documentos, permisos, schema, seed, sesion
+from . import ataque_ia, correos, documentos, permisos, schema, seed, sesion
 from .permisos import Identidad
 
 # CS_LAB_DB permite usar otra BD (p. ej. la prueba de extremo a extremo usa una temporal y no toca data/lab.db).
@@ -36,7 +36,16 @@ EVENTOS_SIEM = {
     "CREDENCIAL_COMPROMETIDA": ("credencial_comprometida", "azul"), "CREDENCIAL_REVOCADA": ("credencial_revocada", "azul"),
     "INCIDENTE_ABIERTO": ("incidente_abierto", "azul"), "INCIDENTE_ACTUALIZADO": ("incidente_actualizado", "azul"),
     "INCIDENTE_RESUELTO": ("incidente_resuelto", "azul"), "MISION_ASUMIDA": ("mision_asumida", "azul"),
+    # Fase F: ataques IA dentro de la partida
+    "ATAQUE_IA_LANZADO": ("ataque_ia_lanzado", "rojo"), "ATAQUE_IA_RESULTADO": ("ataque_ia_resultado", "rojo"),
+    "DEFENSOR_IA_CONFIGURADO": ("defensor_ia_configurado", "azul"),
 }
+# Columnas de ataques_ia que se rellenan al terminar un ataque (constantes del código, nunca del cliente).
+COLUMNAS_CIERRE_IA = ("estado", "resultado", "veredicto", "decision_ia", "origen_decision", "capa_bloqueo",
+                      "herramienta", "objetivo", "sensibilidad_objetivo", "sensibilidad_expuesta", "categoria",
+                      "prompt", "motivo", "error", "explicacion", "puntos_rojo", "puntos_azul",
+                      "atq_ms", "atq_tokens_entrada", "atq_tokens_salida", "atq_carga_ms",
+                      "def_ms", "def_tokens_entrada", "def_tokens_salida", "def_carga_ms")
 SEVERIDADES = ("baja", "media", "alta", "critica")
 # Estados del incidente y transiciones permitidas (no se puede reabrir ni saltar a resuelto sin investigar).
 TRANSICIONES_INCIDENTE = {"abierto": ("en_investigacion",), "en_investigacion": ("resuelto",), "resuelto": ()}
@@ -476,6 +485,63 @@ class Repositorio:
             return "sin_compromiso"
         self.registrar(self.identidad(usuario), "CREDENCIAL_REVOCADA", f"credencial:{usuario}", participante, "BAJO")
         return "revocada"
+
+    # ---------- ataques IA dentro de la partida (Fase F) ----------
+    def identidad_atacante(self, partida):
+        """Con qué identidad ataca la IA de Rojo: la de una credencial comprometida sin revocar (la más antigua) o,
+        si no tiene ninguna, la de invitado. -> (usuario, "credencial_robada" | "invitado")"""
+        f = self.conn.execute("SELECT usuario FROM compromisos_credencial WHERE partida=? AND revocada_ts IS NULL "
+                              "ORDER BY id LIMIT 1", (partida,)).fetchone()
+        return (f["usuario"], "credencial_robada") if f else (ataque_ia.USUARIO_SIN_CREDENCIAL, "invitado")
+
+    def crear_ataque_ia(self, partida, lanzado_por, usuario, origen_identidad, tecnica, intensidad, modelo_atq,
+                        modelo_def):
+        """Reserva el siguiente número de ataque de la partida (estado en_curso). -> dict del ataque, o None si ya
+        se lanzaron los ataque_ia.MAX_ATAQUES."""
+        with self.conn:
+            n = self.conn.execute("SELECT COUNT(*) FROM ataques_ia WHERE partida=?", (partida,)).fetchone()[0] + 1
+            if n > ataque_ia.MAX_ATAQUES:
+                return None
+            cur = self.conn.execute(
+                "INSERT INTO ataques_ia(partida,n,lanzado_por,usuario,origen_identidad,tecnica,intensidad,estado,"
+                "modelo_atq,modelo_def,ts_inicio) VALUES(?,?,?,?,?,?,?,'en_curso',?,?,?)",
+                (partida, n, lanzado_por, usuario, origen_identidad, tecnica, intensidad, modelo_atq, modelo_def,
+                 _ahora()))
+        self.registrar(self.identidad(usuario), "ATAQUE_IA_LANZADO", f"ataque_ia:{n}",
+                       f"{lanzado_por} · {origen_identidad}", "MEDIO")
+        return self.ataque_ia(cur.lastrowid)
+
+    def cerrar_ataque_ia(self, ataque_id, **campos):
+        """Guarda el desenlace de un ataque (solo columnas de COLUMNAS_CIERRE_IA). -> dict del ataque."""
+        malas = set(campos) - set(COLUMNAS_CIERRE_IA)
+        if malas:
+            raise ValueError(f"columnas no permitidas: {sorted(malas)}")
+        cols = list(campos)
+        with self.conn:
+            self.conn.execute(f"UPDATE ataques_ia SET {', '.join(c + '=?' for c in cols)}, ts_fin=? WHERE id=?",
+                              (*[campos[c] for c in cols], _ahora(), ataque_id))
+        a = self.ataque_ia(ataque_id)
+        if a["estado"] == "terminado":
+            nivel = "CRITICO" if a["resultado"] == "datos_expuestos" else "MEDIO" if a["resultado"] == "ia_enganada" else "BAJO"
+            self.registrar(self.identidad(a["usuario"]), "ATAQUE_IA_RESULTADO", f"ataque_ia:{a['n']}",
+                           a["resultado"].upper(), nivel)
+        return a
+
+    def ataque_ia(self, ataque_id):
+        f = self.conn.execute("SELECT * FROM ataques_ia WHERE id=?", (ataque_id,)).fetchone()
+        return dict(f) if f else None
+
+    def ataques_ia(self, partida):
+        return [dict(f) for f in self.conn.execute("SELECT * FROM ataques_ia WHERE partida=? ORDER BY n", (partida,))]
+
+    def puntos_ia(self, partida):
+        """Puntos de los ataques IA terminados -> {rojo, azul, lanzados, datos_expuestos, contenidos}."""
+        f = self.conn.execute(
+            "SELECT COALESCE(SUM(puntos_rojo),0) AS rojo, COALESCE(SUM(puntos_azul),0) AS azul, COUNT(*) AS lanzados, "
+            "COALESCE(SUM(resultado='datos_expuestos'),0) AS expuestos, COALESCE(SUM(resultado='contenido'),0) AS cont "
+            "FROM ataques_ia WHERE partida=?", (partida,)).fetchone()
+        return {"rojo": f["rojo"], "azul": f["azul"], "lanzados": f["lanzados"], "datos_expuestos": f["expuestos"],
+                "contenidos": f["cont"]}
 
     # ---------- incidentes de la partida (Fase E) ----------
     def abrir_incidente(self, partida, usuario, participante, titulo, severidad, correo_id=None):

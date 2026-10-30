@@ -54,6 +54,19 @@ CREATE TABLE IF NOT EXISTS compromisos_credencial(
     correo_id INTEGER NOT NULL REFERENCES correos(id), ts TEXT NOT NULL, revocada_ts TEXT, revocada_por TEXT);
 CREATE UNIQUE INDEX IF NOT EXISTS compromiso_activo ON compromisos_credencial(partida, usuario)
     WHERE revocada_ts IS NULL;
+CREATE TABLE IF NOT EXISTS ataques_ia(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, partida TEXT NOT NULL, n INTEGER NOT NULL, lanzado_por TEXT,
+    usuario TEXT NOT NULL REFERENCES usuarios(usuario),
+    origen_identidad TEXT NOT NULL CHECK(origen_identidad IN ('invitado','credencial_robada')),
+    tecnica TEXT, intensidad INTEGER NOT NULL CHECK(intensidad BETWEEN 1 AND 3),
+    estado TEXT NOT NULL CHECK(estado IN ('en_curso','terminado','cancelado')), resultado TEXT,
+    veredicto TEXT, decision_ia TEXT, origen_decision TEXT, capa_bloqueo TEXT, herramienta TEXT,
+    objetivo TEXT, sensibilidad_objetivo TEXT, sensibilidad_expuesta TEXT, categoria TEXT, prompt TEXT, motivo TEXT,
+    error TEXT, explicacion TEXT, puntos_rojo INTEGER NOT NULL DEFAULT 0, puntos_azul INTEGER NOT NULL DEFAULT 0,
+    modelo_atq TEXT, modelo_def TEXT,
+    atq_ms INTEGER, atq_tokens_entrada INTEGER, atq_tokens_salida INTEGER, atq_carga_ms INTEGER,
+    def_ms INTEGER, def_tokens_entrada INTEGER, def_tokens_salida INTEGER, def_carga_ms INTEGER,
+    ts_inicio TEXT NOT NULL, ts_fin TEXT, UNIQUE(partida, n));
 CREATE TABLE IF NOT EXISTS contenciones(
     correo_id INTEGER PRIMARY KEY REFERENCES correos(id), usuario TEXT NOT NULL REFERENCES usuarios(usuario),
     ts TEXT NOT NULL);
