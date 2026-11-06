@@ -110,3 +110,30 @@ def comparar(nombre_a, exitos_a, n_a, nombre_b, exitos_b, n_b, repeticiones=2000
     return {**base, "veredicto": "sin_diferencia_concluyente",
             "explicacion": (f"El intervalo del 95 % de la diferencia ({boot['bajo']:.3f}, {boot['alto']:.3f}) "
                             "incluye el 0: con esta muestra no se puede afirmar que haya diferencia.")}
+
+
+def clasificacion(vp, fp, fn, vn):
+    """Métricas de un clasificador binario, con intervalo de confianza y denominador siempre visible.
+
+    Cada tasa dice sobre cuántos casos se calculó. Una tasa sin denominador es `None`, no 0: con 0 casos
+    maliciosos no hay recall del 0 %, no hay recall.
+
+    F1 no lleva intervalo de confianza: es una media armónica de dos proporciones correlacionadas y un
+    Wilson sobre ella no significaría nada. Se publica el valor y, al lado, los IC de precisión y recall,
+    que sí son interpretables."""
+    vp, fp, fn, vn = (int(x or 0) for x in (vp, fp, fn, vn))
+    prec = wilson(vp, vp + fp)
+    rec = wilson(vp, vp + fn)
+    p, r = prec["valor"], rec["valor"]
+    f1 = (2 * p * r / (p + r)) if (p is not None and r is not None and (p + r) > 0) else None
+    return {
+        "VP": vp, "FP": fp, "FN": fn, "VN": vn,
+        "n": vp + fp + fn + vn, "positivos_reales": vp + fn, "negativos_reales": fp + vn,
+        "precision": prec,                       # de lo marcado como malicioso, cuánto lo era
+        "recall": rec,                           # de lo malicioso, cuánto se marcó (= sensibilidad)
+        "especificidad": wilson(vn, fp + vn),
+        "exactitud": wilson(vp + vn, vp + fp + fn + vn),
+        "f1": None if f1 is None else round(f1, 6),
+        "nota_f1": ("F1 sin intervalo de confianza a propósito: es una media de dos proporciones "
+                    "correlacionadas. Use los IC de precisión y recall."),
+    }

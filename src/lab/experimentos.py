@@ -188,5 +188,10 @@ def comparar(a, b, semilla=0):
 
 def resumen_conjunto():
     """Qué contiene hoy el conjunto de evaluación (para la documentación y el panel)."""
+    # `fijos` son los escritos a mano; `generados` los que produce la recombinación determinista de la
+    # familia C. Se publican por separado para que nadie confunda cobertura escrita con cobertura generada.
+    gen = escenarios.generados()
     return {"familias": escenarios.resumen_conjunto(), "huella": huella_conjunto(),
-            "total": len(escenarios.FIJOS)}
+            "total": len(escenarios.FIJOS) + len(gen),
+            "fijos": len(escenarios.FIJOS), "generados": len(gen),
+            "huella_generados": escenarios.huella_generados()}

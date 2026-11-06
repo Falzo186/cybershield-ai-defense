@@ -159,6 +159,58 @@ def main():
         chk("cancelar sin campaña en curso da 409",
             c.post("/api/panel/campana/cancelar", json={}, headers=cab).status_code == 409)
 
+        # ── Mediciones de la Fase E: modelo, atacante y lotes ─────────────────────────────────────────────
+        for ruta in ("/api/panel/adversarial/modelo", "/api/panel/adversarial/atacante", "/api/panel/lotes"):
+            r = c.get(ruta)
+            chk(f"GET {ruta} responde 200 sin sesión", r.status_code == 200)
+            j = r.json()
+            chk(f"{ruta} no inventa progreso si no se ha lanzado nada",
+                j["en_curso"] is False and j["progreso"] is None and j["resultado"] is None)
+            chk(f"{ruta} explica qué mide", bool(j.get("nota")))
+        chk("lanzar una medición del modelo exige sesión",
+            c.post("/api/panel/adversarial/modelo", json={"modelo": "x"}).status_code == 403)
+        chk("lanzar una medición del atacante exige sesión",
+            c.post("/api/panel/adversarial/atacante", json={"modelo_atacante": "x"}).status_code == 403)
+        chk("lanzar un lote exige sesión",
+            c.post("/api/panel/lotes", json={"modelo": "x"}).status_code == 403)
+
+        # Las tres medidas están en rutas distintas: el filtro, el modelo y el camino completo no se mezclan.
+        det = c.get("/api/panel/adversarial").json()
+        chk("la ruta del filtro sigue midiendo solo el filtro determinista",
+            "metricas" in det and "deteccion" in det["metricas"])
+        chk("la del modelo declara que va sin el filtro delante",
+            "sin el filtro" in c.get("/api/panel/adversarial/modelo").json()["nota"])
+        chk("la del atacante define «objetivo conseguido» sobre la ejecución",
+            "sobre la ejecución" in c.get("/api/panel/adversarial/atacante").json()["nota"])
+
+        for ruta, cuerpo, que in (("/api/panel/adversarial/modelo", {}, "modelo"),
+                                  ("/api/panel/adversarial/atacante", {}, "modelo_atacante"),
+                                  ("/api/panel/adversarial/atacante", {"modelo_atacante": "x"},
+                                   "modelo_defensor"),
+                                  ("/api/panel/lotes", {}, "modelo")):
+            r = c.post(ruta, json=cuerpo, headers=cab)
+            chk(f"{ruta} sin {que} se rechaza", r.status_code in (400, 503) and "error" in r.json())
+        r = c.post("/api/panel/adversarial/modelo", json={"modelo": "no-existe"}, headers=cab)
+        chk("una medición con un modelo que no está en Ollama se rechaza, nunca se simula",
+            r.status_code in (400, 503) and "error" in r.json())
+        chk("cancelar una medición que no existe da 409",
+            c.post("/api/panel/adversarial/cancelar", json={}, headers=cab).status_code == 409)
+
+        chk("el listado de campañas por lotes es una lista",
+            isinstance(c.get("/api/panel/lotes").json()["campanas"], list))
+        r = c.get("/api/panel/lotes/no-existe-esta-campana")
+        chk("consultar una campaña por lotes inexistente da 404",
+            r.status_code == 404 and "error" in r.json())
+
+        # El conjunto de evaluación publica fijos y generados por separado.
+        cj = c.get("/api/panel/estado").json()["conjunto_evaluacion"]
+        chk("el estado separa escenarios fijos de generados",
+            cj["fijos"] > 0 and cj["generados"] > 0 and cj["total"] == cj["fijos"] + cj["generados"])
+        chk("y publica la huella del conjunto generado, para saber qué se midió",
+            bool(cj["huella_generados"]))
+        chk("la familia generado aparece en el desglose por familias",
+            cj["familias"]["generado"]["total"] == cj["generados"])
+
         # ── El panel estático se sirve ────────────────────────────────────────────────────────────────────
         p = c.get("/panel/")
         chk("la página del panel se sirve", p.status_code == 200 and "CyberShield" in p.text)

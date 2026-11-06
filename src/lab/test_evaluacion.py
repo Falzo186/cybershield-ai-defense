@@ -79,8 +79,10 @@ def main():
 
     # ── El conjunto de evaluación ───────────────────────────────────────────────────────────────────────────
     todos = escenarios.conjunto(repo=repo)
+    # La familia `generado` ya no está vacía (Fase E): se produce por recombinación determinista, así que
+    # las 12 familias del encargo están todas cubiertas.
     chk("hay escenarios de las 12 familias",
-        {e["familia"] for e in todos} == set(escenarios.FAMILIAS) - {"generado"})
+        {e["familia"] for e in todos} == set(escenarios.FAMILIAS))
     chk("los ids son únicos", len({e["id"] for e in todos}) == len(todos))
     chk("todo escenario verificable trae su referencia",
         all(e["esperado"] in escenarios.ESPERADOS for e in todos if e["verificable"]))
@@ -288,8 +290,90 @@ def main():
             experimentos.comparar(None, e2)["comparable"] is False)
         chk("el experimento es serializable a JSON", isinstance(json.dumps(e1, default=str), str))
 
-    chk("el resumen del conjunto cuenta todos los escenarios",
-        experimentos.resumen_conjunto()["total"] == len(escenarios.FIJOS))
+    # ── Familia C · generado (Fase E) ──────────────────────────────────────────────────────────────────────
+    g = escenarios.generados(0)
+    chk("la familia generado ya no está vacía", len(g) > 0)
+    chk("cubre todas las combinaciones rol × herramienta",
+        {(e["rol"], e["herramienta_pedida"]) for e in g} ==
+        {(r, h) for r in escenarios._ROLES_GEN for h in escenarios.CATALOGO_ORDEN})
+    chk("todos son de la familia generado y lo declaran en su origen",
+        all(e["familia"] == "generado" and e["origen"] == "generado" for e in g))
+    chk("todos son verificables: su referencia se calcula, no se escribe a mano",
+        all(e["verificable"] for e in g))
+    chk("y cada uno dice con qué técnica se compuso", all("técnica" in (e["nota"] or "") for e in g))
+    chk("los ids son únicos dentro de la familia", len({e["id"] for e in g}) == len(g))
+    chk("y no choca ninguno con los fijos",
+        not ({e["id"] for e in g} & {e["id"] for e in escenarios.FIJOS}))
+
+    # Reproducibilidad: es la razón de generarlos por recombinación y no con un modelo.
+    chk("la misma semilla da el mismo conjunto",
+        escenarios.huella_generados(7) == escenarios.huella_generados(7))
+    chk("otra semilla da otro conjunto",
+        escenarios.huella_generados(7) != escenarios.huella_generados(8))
+    chk("el texto es idéntico con la misma semilla",
+        [e["texto"] for e in escenarios.generados(3)] == [e["texto"] for e in escenarios.generados(3)])
+    chk("por_combinacion multiplica el conjunto", len(escenarios.generados(0, 3)) == 3 * len(g))
+    chk("por_combinacion no puede pedir más plantillas de las que hay",
+        len(escenarios.generados(0, 99)) == len(escenarios._PLANTILLAS) * len(g))
+    chk("por_combinacion por debajo de 1 se trata como 1", len(escenarios.generados(0, 0)) == len(g))
+
+    # La técnica de escalada NO se genera: su referencia no se deduce de la herramienta pedida.
+    chk("ninguna plantilla generada pide escalar privilegios",
+        all("escalar_privilegios" not in (e["nota"] or "") for e in escenarios.generados(0, 99)))
+    chk("y ninguna pide un cambio de perfil",
+        all("perfil a administración" not in e["texto"] for e in escenarios.generados(0, 99)))
+
+    # La referencia de un generado se calcula igual que la de un fijo.
+    con_ref = escenarios.conjunto(["generado"], repo)
+    chk("pedir solo la familia generado la devuelve", len(con_ref) == len(g))
+    chk("cada generado trae su referencia y su motivo",
+        all(e["esperado"] in escenarios.ESPERADOS and e["motivo_esperado"] for e in con_ref))
+    chk("la referencia coincide con la capa de permisos",
+        all(e["esperado"] == escenarios.esperado(e["rol"], e["herramienta_pedida"], repo)[0] for e in con_ref))
+    chk("hay controles legítimos entre los generados (referencia «permitir»)",
+        any(e["esperado"] == "permitir" for e in con_ref))
+    chk("y casos que hay que contener", any(e["esperado"] == "contener" for e in con_ref))
+
+    # El plan de una campaña ata la semilla al conjunto generado, no solo al orden.
+    p1 = campana.plan("intensivo", ["generado"], 1, 11, repo)
+    p2 = campana.plan("intensivo", ["generado"], 1, 11, repo)
+    p3 = campana.plan("intensivo", ["generado"], 1, 12, repo)
+    chk("el plan con la misma semilla mide el mismo conjunto generado",
+        [e["texto"] for e, _ in p1] == [e["texto"] for e, _ in p2])
+    chk("con otra semilla, el conjunto generado cambia",
+        sorted(e["texto"] for e, _ in p1) != sorted(e["texto"] for e, _ in p3))
+
+    chk("el resumen del conjunto separa fijos de generados",
+        experimentos.resumen_conjunto()["fijos"] == len(escenarios.FIJOS)
+        and experimentos.resumen_conjunto()["generados"] == len(g))
+
+    # ── metricas.clasificacion ─────────────────────────────────────────────────────────────────────────────
+    c = metricas.clasificacion(8, 2, 1, 9)
+    chk("clasificacion cuenta los cuatro cuadrantes",
+        (c["VP"], c["FP"], c["FN"], c["VN"], c["n"]) == (8, 2, 1, 9, 20))
+    chk("precisión = VP/(VP+FP)", abs(c["precision"]["valor"] - 8 / 10) < 1e-12)
+    chk("recall = VP/(VP+FN)", abs(c["recall"]["valor"] - 8 / 9) < 1e-12)
+    chk("especificidad = VN/(VN+FP)", abs(c["especificidad"]["valor"] - 9 / 11) < 1e-12)
+    chk("exactitud = (VP+VN)/n", abs(c["exactitud"]["valor"] - 17 / 20) < 1e-12)
+    chk("F1 es la media armónica de precisión y recall",
+        abs(c["f1"] - 2 * (8 / 10) * (8 / 9) / ((8 / 10) + (8 / 9))) < 1e-6)
+    chk("precisión y recall traen intervalo de confianza",
+        c["precision"]["bajo"] is not None and c["recall"]["alto"] is not None)
+    chk("F1 no trae intervalo de confianza, y se explica por qué", "nota_f1" in c and "f1" in c)
+    vacio = metricas.clasificacion(0, 0, 0, 0)
+    chk("sin casos no hay tasas, y valen None",
+        vacio["precision"]["valor"] is None and vacio["recall"]["valor"] is None and vacio["f1"] is None)
+    chk("sin positivos reales no hay recall",
+        metricas.clasificacion(0, 3, 0, 5)["recall"]["valor"] is None)
+    chk("sin positivos marcados no hay precisión",
+        metricas.clasificacion(0, 0, 4, 5)["precision"]["valor"] is None)
+    chk("un clasificador perfecto da 1 en todo",
+        metricas.clasificacion(10, 0, 0, 10)["f1"] == 1.0)
+    chk("clasificacion tolera None como cero",
+        metricas.clasificacion(None, None, None, None)["n"] == 0)
+
+    chk("el resumen del conjunto cuenta todos los escenarios, fijos y generados",
+        experimentos.resumen_conjunto()["total"] == len(escenarios.FIJOS) + len(escenarios.generados()))
 
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)

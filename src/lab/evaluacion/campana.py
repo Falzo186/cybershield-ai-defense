@@ -69,7 +69,9 @@ def plan(modo="estandar", familias=None, repeticiones=None, semilla=0, repo=None
     fam_modo, rep_modo, _ = MODOS.get(modo, MODOS["estandar"])
     fams = familias if familias is not None else fam_modo
     reps = int(repeticiones if repeticiones is not None else rep_modo)
-    base = escenarios.conjunto(fams, repo, solo_verificables)
+    # La semilla de la campaña también fija el conjunto `generado`: así «misma semilla» significa de verdad
+    # «mismo conjunto medido», y no solo «mismo orden».
+    base = escenarios.conjunto(fams, repo, solo_verificables, semilla_generados=semilla)
     trabajos = [(e, i + 1) for e in base for i in range(max(1, reps))]
     random.Random(semilla).shuffle(trabajos)   # el orden también es parte de la reproducibilidad
     return trabajos
