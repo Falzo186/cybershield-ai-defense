@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CyberShield · Panel de operaciones</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+
+<!-- Iconos: SVG en línea, nunca emojis. Se referencian con <use href="#i-..."> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <g id="i-escudo"><path d="M12 2 4 5.5v6c0 5 3.4 9.3 8 10.5 4.6-1.2 8-5.5 8-10.5v-6L12 2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></g>
+  <g id="i-panel"><rect x="3" y="3" width="7" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="13" width="7" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/></g>
+  <g id="i-consola"><rect x="2.5" y="4" width="19" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m7 10 2.5 2L7 14M12.5 15H17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-experimento"><path d="M9 3v6.5L4.2 18A2 2 0 0 0 6 21h12a2 2 0 0 0 1.8-3L15 9.5V3M8 3h8M7.5 14h9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-escenarios"><path d="M4 5h16M4 10h16M4 15h10M4 20h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+  <g id="i-rag"><path d="M4 6a3 3 0 0 1 3-3h13v15H7a3 3 0 0 0-3 3V6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 7h7M9 11h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+  <g id="i-harness"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.8 2.8M16.2 16.2 19 19M19 5l-2.8 2.8M7.8 16.2 5 19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+  <g id="i-seguridad"><rect x="4" y="10" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/></g>
+  <g id="i-soc"><path d="M3 12h4l2.5-6 4 13L16 12h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-cronologia"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5.5l3.5 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+  <g id="i-correlacion"><circle cx="5.5" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="18.5" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="18.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m7.7 7.2 8.4 2M17.3 12.3l-7.5 4.6" stroke="currentColor" stroke-width="1.6"/></g>
+  <g id="i-diagnostico"><path d="M12 3v7M12 21v-3M5 7l4 3M19 7l-4 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="14" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/></g>
+  <g id="i-info"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v5.5M12 7.8v.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></g>
+  <g id="i-aviso"><path d="M12 3.5 2.8 20h18.4L12 3.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 9.5v4.5M12 17.2v.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></g>
+  <g id="i-refrescar"><path d="M20 11a8 8 0 1 0-1.5 6M20 5v6h-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-jugar"><path d="M7 4.5 19 12 7 19.5V4.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></g>
+  <g id="i-detener"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/></g>
+</defs></svg>
+
+<div class="armazon">
+
+  <!-- ── Barra lateral ──────────────────────────────────────────────────────────────────────────── -->
+  <aside class="lateral">
+    <div class="marca">
+      <svg class="marca-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-escudo"></use></svg>
+      <div>
+        <div class="marca-texto">CyberShield</div>
+        <div class="marca-sub">Panel de operaciones</div>
+      </div>
+    </div>
+
+    <nav class="nav" aria-label="Secciones">
+      <div class="nav-grupo">Análisis</div>
+      <button class="nav-item" data-vista="dashboard" aria-current="page"><svg viewBox="0 0 24 24"><use href="#i-panel"></use></svg><span>Dashboard</span></button>
+      <button class="nav-item" data-vista="consola"><svg viewBox="0 0 24 24"><use href="#i-consola"></use></svg><span>Consola de defensa</span></button>
+      <button class="nav-item" data-vista="experimentos"><svg viewBox="0 0 24 24"><use href="#i-experimento"></use></svg><span>Experimentos</span></button>
+      <button class="nav-item" data-vista="escenarios"><svg viewBox="0 0 24 24"><use href="#i-escenarios"></use></svg><span>Conjunto de evaluación</span></button>
+      <button class="nav-item" data-vista="diagnostico"><svg viewBox="0 0 24 24"><use href="#i-diagnostico"></use></svg><span>Clasificación de fallos</span></button>
+
+      <div class="nav-grupo">Motor</div>
+      <button class="nav-item" data-vista="rag"><svg viewBox="0 0 24 24"><use href="#i-rag"></use></svg><span>RAG</span></button>
+      <button class="nav-item" data-vista="harness"><svg viewBox="0 0 24 24"><use href="#i-harness"></use></svg><span>Harness</span></button>
+
+      <div class="nav-grupo">Operaciones</div>
+      <button class="nav-item" data-vista="soc"><svg viewBox="0 0 24 24"><use href="#i-soc"></use></svg><span>Centro SOC</span></button>
+      <button class="nav-item" data-vista="cronologia"><svg viewBox="0 0 24 24"><use href="#i-cronologia"></use></svg><span>Cronología</span></button>
+      <button class="nav-item" data-vista="correlacion"><svg viewBox="0 0 24 24"><use href="#i-correlacion"></use></svg><span>Correlación</span></button>
+      <button class="nav-item" data-vista="seguridad"><svg viewBox="0 0 24 24"><use href="#i-seguridad"></use></svg><span>Laboratorio adversarial</span></button>
+    </nav>
+
+    <div class="pie-lateral">
+      Laboratorio local · datos ficticios<br>
+      <a href="/">Ir a la partida Rojo/Azul</a>
+    </div>
+  </aside>
+
+  <!-- ── Principal ──────────────────────────────────────────────────────────────────────────────── -->
+  <div class="principal">
+    <header class="superior">
+      <h1 class="titulo-seccion" id="titulo-seccion">Dashboard</h1>
+      <div class="estados" id="estados" aria-live="polite">
+        <span class="chip chip-neutro">Comprobando estado</span>
+      </div>
+    </header>
+
+    <main class="contenido">
+
+      <!-- Dashboard ------------------------------------------------------------------------------- -->
+      <section class="vista" id="vista-dashboard">
+        <div class="cabecera-vista">
+          <h2>Estado del laboratorio</h2>
+          <p>Cifras obtenidas del registro de experimentos y de los módulos reales. Un indicador sin datos
+             se muestra como «sin datos», nunca como cero.</p>
+        </div>
+        <div class="pila">
+          <div class="rejilla rejilla-4" id="kpis"></div>
+          <div class="rejilla rejilla-2">
+            <div class="tarjeta">
+              <div class="tarjeta-cab"><h3>Exactitud por experimento</h3>
+                <span class="chip chip-neutro sin-punto" id="chip-serie">—</span></div>
+              <div class="tarjeta-cuerpo" id="grafica-serie"></div>
+            </div>
+            <div class="tarjeta">
+              <div class="tarjeta-cab"><h3>Exactitud por técnica</h3>
+                <span class="chip chip-neutro sin-punto">media de los experimentos registrados</span></div>
+              <div class="tarjeta-cuerpo" id="grafica-tecnicas"></div>
+            </div>
+          </div>
+          <div class="tarjeta">
+            <div class="tarjeta-cab"><h3>Experimentos recientes</h3>
+              <div class="acciones"><button class="boton" id="btn-refrescar-dash">
+                <svg viewBox="0 0 24 24"><use href="#i-refrescar"></use></svg>Actualizar</button></div></div>
+            <div class="tarjeta-cuerpo sin-relleno" id="tabla-recientes"></div>
+          </div>
+          <div class="rejilla rejilla-2">
+            <div class="tarjeta">
+              <div class="tarjeta-cab"><h3>Servicios</h3></div>
+              <div class="tarjeta-cuerpo" id="servicios"></div>
+            </div>
+            <div class="tarjeta">
+              <div class="tarjeta-cab"><h3>Defensa determinista frente a inyección</h3></div>
+              <div class="tarjeta-cuerpo" id="resumen-adversarial"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Consola de defensa ---------------------------------------------------------------------- -->
+      <section class="vista" id="vista-consola" hidden>
+        <div class="cabecera-vista">
+          <h2>Consola de defensa</h2>
+          <p>Lanza una campaña de evaluación contra Ollama real y sigue su progreso. El progreso es
+             rondas hechas sobre planificadas: no hay barras estimadas.</p>
+        </div>
+        <div class="consola">
+          <div class="pila">
+            <div class="tarjeta">
+              <div class="tarjeta-cab"><h3>Campaña</h3><span class="chip chip-neutro sin-punto" id="chip-campana">en reposo</span></div>
+              <div class="tarjeta-cuerpo" id="campana-estado"></div>
+            </div>
+            <div class="tarjeta">
+              <div class="tarjeta-cab"><h3>Resultado</h3></div>
+              <div class="tarjeta-cuerpo" id="campana-resultado">
+                <div class="vacio"><strong>Todavía no hay resultados en esta sesión</strong>
+                  Lanza una campaña o consulta la sección de experimentos.</div>
+              </div>
+            </div>
+          </div>
+          <div class="pila">
+            <div class="tarjeta">
+              <div class="tarjeta-cab"><h3>Configuración</h3></div>
+              <div class="tarjeta-cuerpo pila" id="formulario-campana"></div>
+            </div>
+            <div class="tarjeta">
+              <div class="tarjeta-cab"><h3>Consulta al RAG</h3></div>
+              <div class="tarjeta-cuerpo pila">
+                <label class="campo"><span>Solicitud</span>
+                  <textarea id="rag-consulta" rows="3" placeholder="Escribe una solicitud para ver qué documentación recuperaría el defensor"></textarea></label>
+                <button class="boton" id="btn-rag-consulta">Recuperar</button>
+                <div id="rag-resultado"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Experimentos ---------------------------------------------------------------------------- -->
+      <section class="vista" id="vista-experimentos" hidden>
+        <div class="cabecera-vista">
+          <h2>Experimentos</h2>
+          <p>Cada experimento guarda modelo, técnica, semilla, temperatura, versión del código y huella del
+             conjunto. Dos experimentos que difieran en algo más que la variable comparada se marcan como
+             no comparables.</p>
+        </div>
+        <div class="pila">
+          <div class="tarjeta">
+            <div class="barra-filtros" id="filtros-experimentos"></div>
+            <div class="tarjeta-cuerpo sin-relleno" id="tabla-experimentos"></div>
+          </div>
+          <div class="tarjeta">
+            <div class="tarjeta-cab"><h3>Comparar dos experimentos</h3></div>
+            <div class="tarjeta-cuerpo pila" id="comparador"></div>
+          </div>
+          <div class="tarjeta" id="tarjeta-detalle-exp" hidden>
+            <div class="tarjeta-cab"><h3>Detalle del experimento</h3>
+              <div class="acciones"><button class="boton" id="btn-cerrar-detalle">Cerrar</button></div></div>
+            <div class="tarjeta-cuerpo" id="detalle-experimento"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Conjunto de evaluación ------------------------------------------------------------------ -->
+      <section class="vista" id="vista-escenarios" hidden>
+        <div class="cabecera-vista">
+          <h2>Conjunto de evaluación</h2>
+          <p>La referencia de cada escenario se calcula con la capa de permisos, no la decide ningún modelo.
+             Los escenarios sin referencia calculable se marcan como exploratorios y quedan fuera de la
+             exactitud oficial.</p>
+        </div>
+        <div class="tarjeta">
+          <div class="barra-filtros" id="filtros-escenarios"></div>
+          <div class="tarjeta-cuerpo sin-relleno" id="tabla-escenarios"></div>
+        </div>
+      </section>
+
+      <!-- Clasificación de fallos ----------------------------------------------------------------- -->
+      <section class="vista" id="vista-diagnostico" hidden>
+        <div class="cabecera-vista">
+          <h2>Clasificación de fallos</h2>
+          <p>Las clases con las que se diagnostica cada ronda. Las que no cuentan para el modelo quedan
+             fuera del denominador de exactitud y se publican por separado.</p>
+        </div>
+        <div class="tarjeta"><div class="tarjeta-cuerpo sin-relleno" id="tabla-diagnostico"></div></div>
+      </section>
+
+      <!-- RAG ------------------------------------------------------------------------------------- -->
+      <section class="vista" id="vista-rag" hidden>
+        <div class="cabecera-vista">
+          <h2>Recuperación documental (RAG)</h2>
+          <p>Estado del índice y corpus indexado. Lo recuperado es material de consulta: cada fragmento pasa
+             por el filtro de inyección antes de entrar en el prompt.</p>
+        </div>
+        <div class="pila">
+          <div class="rejilla rejilla-4" id="rag-kpis"></div>
+          <div class="tarjeta">
+            <div class="tarjeta-cab"><h3>Corpus indexado</h3>
+              <div class="acciones"><button class="boton" id="btn-rag-reconstruir">
+                <svg viewBox="0 0 24 24"><use href="#i-refrescar"></use></svg>Reconstruir índice</button></div></div>
+            <div class="tarjeta-cuerpo sin-relleno" id="tabla-corpus"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Harness --------------------------------------------------------------------------------- -->
+      <section class="vista" id="vista-harness" hidden>
+        <div class="cabecera-vista">
+          <h2>Harness</h2>
+          <p>Capa de control sobre lo que el modelo puede hacer: presupuestos, detección de bucles y
+             cancelación. Un reintento nunca sirve para rodear un permiso.</p>
+        </div>
+        <div class="pila" id="harness-contenido"></div>
+      </section>
+
+      <!-- Centro SOC ------------------------------------------------------------------------------ -->
+      <section class="vista" id="vista-soc" hidden>
+        <div class="cabecera-vista">
+          <h2>Centro de operaciones</h2>
+          <p>Alertas según el modo de Wazuh activo. Una alerta deducida por el adaptador simulado va
+             siempre marcada como simulada y nunca se presenta como procedente de Wazuh.</p>
+        </div>
+        <div class="pila">
+          <div id="soc-aviso-modo"></div>
+          <div class="rejilla rejilla-4" id="soc-kpis"></div>
+          <div class="tarjeta">
+            <div class="barra-filtros" id="filtros-soc"></div>
+            <div class="tarjeta-cuerpo sin-relleno" id="tabla-alertas"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cronología ------------------------------------------------------------------------------ -->
+      <section class="vista" id="vista-cronologia" hidden>
+        <div class="cabecera-vista">
+          <h2>Cronología del incidente</h2>
+          <p>Eventos del laboratorio, auditoría y alertas en una sola línea de tiempo. Cada registro indica
+             de dónde viene y si es real o simulado.</p>
+        </div>
+        <div class="tarjeta">
+          <div class="barra-filtros" id="filtros-cronologia"></div>
+          <div class="tarjeta-cuerpo" id="lista-cronologia"></div>
+        </div>
+      </section>
+
+      <!-- Correlación ----------------------------------------------------------------------------- -->
+      <section class="vista" id="vista-correlacion" hidden>
+        <div class="cabecera-vista">
+          <h2>Correlación de incidentes</h2>
+          <p>Eventos agrupados con reglas fijas y explicables. Una coincidencia temporal no basta: si no hay
+             una regla que los una, no se relacionan.</p>
+        </div>
+        <div class="pila">
+          <div class="rejilla rejilla-4" id="correlacion-kpis"></div>
+          <div class="tarjeta">
+            <div class="tarjeta-cab"><h3>Incidentes detectados</h3></div>
+            <div class="tarjeta-cuerpo" id="lista-incidentes"></div>
+          </div>
+          <div class="tarjeta">
+            <div class="tarjeta-cab"><h3>Reglas de correlación</h3></div>
+            <div class="tarjeta-cuerpo sin-relleno" id="tabla-reglas-correlacion"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Laboratorio adversarial ----------------------------------------------------------------- -->
+      <section class="vista" id="vista-seguridad" hidden>
+        <div class="cabecera-vista">
+          <h2>Laboratorio adversarial</h2>
+          <p>Resistencia de la defensa determinista a prompt injection directa e indirecta. Reproducible al
+             100 %: no interviene ningún modelo.</p>
+        </div>
+        <div class="pila">
+          <div class="rejilla rejilla-4" id="adv-kpis"></div>
+          <div class="rejilla rejilla-2">
+            <div class="tarjeta">
+              <div class="tarjeta-cab"><h3>Matriz de confusión</h3></div>
+              <div class="tarjeta-cuerpo" id="adv-matriz"></div>
+            </div>
+            <div class="tarjeta">
+              <div class="tarjeta-cab"><h3>Por vector de ataque</h3></div>
+              <div class="tarjeta-cuerpo" id="adv-vectores"></div>
+            </div>
+          </div>
+          <div class="tarjeta">
+            <div class="barra-filtros" id="filtros-adv"></div>
+            <div class="tarjeta-cuerpo sin-relleno" id="tabla-adversarial"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script src="panel.js"></script>
+</body>
+</html>

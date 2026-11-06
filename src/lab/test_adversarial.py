@@ -124,13 +124,22 @@ def main():
     chk("resumir_cumplimiento vacío no lanza", adv.resumir_cumplimiento([])["intentos"] == 0)
 
     # ── Aislamiento del camino de producción ────────────────────────────────────────────────────────────────
+    # El laboratorio adversarial NO puede estar en el camino que atiende una solicitud real: ni el motor, ni
+    # las capas, ni el servidor de la partida. Sí puede leerlo una vista de solo lectura (server/panel.py),
+    # que es donde se presenta su resultado; esa excepción es explícita y está aquí para que se vea.
     from pathlib import Path
     raiz = Path(__file__).resolve().parents[2]
-    usuarios = [p for p in list((raiz / "src" / "lab").glob("*.py")) + list((raiz / "server").glob("*.py"))
+    PERMITIDO_LEER = {"adversarial.py", "panel.py"}
+    usuarios = [p.name for p in list((raiz / "src" / "lab").glob("*.py")) + list((raiz / "server").glob("*.py"))
                 if "adversarial" in p.read_text(encoding="utf-8") and not p.name.startswith("test_")
-                and p.name != "adversarial.py"]
-    chk("el laboratorio adversarial no lo importa el código de producción",
-        usuarios == [], )
+                and p.name not in PERMITIDO_LEER]
+    chk("el laboratorio adversarial no está en el camino que atiende una solicitud real", usuarios == [])
+    chk("en concreto, ni el motor ni el servidor de la partida lo importan",
+        "adversarial" not in (raiz / "src" / "lab" / "motor.py").read_text(encoding="utf-8")
+        and "adversarial" not in (raiz / "src" / "lab" / "herramientas.py").read_text(encoding="utf-8")
+        and "adversarial" not in (raiz / "server" / "app.py").read_text(encoding="utf-8"))
+    chk("la única vista que lo lee es el panel, y solo para mostrar su resultado",
+        "adversarial.campana_deteccion" in (raiz / "server" / "panel.py").read_text(encoding="utf-8"))
 
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)

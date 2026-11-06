@@ -26,6 +26,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse  # noqa: 
 from pydantic import BaseModel, Field  # noqa: E402
 
 import mock_server as ms  # noqa: E402
+import panel as pn  # noqa: E402
 import partida as pt  # noqa: E402
 from src.lab import apps, ataque_ia, atacante, cliente_ollama, correos, documentos, informe, motor, repositorio, sesion  # noqa: E402
 
@@ -59,6 +60,10 @@ SALA = pt.Sala(CODIGO_ARBITRO)
 RUTAS_PUBLICAS = ("/api/eventos", "/api/estado", "/api/ia/estado", "/api/cronologia", "/api/resultados", "/api/partidas",
                   "/api/apps", "/api/recursos", "/api/ayuda")
 RUTA_SESION = "/api/sesion"
+# El panel de análisis (/api/panel/...) es una vista de solo lectura del laboratorio: no toca la partida, no
+# expone secretos y se consulta sin unirse a ningún equipo. Sus POST (lanzar o cancelar una campaña) sí
+# exigen sesión, como cualquier otra acción.
+PREFIJOS_PUBLICOS = ("/api/panel/",)
 # Rutas reservadas a UN equipo (además de exigir sesión). Detener, iniciar y cerrar la partida es cosa del árbitro;
 # Rojo envía correos de entrenamiento y Azul los lee en su buzón.
 SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul",
@@ -146,7 +151,8 @@ async def _verificar_sesion(request: Request, call_next):
     p = SALA.por_token(request.headers.get("X-Equipo-Token"))
     request.state.participante = p
     request.state.equipo = p.equipo if p else None
-    if p is None and not (request.method == "GET" and ruta in RUTAS_PUBLICAS):
+    publica = ruta in RUTAS_PUBLICAS or ruta.startswith(PREFIJOS_PUBLICOS)
+    if p is None and not (request.method == "GET" and publica):
         return _prohibido("Falta una sesión válida: únete a la partida con tu nombre. "
                           "Sin sesión (espectador) solo se puede leer eventos y estado.")
     if p is not None and p.rol == "espectador" and request.method != "GET":
@@ -1814,6 +1820,8 @@ async def manual_real(body: ManualRealIn):
     return payload if ok else JSONResponse(payload, status_code=502)
 
 
+# El panel va antes del mount de la UI: ese mount captura «/» y se traga lo que venga después.
+pn.registrar(app, HOST, repositorio.por_defecto)
 ms.montar_ui(app)
 
 if __name__ == "__main__":
