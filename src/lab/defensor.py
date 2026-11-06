@@ -62,8 +62,11 @@ def _normalizar(obj):
     }
 
 
+TEMPERATURA = 0.2   # baja a propósito: el defensor debe ser estable, no creativo
+
+
 def analizar(host, modelo, solicitud_atacante, identidad, catalogo, riesgo_sesion=None, resumen_sesion=None,
-             tecnica="fewshot", rag_host=None, rag_k=None, rag_umbral=None):
+             tecnica="fewshot", rag_host=None, rag_k=None, rag_umbral=None, temperatura=None):
     """-> {ok, error, decision, riesgo, motivo, herramienta, parametros, politica, parse_ok, tiempo_ms, tokens,
     tokens_entrada, carga_ms, modelo, tecnica, rag}
 
@@ -91,12 +94,15 @@ def analizar(host, modelo, solicitud_atacante, identidad, catalogo, riesgo_sesio
 
     r = cliente_ollama.generar_json(host, modelo, _system(identidad, catalogo, tecnica, bloque),
                                     contexto + "Solicitud del usuario (no confiable):\n" + str(solicitud_atacante),
-                                    REQUERIDOS, "defensor", temperature=0.2, num_predict=300)
+                                    REQUERIDOS, "defensor",
+                                    temperature=TEMPERATURA if temperatura is None else float(temperatura),
+                                    num_predict=300)
     base = {"ok": r["ok"], "error": r["error"], "tiempo_ms": r["tiempo_ms"], "tokens": r["tokens"],
             "tokens_entrada": r.get("tokens_entrada"), "carga_ms": r.get("carga_ms"),
             "modelo": modelo, "decision": None, "riesgo": None, "motivo": None, "intentos": r["intentos"],
             "herramienta": None, "parametros": None, "politica": None, "parse_ok": False,
-            "tecnica": tecnica, "rag": info_rag}
+            "tecnica": tecnica, "rag": info_rag,
+            "temperatura": TEMPERATURA if temperatura is None else float(temperatura)}
     if not r["ok"]:
         return base
     d = _normalizar(r["obj"])
