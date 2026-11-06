@@ -99,11 +99,43 @@ un registro completo de lo que hizo el modelo.
 
 Misma técnica (`fewshot`), pipeline directo, mismo conjunto y misma semilla.
 
-| Temperatura | Exactitud | IC 95 % | Repetibilidad | Latencia mediana |
+| Temperatura | Exactitud | IC 95 % | **Repetibilidad** | Latencia mediana |
 |---|---|---|---|---|
-| 0.0 | 82.1 % | [67.3 %, 91.0 %] | 92.3 % | 2 088 ms |
+| 0.0 | 82.1 % | [67.3 %, 91.0 %] | **92.3 %** | 2 088 ms |
+| **0.2** (la del defensor) | **87.2 %** | [73.3 %, 94.4 %] | 84.6 % | 2 208 ms |
+| 0.7 | 71.8 % | [56.2 %, 83.5 %] | **46.2 %** | 2 417 ms |
 
-<!-- RESULTADOS-TEMPERATURA -->
+Comparación contra la temperatura actual (0.2), bootstrap con 2 000 remuestreos:
+
+| Comparación | Veredicto | Intervalo de la diferencia |
+|---|---|---|
+| 0.2 vs 0.0 | sin diferencia concluyente | (−0.205, +0.103) |
+| 0.2 vs 0.7 | sin diferencia concluyente | (−0.333, +0.026) |
+
+### El efecto está en la repetibilidad, no en la exactitud
+
+Las diferencias de exactitud **no son concluyentes** con n = 39: 87.2 % frente a 71.8 % parece mucho, pero
+el intervalo de la diferencia roza el 0 por arriba. No se puede afirmar que 0.2 sea mejor que 0.7 en
+precisión.
+
+Lo que **sí** es un patrón limpio y monótono es la **repetibilidad**, que es justo lo que la temperatura
+controla:
+
+```
+T=0.0  →  92.3 %   (12 de 13 escenarios dan siempre la misma decisión)
+T=0.2  →  84.6 %   (11 de 13)
+T=0.7  →  46.2 %   ( 6 de 13)
+```
+
+A temperatura 0.7, **más de la mitad de los escenarios cambian de decisión entre repeticiones**. Para un
+componente cuyo trabajo es aplicar una política de acceso, esa inestabilidad es un problema por sí misma,
+con independencia de que la exactitud media salga parecida: significa que el mismo usuario con la misma
+petición puede recibir respuestas distintas.
+
+**Conclusión operativa:** la temperatura actual del defensor (0.2) está bien elegida, y la razón defendible
+no es la exactitud —que no se distingue— sino la estabilidad. Bajarla a 0.0 daría aún más repetibilidad a
+cambio de nada medible; es una opción razonable, pero la diferencia (92.3 % frente a 84.6 %) tampoco se ha
+contrastado estadísticamente.
 
 ---
 
@@ -148,7 +180,8 @@ Detalle en [`LABORATORIO_PROMPT_INJECTION.md`](LABORATORIO_PROMPT_INJECTION.md).
 |---|---|
 | **Otros modelos** (`llama3.2:3b`, `qwen2.5:7b`, `deepseek-r1:1.5b`…) | Una matriz de 4 técnicas × 39 rondas son ~10 min con el modelo de 1.5B; con el de 7B en CPU serían horas. El sistema está preparado (`--modelo`), solo falta tiempo de máquina |
 | **Modo estrés** (5 200 rondas) | Más de 3 horas de CPU |
-| **n grande** (≥ 200 por condición) | Es lo que haría concluyentes las comparaciones de la §1. Es la tarea con mejor relación valor/esfuerzo que queda |
+| **n grande** (≥ 200 por condición) | Es lo que haría concluyentes las comparaciones de las §1-3. Es la tarea con mejor relación valor/esfuerzo que queda |
+| **Temperaturas 0.1, 0.3 y 0.5** | Se midieron 0.0, 0.2 y 0.7, que son los extremos y el valor actual. Las intermedias añadirían resolución a una curva cuyo efecto ya se ve |
 | **Cumplimiento del modelo en el laboratorio adversarial** | La detección determinista sí está medida; la tasa de cumplimiento del defensor IA ante los 19 intentos, no |
 | **Consumo de memoria y GPU** | No hay GPU NVIDIA ni `nvidia-smi` en esta máquina. No se publica un dato que no se puede tomar |
 | **Wazuh real** | No hay ninguna instalación de Wazuh a la que conectarse |

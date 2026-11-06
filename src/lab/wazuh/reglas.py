@@ -52,8 +52,7 @@ def evaluar(reglas, evento):
                    if r["padre"] is None and r["correlacion"] is None and r["json"] and coincide(r, evento)),
                   None)
     while actual:
-        hija = next((r for r in reglas if r["padre"] == str(actual["id"]) and coincide(r, actual and evento)),
-                    None)
+        hija = next((r for r in reglas if r["padre"] == str(actual["id"]) and coincide(r, evento)), None)
         if hija is None:
             return actual
         actual = hija
