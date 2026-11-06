@@ -72,7 +72,7 @@ def resumen_sino(rondas):
 
 
 def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None, resumen_sesion=None,
-                     equipo=None):
+                     equipo=None, tecnica="fewshot", rag_host=None, rag_k=None, rag_umbral=None):
     """Defensor IA -> capas deterministas -> veredicto -> diagnóstico, para UNA solicitud. Nunca lanza.
 
     La decisión del modelo es una PROPUESTA; las capas deciden con la identidad REAL del sistema.
@@ -81,13 +81,14 @@ def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_s
     `diagnostico` (ver diagnostico.py) explica POR QUÉ salió ese veredicto y separa los fallos de
     infraestructura de los del modelo. Es informativo: no cambia el veredicto ni el puntaje.
     """
-    out = _procesar_defensa(host, modelo_def, solicitud, identidad, repo, riesgo_sesion, resumen_sesion, equipo)
+    out = _procesar_defensa(host, modelo_def, solicitud, identidad, repo, riesgo_sesion, resumen_sesion, equipo,
+                            tecnica, rag_host, rag_k, rag_umbral)
     out["diagnostico"] = diagnostico.diagnosticar(out)
     return out
 
 
 def _procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None, resumen_sesion=None,
-                      equipo=None):
+                      equipo=None, tecnica="fewshot", rag_host=None, rag_k=None, rag_umbral=None):
     out = {"defensa": None, "ejecucion": None, "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False,
            "nivel_fuga": "NINGUNA", "circuito_sesion": False, "origen_decision": "ia"}
     try:
@@ -98,13 +99,17 @@ def _procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_
                               "politica": "FILTRO-RAPIDO:" + f["categoria_detectada"], "herramienta": None,
                               "parametros": None, "parse_ok": True, "tiempo_ms": 0, "tokens": None,
                               "tokens_entrada": None, "carga_ms": None,
-                              "modelo": None, "intentos": 0, "origen_decision": "filtro_rapido"}
+                              "modelo": None, "intentos": 0, "origen_decision": "filtro_rapido",
+                              "tecnica": tecnica, "rag": None}
             out.update(veredicto="DEFENSA_EXITOSA", origen_decision="filtro_rapido")
             return out
         dfn = defensor.analizar(host, modelo_def, solicitud, identidad, herramientas.catalogo(), riesgo_sesion,
-                                resumen_sesion)
-        out["defensa"] = {k: dfn[k] for k in ("decision", "riesgo", "motivo", "politica", "herramienta",
-                                              "parametros", "parse_ok")} | _meta(dfn)
+                                resumen_sesion, tecnica, rag_host, rag_k, rag_umbral)
+        # «tecnica» y «rag» se leen con .get: son opcionales, y un defensor sustituido en pruebas puede no
+        # traerlas. Las obligatorias siguen siendo de acceso directo, para que falte lo que debe fallar.
+        out["defensa"] = ({k: dfn[k] for k in ("decision", "riesgo", "motivo", "politica", "herramienta",
+                                               "parametros", "parse_ok")}
+                          | {k: dfn.get(k) for k in ("tecnica", "rag")} | _meta(dfn))
         if not dfn["ok"]:
             out["error"] = "defensor: " + str(dfn["error"])
             return out
