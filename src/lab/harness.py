@@ -286,3 +286,216 @@ def ejecutar(host, modelo_def, solicitud, identidad, repo=None, presupuesto=None
         base["diagnostico"] = diagnostico.diagnosticar(base)
         base["harness"] = ej.a_json()
         return base
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+# Control de una PARTIDA completa (Fase B)
+# ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+# `Ejecucion` acota UNA solicitud. Una partida son muchas, y hasta ahora nadie ponía techo al conjunto: una
+# batalla podía gastar inferencia sin límite y repetir el mismo ataque ronda tras ronda sin que constara.
+#
+# `ControlPartida` es ese techo. Lo que NO hace, y es la razón de que se pueda poner en el camino de la
+# batalla sin debilitarla:
+#   - no cambia ningún veredicto;
+#   - no reintenta nada (el único reintento del laboratorio sigue siendo el de `_puede_reintentar`);
+#   - no concede permisos ni los retira;
+#   - solo cuenta, y cuando se agota un techo, PARA y dice por qué.
+
+
+@dataclass(frozen=True)
+class PresupuestoPartida:
+    """Techos de una partida completa. `max_rondas` lo fija quien inicia la partida; el resto son topes de
+    seguridad para que una batalla no se coma la máquina ni gire en vacío.
+
+    `max_errores_consecutivos` corta cuando algo está roto de verdad (Ollama caído, por ejemplo) en vez de
+    quemar las rondas restantes produciendo errores. Cuenta errores de cualquier clase a propósito: el
+    objetivo es detectar que el entorno no responde, y para eso da igual de quién sea la culpa."""
+    max_rondas: int = 12
+    max_llamadas_modelo: int = 64
+    max_tokens_salida: int | None = None
+    max_tokens_entrada: int | None = None
+    timeout_global_s: float = 1800.0
+    max_errores_consecutivos: int = 3
+    max_repeticiones_identicas: int = 2
+
+
+class ControlPartida:
+    """Presupuesto observable y cancelable de UNA partida. Serializable con `a_json()`."""
+
+    def __init__(self, presupuesto=None, reloj=time.monotonic):
+        self.presupuesto = presupuesto or PresupuestoPartida()
+        self._reloj = reloj
+        self.inicio = reloj()
+        self.estado = "en_curso"
+        self.motivo_corte = None
+        self.rondas = 0
+        self.llamadas_modelo = 0
+        self.tokens_entrada = 0
+        self.tokens_salida = 0
+        self.errores = 0
+        self.errores_consecutivos = 0
+        self.cortes = []          # rondas en las que el harness cortó, con su motivo
+        self.huellas = {}
+        self._cancelar = threading.Event()
+
+    # -- Control -------------------------------------------------------------------------------------------
+    @property
+    def transcurrido_s(self):
+        return self._reloj() - self.inicio
+
+    @property
+    def restante_s(self):
+        return max(0.0, self.presupuesto.timeout_global_s - self.transcurrido_s)
+
+    def cancelar(self, motivo="cancelado por el árbitro"):
+        """Pide la detención. Se atiende ENTRE rondas: una ronda en curso termina y se registra entera, para
+        que la partida no quede con una ronda a medias en la auditoría."""
+        self._cancelar.set()
+        if self.motivo_corte is None:
+            self.motivo_corte = motivo
+
+    @property
+    def cancelada(self):
+        return self._cancelar.is_set()
+
+    def puede_jugar_ronda(self):
+        """-> (bool, motivo). Se consulta ANTES de cada ronda. Fija `estado` cuando la respuesta es no."""
+        p = self.presupuesto
+        if self.cancelada:
+            return self._no("cancelado", self.motivo_corte or "cancelado")
+        if self.transcurrido_s >= p.timeout_global_s:
+            return self._no("agotado", f"timeout global de partida ({p.timeout_global_s:g} s)")
+        if self.rondas >= p.max_rondas:
+            return self._no("terminado", f"se jugaron las {p.max_rondas} rondas previstas")
+        if self.llamadas_modelo >= p.max_llamadas_modelo:
+            return self._no("agotado", f"límite de {p.max_llamadas_modelo} llamadas al modelo en la partida")
+        if p.max_tokens_salida is not None and self.tokens_salida >= p.max_tokens_salida:
+            return self._no("agotado", f"presupuesto de {p.max_tokens_salida} tokens de salida")
+        if p.max_tokens_entrada is not None and self.tokens_entrada >= p.max_tokens_entrada:
+            return self._no("agotado", f"presupuesto de {p.max_tokens_entrada} tokens de entrada")
+        if self.errores_consecutivos >= p.max_errores_consecutivos:
+            return self._no("error",
+                            f"{self.errores_consecutivos} rondas con error seguidas: el entorno no responde")
+        return True, None
+
+    def _no(self, estado, motivo):
+        self.estado = estado
+        self.motivo_corte = motivo
+        return False, motivo
+
+    def ataque_repetido(self, prompt):
+        """¿El atacante ya mandó ese mismo texto más veces de las permitidas? Registra y responde.
+
+        No corta la partida por sí mismo: quien decide es quien lleva el bucle de rondas. Un ataque repetido
+        no es un fallo de seguridad, es un modelo girando en vacío, y conviene que se vea como tal."""
+        if not prompt:
+            return False
+        h = huella("ataque", prompt)
+        self.huellas[h] = self.huellas.get(h, 0) + 1
+        return self.huellas[h] > self.presupuesto.max_repeticiones_identicas
+
+    # -- Contabilidad --------------------------------------------------------------------------------------
+    def _sumar(self, origen, pares):
+        for campo, attr in pares:
+            v = (origen or {}).get(campo)
+            if isinstance(v, int) and not isinstance(v, bool):
+                setattr(self, attr, getattr(self, attr) + v)
+
+    def registrar_ronda(self, r):
+        """Suma a la partida lo que consumió una ronda. `r` es el dict de `motor.ejecutar_ronda`.
+
+        El consumo del defensor sale del bloque `harness` cuando la ronda pasó por él; si no pasó, se cuenta
+        una llamada por el defensor. La del atacante se cuenta siempre aparte, porque ocurre fuera del
+        harness. `intentos` incluye el reintento de JSON de `cliente_ollama`, que también es inferencia."""
+        r = r if isinstance(r, dict) else {}
+        self.rondas += 1
+        at = r.get("ataque") or {}
+        dfn = r.get("defensa") or {}
+        hns = r.get("harness") or {}
+        consumo = hns.get("consumo") or {}
+
+        llamadas = max(1, int(at.get("intentos") or 1)) if at else 0
+        if consumo:
+            llamadas += int(consumo.get("llamadas_modelo") or 0)
+        elif dfn:
+            llamadas += max(1, int(dfn.get("intentos") or 1))
+        self.llamadas_modelo += llamadas
+
+        self._sumar(at, (("tokens", "tokens_salida"), ("tokens_entrada", "tokens_entrada")))
+        if consumo:
+            self._sumar(consumo, (("tokens_salida", "tokens_salida"), ("tokens_entrada", "tokens_entrada")))
+        elif dfn:
+            self._sumar(dfn, (("tokens", "tokens_salida"), ("tokens_entrada", "tokens_entrada")))
+
+        if r.get("veredicto") == "ERROR":
+            self.errores += 1
+            self.errores_consecutivos += 1
+        else:
+            self.errores_consecutivos = 0
+
+        if hns.get("estado") in ("agotado", "bucle", "cancelado", "error"):
+            self.cortes.append({"ronda": r.get("ronda"), "estado": hns["estado"],
+                                "motivo": hns.get("motivo_corte")})
+        return self.consumo()
+
+    def consumo(self):
+        """Lo que la interfaz necesita para dibujar el presupuesto SIN inventar nada."""
+        p = self.presupuesto
+        return {"rondas": self.rondas, "max_rondas": p.max_rondas,
+                "llamadas_modelo": self.llamadas_modelo, "max_llamadas_modelo": p.max_llamadas_modelo,
+                "tokens_entrada": self.tokens_entrada, "tokens_salida": self.tokens_salida,
+                "max_tokens_salida": p.max_tokens_salida,
+                "errores": self.errores, "errores_consecutivos": self.errores_consecutivos,
+                "max_errores_consecutivos": p.max_errores_consecutivos,
+                "transcurrido_ms": int(self.transcurrido_s * 1000),
+                "timeout_global_s": p.timeout_global_s,
+                "estado": self.estado, "motivo_corte": self.motivo_corte,
+                "cortes_harness": len(self.cortes)}
+
+    def cerrar(self, motivo="partida finalizada"):
+        """Marca el final normal. No sobreescribe un corte anterior: si la partida se agotó, se agotó."""
+        if self.estado == "en_curso":
+            self.estado, self.motivo_corte = "terminado", motivo
+        return self.consumo()
+
+    def a_json(self):
+        return {"estado": self.estado, "motivo_corte": self.motivo_corte,
+                "presupuesto": asdict(self.presupuesto), "consumo": self.consumo(),
+                "cortes": list(self.cortes)}
+
+
+def _sin_ejecucion(presupuesto, motivo):
+    """Resultado de una solicitud que NO se lanzó porque la partida ya no tenía presupuesto. Es un error
+    visible con la forma de siempre, nunca un veredicto inventado."""
+    return {"defensa": None, "ejecucion": None, "veredicto": "ERROR", "nota": None, "ia_fallo": False,
+            "nivel_fuga": "NINGUNA", "circuito_sesion": False, "origen_decision": "harness",
+            "error": f"harness: {motivo}",
+            "harness": {"estado": "agotado", "motivo_corte": motivo,
+                        "presupuesto": asdict(presupuesto or Presupuesto()),
+                        "consumo": {"iteraciones": 0, "llamadas_modelo": 0, "tokens_entrada": 0,
+                                    "tokens_salida": 0, "transcurrido_ms": 0},
+                        "pasos": [], "herramientas_usadas": [], "errores": []}}
+
+
+def procesador(presupuesto=None, control=None):
+    """-> una función con la MISMA firma que `motor.procesar_defensa` que pasa por el harness.
+
+    Es la pieza que conecta el harness con la partida sin que `motor` tenga que importar `harness` (sería un
+    ciclo: aquí se importa `motor`). Se le pasa a `motor.ejecutar_ronda(procesar=...)`.
+
+    El presupuesto por defecto de una solicitud permite hasta 3 iteraciones, pero el harness solo itera ante
+    un error TÉCNICO del modelo; ante cualquier decisión válida sale en la primera. Es decir: en una partida
+    normal el número de inferencias es el mismo que por el camino directo."""
+    def _procesar(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None, resumen_sesion=None,
+                  equipo=None, **kw):
+        pres = presupuesto
+        if control is not None:
+            if control.restante_s <= 0:
+                return _sin_ejecucion(pres, "timeout global de partida agotado")
+            base = pres or Presupuesto()
+            # El techo de tiempo de una solicitud nunca puede pasarse del que le queda a la partida.
+            pres = Presupuesto(**{**asdict(base),
+                                  "timeout_global_s": min(base.timeout_global_s, control.restante_s)})
+        return ejecutar(host, modelo_def, solicitud, identidad, repo, pres, equipo, riesgo_sesion,
+                        resumen_sesion)
+    return _procesar

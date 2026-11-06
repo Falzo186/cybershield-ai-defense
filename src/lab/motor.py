@@ -164,10 +164,15 @@ def nota_verificacion_falsa(categoria, defensa, ejecucion, identidad):
 
 
 def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=None, repo=None, intensidad=2,
-                   host_def=None, riesgo_sesion=None, resumen_sesion=None, escenario=None, equipo=None):
+                   host_def=None, riesgo_sesion=None, resumen_sesion=None, escenario=None, equipo=None,
+                   procesar=None):
     """host = Ollama del atacante; host_def = Ollama del defensor (por defecto el mismo).
     escenario = clave de atacante.ESCENARIOS (técnica fija por ronda) o None (el atacante elige libremente).
-    equipo = a quién se atribuyen las filas de auditoría de la ronda ("rojo" en la batalla IA vs IA)."""
+    equipo = a quién se atribuyen las filas de auditoría de la ronda ("rojo" en la batalla IA vs IA).
+
+    `procesar` sustituye a `procesar_defensa` conservando su firma. Es el punto por el que la partida entra
+    en el harness (`harness.procesador(...)`) sin que este módulo tenga que importarlo: `harness` importa
+    `motor`, y al revés sería un ciclo. Con None, el camino es el directo de siempre."""
     res = {"ronda": ronda, "ataque": None, "defensa": None, "ejecucion": None,
            "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False, "diagnostico": None}
     try:
@@ -178,8 +183,8 @@ def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=Non
             res["error"] = "atacante: " + str(atq["error"])
             res["diagnostico"] = diagnostico.diagnosticar(res)
             return res
-        res.update(procesar_defensa(host_def or host, modelo_def, atq["prompt"], identidad, repo, riesgo_sesion,
-                                    resumen_sesion, equipo))
+        res.update((procesar or procesar_defensa)(host_def or host, modelo_def, atq["prompt"], identidad, repo,
+                                                  riesgo_sesion, resumen_sesion, equipo))
         nota = nota_verificacion_falsa(atq["categoria"], res["defensa"], res["ejecucion"], identidad)
         if nota:
             res["nota"] = nota if not res["nota"] else res["nota"] + " · " + nota

@@ -28,7 +28,8 @@ from pydantic import BaseModel, Field  # noqa: E402
 import mock_server as ms  # noqa: E402
 import panel as pn  # noqa: E402
 import partida as pt  # noqa: E402
-from src.lab import apps, ataque_ia, atacante, cliente_ollama, correos, documentos, informe, motor, repositorio, sesion  # noqa: E402
+from src.lab import (apps, ataque_ia, atacante, cliente_ollama, correos, documentos, harness, informe, motor,  # noqa: E402
+                     repositorio, sesion)
 
 app = ms.app
 HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -58,7 +59,7 @@ RESTO = ["politicas", "autorizacion", "herramienta", "bd"]
 CODIGO_ARBITRO = os.getenv("CS_CODIGO_ARBITRO") or f"{secrets.randbelow(10 ** 6):06d}"
 SALA = pt.Sala(CODIGO_ARBITRO)
 RUTAS_PUBLICAS = ("/api/eventos", "/api/estado", "/api/ia/estado", "/api/cronologia", "/api/resultados", "/api/partidas",
-                  "/api/apps", "/api/recursos", "/api/ayuda")
+                  "/api/apps", "/api/recursos", "/api/ayuda", "/api/batalla/presupuesto")
 RUTA_SESION = "/api/sesion"
 # El panel de análisis (/api/panel/...) es una vista de solo lectura del laboratorio: no toca la partida, no
 # expone secretos y se consulta sin unirse a ningún equipo. Sus POST (lanzar o cancelar una campaña) sí
@@ -75,6 +76,15 @@ SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "
 PARTIDA = pt.Partida()
 PARTIDA_ID = PARTIDA.id
 TAREA_TIEMPO = None  # tarea que cierra la partida al agotarse el tiempo
+# Presupuesto de la batalla IA vs IA en curso (harness.ControlPartida) o None si no hay ninguna. Es la pieza
+# que acota la partida completa: techo de rondas, de llamadas al modelo, de tokens, de tiempo y de errores
+# seguidos, más detección de que el atacante repite el mismo prompt. Se consulta en /api/batalla/presupuesto.
+CONTROL_BATALLA = None
+# Presupuesto de UNA solicitud del defensor dentro de la batalla. max_iteraciones=2 deja margen para UNA
+# corrección de un error técnico del modelo (JSON ilegible, herramienta inexistente con derecho real): nunca
+# para rodear una denegación de permiso, que harness._puede_reintentar excluye por clase de diagnóstico.
+PRESUPUESTO_RONDA = harness.Presupuesto(max_iteraciones=2, max_llamadas_modelo=3, timeout_herramienta_s=20.0,
+                                        timeout_global_s=float(TIMEOUT_RONDA))
 USUARIO_AZUL_DEFECTO = "ana.perez"
 USUARIO_EQUIPO = {}  # equipo -> usuario semilla con el que juega (hoy solo azul: dueño del buzón)
 # Riesgo de la partida Rojo/Azul (buzón): cada evento aplica su consecuencia fija de sesion.REGLAS_EVENTO.
@@ -1104,6 +1114,17 @@ def _partida_fin(puntos, jugadas, errores, detenida=False, informe=None):
 
 
 # ---------- batalla real ----------
+def _presupuesto_partida(rondas):
+    """Techos de una batalla IA vs IA. `max_llamadas_modelo` deja 3 por ronda (atacante + defensor + una
+    corrección técnica del defensor) y nada más: si se agota, la batalla se detiene y lo dice; no se amplía
+    sola y no hay ninguna ruta que la amplíe.
+
+    Está en una función aparte para poder reducirla en las pruebas sin tocar el bucle de la batalla."""
+    return harness.PresupuestoPartida(max_rondas=rondas, max_llamadas_modelo=3 * rondas,
+                                      timeout_global_s=float(TIMEOUT_RONDA * rondas),
+                                      max_errores_consecutivos=3)
+
+
 def _registrar_real(d, categoria):
     """Métricas de la batalla real. El atacante es malicioso por construcción; sin verdad de terreno por
     ronda, 'coincidencia' = ronda contenida (no FALLA_DEFENSA). Las rondas ERROR nunca llegan aquí."""
@@ -1271,10 +1292,14 @@ async def _emitir_ronda(r, matq, mdef, manual=False, puntos=None, sesion_estado=
 
 async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host_atq=None, host_def=None, demo=False,
                        dificultad=None, escenario=None):
+    global CONTROL_BATALLA
     host_atq, host_def = host_atq or HOST, host_def or HOST
     # Modelo y host que REALMENTE se usan en esta batalla (se envían en cada ronda_inicio para inspección).
     asignacion = {"atacante": {"modelo": modelo_atq, "host": host_atq},
                   "defensor": {"modelo": modelo_def, "host": host_def}}
+    control = harness.ControlPartida(_presupuesto_partida(rondas))
+    CONTROL_BATALLA = control
+    procesar = harness.procesador(PRESUPUESTO_RONDA, control)
     loop = asyncio.get_running_loop()
     previo = (ms.ESTADO["modelo_atq"], ms.ESTADO["modelo_def"])
     ms.ESTADO.update(modo="batalla", corriendo=True, modelo_atq=modelo_atq, modelo_def=modelo_def)
@@ -1293,6 +1318,14 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
     ms.emitir("auditoria", ms.aud("SYSTEM", "ASIGNACION", f"atacante {modelo_atq} @ {host_atq} · defensor {modelo_def} @ {host_def}", "OK", "BAJO"))
     try:
         for n in range(1, rondas + 1):
+            puede, motivo = control.puede_jugar_ronda()
+            if not puede:
+                # El presupuesto manda. No se juega la ronda y se dice por qué, con el nombre del techo que
+                # se agotó: nunca se presenta como un final normal si no lo fue.
+                ms.emitir("presupuesto", {"ronda": n, "agotado": True, "motivo": motivo, **control.consumo()})
+                ms.emitir("auditoria", ms.aud("SYSTEM", "PRESUPUESTO", "batalla real", motivo.upper()[:80],
+                                              "BAJO" if control.estado == "terminado" else "MEDIO"))
+                break
             ms.emitir("ronda_inicio", {"ronda": n, "modo": "batalla", "escenario_id": None,
                                        "escenario_nombre": f"{ident.usuario} ({ident.rol})", "origen": "ollama",
                                        "asignacion": asignacion})
@@ -1303,7 +1336,8 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
                     loop.run_in_executor(None, lambda n=n, h=list(historial): motor.ejecutar_ronda(
                         host_atq, modelo_atq, modelo_def, ident, n, historial=h, intensidad=intensidad,
                         host_def=host_def, riesgo_sesion=estado_sesion.riesgo_acumulado,
-                        resumen_sesion=estado_sesion.resumen(), escenario=escenario, equipo="rojo")),
+                        resumen_sesion=estado_sesion.resumen(), escenario=escenario, equipo="rojo",
+                        procesar=procesar)),
                     TIMEOUT_RONDA)
             except asyncio.TimeoutError:
                 r = {"ronda": n, "ataque": None, "defensa": None, "ejecucion": None, "veredicto": "ERROR",
@@ -1324,16 +1358,31 @@ async def _correr_real(modelo_atq, modelo_def, rondas, ident, intensidad=2, host
                 jugadas += 1
                 historial.append({"categoria": r["ataque"]["categoria"], "resultado": r["veredicto"]})
                 _emitir_marcador()  # cuenta en vivo los intentos de Rojo frenados (denegaciones)
+            consumo = control.registrar_ronda(r)
+            ms.emitir("presupuesto", {"ronda": n, "agotado": False, "motivo": None, **consumo})
+            # El atacante repitiendo el mismo texto no es un ataque mejor: es un modelo girando en vacío.
+            # Se corta la partida y se nombra, en vez de gastar inferencia en rondas idénticas.
+            if control.ataque_repetido((r.get("ataque") or {}).get("prompt")):
+                control.cancelar(f"el atacante repitió el mismo prompt más de "
+                                 f"{control.presupuesto.max_repeticiones_identicas} veces")
+                control.estado = "bucle"
+                ms.emitir("presupuesto", {"ronda": n, "agotado": True, "motivo": control.motivo_corte,
+                                          **control.consumo()})
+                ms.emitir("auditoria", ms.aud("SYSTEM", "BUCLE", f"atacante {modelo_atq}",
+                                              "PROMPT REPETIDO", "MEDIO"))
+                break
             await asyncio.sleep(0.6)
         ms.emitir("fin", {"modo": "batalla", "origen": "ollama", "metricas": ms.snapshot(), "errores": errores,
-                          "demo": demo})
+                          "demo": demo, "presupuesto": control.cerrar()})
         if puntos is not None:
             _partida_fin(puntos, jugadas, errores,
                          informe=_cerrar_informe(informe_b, puntos, jugadas, errores, estado_sesion, decisiones))
     except asyncio.CancelledError:
+        control.cancelar("detenida por el árbitro")
         ms.emitir("auditoria", ms.aud("SYSTEM", "DETENIDO", "batalla real", "CANCELADO", "BAJO"))
         ms.emitir("fin", {"modo": "batalla", "origen": "ollama", "detenido": True,
-                          "metricas": ms.snapshot(), "errores": errores})
+                          "metricas": ms.snapshot(), "errores": errores,
+                          "presupuesto": control.consumo()})
         if puntos is not None:
             _partida_fin(puntos, jugadas, errores, detenida=True,
                          informe=_cerrar_informe(informe_b, puntos, jugadas, errores, estado_sesion, decisiones))
@@ -1593,6 +1642,20 @@ def _datos_partida(pid):
     if guardado:
         return guardado["inicio"], "finalizada", guardado
     return None
+
+
+@app.get("/api/batalla/presupuesto")
+async def batalla_presupuesto():
+    """Presupuesto de la batalla IA vs IA: el de la que corre ahora o el de la última que corrió.
+
+    Es solo observación. No hay forma de ampliar un techo desde fuera: los presupuestos se fijan al arrancar
+    la batalla y no existe ninguna ruta que los modifique."""
+    c = CONTROL_BATALLA
+    if c is None:
+        return {"activo": False, "presupuesto": None,
+                "nota": "No se ha ejecutado ninguna batalla IA vs IA en este servidor."}
+    return {"activo": bool(ms.ESTADO.get("corriendo")) and c.estado == "en_curso",
+            "presupuesto": c.a_json(), "presupuesto_ronda": harness.asdict(PRESUPUESTO_RONDA)}
 
 
 @app.get("/api/partidas")

@@ -17,3 +17,4 @@ data/*.log
 
 # Índice RAG: se reconstruye desde el corpus, no se versiona
 data/rag_indice.json
+data/campanas/
