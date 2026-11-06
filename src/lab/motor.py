@@ -1,7 +1,7 @@
 """Orquesta rondas reales (atacante -> defensor -> capas deterministas). Sin UI. Nunca lanza."""
 import re
 
-from . import atacante, defensor, filtro_rapido, herramientas, permisos, repositorio, sesion
+from . import atacante, defensor, diagnostico, filtro_rapido, herramientas, permisos, repositorio, sesion
 
 CAPAS = ("catalogo", "validacion", "permisos", "autorizacion", "repositorio")
 RECHAZOS = ("RECHAZAR", "AISLAR", "SOLICITAR_AUTORIZACION", "MARCAR_COMO_RIESGO")
@@ -73,11 +73,21 @@ def resumen_sino(rondas):
 
 def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None, resumen_sesion=None,
                      equipo=None):
-    """Defensor IA -> capas deterministas -> veredicto, para UNA solicitud. Nunca lanza.
+    """Defensor IA -> capas deterministas -> veredicto -> diagnóstico, para UNA solicitud. Nunca lanza.
 
     La decisión del modelo es una PROPUESTA; las capas deciden con la identidad REAL del sistema.
-    -> {defensa, ejecucion, veredicto, error, nota}
+    -> {defensa, ejecucion, veredicto, error, nota, diagnostico}
+
+    `diagnostico` (ver diagnostico.py) explica POR QUÉ salió ese veredicto y separa los fallos de
+    infraestructura de los del modelo. Es informativo: no cambia el veredicto ni el puntaje.
     """
+    out = _procesar_defensa(host, modelo_def, solicitud, identidad, repo, riesgo_sesion, resumen_sesion, equipo)
+    out["diagnostico"] = diagnostico.diagnosticar(out)
+    return out
+
+
+def _procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None, resumen_sesion=None,
+                      equipo=None):
     out = {"defensa": None, "ejecucion": None, "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False,
            "nivel_fuga": "NINGUNA", "circuito_sesion": False, "origen_decision": "ia"}
     try:
@@ -152,13 +162,14 @@ def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=Non
     escenario = clave de atacante.ESCENARIOS (técnica fija por ronda) o None (el atacante elige libremente).
     equipo = a quién se atribuyen las filas de auditoría de la ronda ("rojo" en la batalla IA vs IA)."""
     res = {"ronda": ronda, "ataque": None, "defensa": None, "ejecucion": None,
-           "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False}
+           "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False, "diagnostico": None}
     try:
         atq =atacante.generar_ataque(host, modelo_atq, identidad.rol, historial, intensidad, escenario, ronda)
         res["ataque"] = {"prompt": atq["prompt"], "categoria": atq["categoria"], "objetivo": atq["objetivo"],
                          "sensibilidad_objetivo": atq["sensibilidad_objetivo"], **_meta(atq)}
         if not atq["ok"]:
             res["error"] = "atacante: " + str(atq["error"])
+            res["diagnostico"] = diagnostico.diagnosticar(res)
             return res
         res.update(procesar_defensa(host_def or host, modelo_def, atq["prompt"], identidad, repo, riesgo_sesion,
                                     resumen_sesion, equipo))
@@ -169,4 +180,5 @@ def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=Non
     except Exception as exc:  # noqa: BLE001
         res["veredicto"] = "ERROR"
         res["error"] = f"{type(exc).__name__}: {exc}"
+        res["diagnostico"] = diagnostico.diagnosticar(res)
         return res

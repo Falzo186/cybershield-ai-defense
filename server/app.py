@@ -1166,7 +1166,7 @@ async def _emitir_error(r, matq, mdef, manual=False):
         else:  # timeout de ronda o fallo interno de las capas
             etapas += [(e, "omitido", {}) for e in ("analisis", "defensor", *RESTO)]
     await _emitir_etapas(n, etapas)
-    ms.emitir("ronda_error", {"ronda": n, "modelo": modelo, "error": err})
+    ms.emitir("ronda_error", {"ronda": n, "modelo": modelo, "error": err, "diagnostico": r.get("diagnostico")})
     ms.emitir("auditoria", ms.aud("SYSTEM", "ERROR", modelo, err[:80], "MEDIO"))
 
 
@@ -1236,7 +1236,8 @@ async def _emitir_ronda(r, matq, mdef, manual=False, puntos=None, sesion_estado=
          "resultado": v, "tiempo_ms": df["tiempo_ms"] or 0, "tokens": df["tokens"],
          "parse_ok": df["parse_ok"], "modelo": mdef, "origen": "ollama", "ia_fallo": bool(r.get("ia_fallo")),
          "nivel_fuga": r.get("nivel_fuga", "NINGUNA"), "circuito_sesion": circuito,
-         "origen_decision": "filtro_rapido" if filtro else "ia", "nota": r.get("nota")}
+         "origen_decision": "filtro_rapido" if filtro else "ia", "nota": r.get("nota"),
+         "diagnostico": r.get("diagnostico")}
     if sesion_estado is not None:  # riesgo acumulado de la sesión DESPUÉS de esta ronda (señal, no veredicto)
         d["riesgo_acumulado"] = sesion_estado.registrar(at["categoria"], v, efectiva)
     if puntos is not None:
