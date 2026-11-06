@@ -431,6 +431,7 @@ PROGRESO.md         bitácora de desarrollo
 | [`docs/LABORATORIO_PROMPT_INJECTION.md`](docs/LABORATORIO_PROMPT_INJECTION.md) | Resistencia a prompt injection, medida |
 | [`docs/INTEGRACION_WAZUH.md`](docs/INTEGRACION_WAZUH.md) | Los tres modos y el cliente de solo lectura |
 | [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md) | Revisión de seguridad y riesgos abiertos |
+| [`docs/INFORME_FINAL.md`](docs/INFORME_FINAL.md) | **Informe de la evolución técnica**: qué se hizo, qué se midió y qué queda |
 
 ## Panel de operaciones y análisis
 
