@@ -1,6 +1,6 @@
 # Laboratorio adversarial — resistencia a prompt injection
 
-Módulo: [`src/lab/adversarial.py`](../src/lab/adversarial.py) · Pruebas: `python -m src.lab.test_adversarial` (35/35).
+Módulo: [`src/lab/adversarial.py`](../src/lab/adversarial.py) · Pruebas: `python -m src.lab.test_adversarial` (37/37).
 
 > Entorno local y datos 100 % sintéticos. No se ataca ningún sistema real, no se usan credenciales reales y
 > los «secretos» son los valores de laboratorio que ya usa el resto del proyecto.

@@ -150,7 +150,7 @@ inyectado y comprueban el **camino del código**. La calidad del modelo se mide 
 que son una herramienta aparte y nunca parte de la batería.
 
 Suites nuevas: `test_diagnostico` 50 · `test_harness` 49 · `test_rag` 64 · `test_evaluacion` 85 ·
-`test_adversarial` 35 · `test_wazuh` 48 · `test_correlacion` 39 · `server/test_panel` 57.
+`test_adversarial` 37 · `test_wazuh` 48 · `test_correlacion` 39 · `server/test_panel` 57.
 
 ---
 
@@ -292,7 +292,7 @@ descargó ningún modelo nuevo**; se comprobaron antes VRAM, RAM y disco.
 | RAG | **Terminado** | 64/64 · matriz de 4 técnicas medida · `RAG.md` | Embeddings sin medir; corpus pequeño | 90 |
 | Evaluación autónoma | **Terminado** | 85/85 · 10 campañas reales, 364 rondas · `EVALUACION_AUTONOMA.md` | Familia `generado`; modo estrés sin correr | 85 |
 | Registro de experimentos | **Terminado** | 10 experimentos con hashes · comparador con bootstrap | — | 95 |
-| Laboratorio adversarial | **Terminado** | 35/35 · detección medida (78.9 %, IC95) · `LABORATORIO_PROMPT_INJECTION.md` | Cumplimiento del modelo sin medir | 80 |
+| Laboratorio adversarial | **Terminado** | 37/37 · detección medida (78.9 %, IC95) · `LABORATORIO_PROMPT_INJECTION.md` | Cumplimiento del modelo sin medir | 80 |
 | Wazuh | **Parcial** | 48/48 + 14/14 · simulado medido · `INTEGRACION_WAZUH.md` | Lectura de alertas; nunca probado contra un Wazuh real | 70 |
 | Correlación y cronología | **Terminado** | 39/39 · funcionando sobre eventos reales | Correlación de Wazuh (`frequency`) no se simula | 95 |
 | Panel e interfaz | **Terminado** | 57/57 · 11 pantallas verificadas sin errores de consola | El sistema de diseño no se aplicó a la interfaz de la partida | 85 |
