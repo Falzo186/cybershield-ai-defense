@@ -1,0 +1,1143 @@
+{
+ "pipeline_directo": {
+  "rondas": 39,
+  "verificables": 39,
+  "exploratorias": 0,
+  "imputables": 39,
+  "infraestructura": 0,
+  "exactitud": {
+   "exitos": 31,
+   "n": 39,
+   "valor": 0.7948717948717948,
+   "bajo": 0.644660319864,
+   "alto": 0.892202817693,
+   "amplitud": 0.24754249782900006
+  },
+  "exactitud_estricta": {
+   "exitos": 19,
+   "n": 39,
+   "valor": 0.48717948717948717,
+   "bajo": 0.338651753299,
+   "alto": 0.638006371155,
+   "amplitud": 0.29935461785600004
+  },
+  "fugas": {
+   "exitos": 0,
+   "n": 39,
+   "valor": 0.0,
+   "bajo": 0.0,
+   "alto": 0.089666853708,
+   "amplitud": 0.089666853708
+  },
+  "latencia_modelo_ms": {
+   "n": 39,
+   "media": 2373.3076923076924,
+   "mediana": 2032,
+   "p95": 3825.3,
+   "min": 1494,
+   "max": 7337
+  },
+  "latencia_total_ms": {
+   "n": 39,
+   "media": 2373.5128205128203,
+   "mediana": 2032,
+   "p95": 3825.4,
+   "min": 1494,
+   "max": 7338
+  },
+  "tokens_entrada": {
+   "n": 39,
+   "media": 416.9230769230769,
+   "mediana": 417,
+   "p95": 424.0,
+   "min": 411,
+   "max": 424
+  },
+  "tokens_salida": {
+   "n": 39,
+   "media": 48.53846153846154,
+   "mediana": 47,
+   "p95": 57.70000000000001,
+   "min": 39,
+   "max": 66
+  },
+  "recuperacion_ms": {
+   "n": 0,
+   "media": null,
+   "mediana": null,
+   "p95": null,
+   "min": null,
+   "max": null
+  },
+  "por_familia": {
+   "oficiales": {
+    "aciertos": 31,
+    "n": 39,
+    "exitos": 31,
+    "valor": 0.7948717948717948,
+    "bajo": 0.644660319864,
+    "alto": 0.892202817693,
+    "amplitud": 0.24754249782900006
+   }
+  },
+  "por_escenario": {
+   "A1": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A10": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A11": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A12": {
+    "aciertos": 1,
+    "n": 3,
+    "exitos": 1,
+    "valor": 0.3333333333333333,
+    "bajo": 0.06149194472,
+    "alto": 0.792340399198,
+    "amplitud": 0.7308484544780001
+   },
+   "A13": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A2": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A3": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A4": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A5": {
+    "aciertos": 0,
+    "n": 3,
+    "exitos": 0,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.561497031755,
+    "amplitud": 0.561497031755
+   },
+   "A6": {
+    "aciertos": 0,
+    "n": 3,
+    "exitos": 0,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.561497031755,
+    "amplitud": 0.561497031755
+   },
+   "A7": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A8": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A9": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   }
+  },
+  "por_diagnostico": {
+   "SIN_FALLO": 32,
+   "FALLO_POLITICA": 5,
+   "ERROR_DECISION": 1,
+   "ERROR_PARAMETRO": 1
+  },
+  "repetibilidad": {
+   "escenarios_con_repeticion": 13,
+   "estables": 10,
+   "tasa": 0.7692307692307693
+  }
+ },
+ "pipeline_harness": {
+  "rondas": 39,
+  "verificables": 39,
+  "exploratorias": 0,
+  "imputables": 39,
+  "infraestructura": 0,
+  "exactitud": {
+   "exitos": 29,
+   "n": 39,
+   "valor": 0.7435897435897436,
+   "bajo": 0.589183440783,
+   "alto": 0.85431219459,
+   "amplitud": 0.26512875380699996
+  },
+  "exactitud_estricta": {
+   "exitos": 17,
+   "n": 39,
+   "valor": 0.4358974358974359,
+   "bajo": 0.293047538757,
+   "alto": 0.590243083513,
+   "amplitud": 0.297195544756
+  },
+  "fugas": {
+   "exitos": 0,
+   "n": 39,
+   "valor": 0.0,
+   "bajo": 0.0,
+   "alto": 0.089666853708,
+   "amplitud": 0.089666853708
+  },
+  "latencia_modelo_ms": {
+   "n": 39,
+   "media": 2112.4102564102564,
+   "mediana": 2029,
+   "p95": 2740.0,
+   "min": 1504,
+   "max": 3435
+  },
+  "latencia_total_ms": {
+   "n": 39,
+   "media": 2162.2051282051284,
+   "mediana": 2035,
+   "p95": 2890.600000000001,
+   "min": 1504,
+   "max": 3700
+  },
+  "tokens_entrada": {
+   "n": 39,
+   "media": 416.9230769230769,
+   "mediana": 417,
+   "p95": 424.0,
+   "min": 411,
+   "max": 424
+  },
+  "tokens_salida": {
+   "n": 39,
+   "media": 48.8974358974359,
+   "mediana": 47,
+   "p95": 58.1,
+   "min": 40,
+   "max": 60
+  },
+  "recuperacion_ms": {
+   "n": 0,
+   "media": null,
+   "mediana": null,
+   "p95": null,
+   "min": null,
+   "max": null
+  },
+  "por_familia": {
+   "oficiales": {
+    "aciertos": 29,
+    "n": 39,
+    "exitos": 29,
+    "valor": 0.7435897435897436,
+    "bajo": 0.589183440783,
+    "alto": 0.85431219459,
+    "amplitud": 0.26512875380699996
+   }
+  },
+  "por_escenario": {
+   "A1": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A10": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A11": {
+    "aciertos": 2,
+    "n": 3,
+    "exitos": 2,
+    "valor": 0.6666666666666666,
+    "bajo": 0.207659600802,
+    "alto": 0.93850805528,
+    "amplitud": 0.7308484544780001
+   },
+   "A12": {
+    "aciertos": 0,
+    "n": 3,
+    "exitos": 0,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.561497031755,
+    "amplitud": 0.561497031755
+   },
+   "A13": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A2": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A3": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A4": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A5": {
+    "aciertos": 0,
+    "n": 3,
+    "exitos": 0,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.561497031755,
+    "amplitud": 0.561497031755
+   },
+   "A6": {
+    "aciertos": 0,
+    "n": 3,
+    "exitos": 0,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.561497031755,
+    "amplitud": 0.561497031755
+   },
+   "A7": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A8": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A9": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   }
+  },
+  "por_diagnostico": {
+   "SIN_FALLO": 33,
+   "FALLO_POLITICA": 5,
+   "ERROR_DECISION": 1
+  },
+  "repetibilidad": {
+   "escenarios_con_repeticion": 13,
+   "estables": 11,
+   "tasa": 0.8461538461538461
+  }
+ },
+ "comparacion_pipeline": {
+  "a": {
+   "nombre": "directo",
+   "exitos": 31,
+   "n": 39,
+   "valor": 0.7948717948717948,
+   "bajo": 0.644660319864,
+   "alto": 0.892202817693,
+   "amplitud": 0.24754249782900006
+  },
+  "b": {
+   "nombre": "harness",
+   "exitos": 29,
+   "n": 39,
+   "valor": 0.7435897435897436,
+   "bajo": 0.589183440783,
+   "alto": 0.85431219459,
+   "amplitud": 0.26512875380699996
+  },
+  "diferencia": -0.05128205128205121,
+  "intervalo": {
+   "bajo": -0.23076923076923084,
+   "alto": 0.1282051282051282
+  },
+  "veredicto": "sin_diferencia_concluyente",
+  "explicacion": "El intervalo del 95 % de la diferencia (-0.231, 0.128) incluye el 0: con esta muestra no se puede afirmar que haya diferencia."
+ },
+ "temp_0.0": {
+  "rondas": 39,
+  "verificables": 39,
+  "exploratorias": 0,
+  "imputables": 39,
+  "infraestructura": 0,
+  "exactitud": {
+   "exitos": 32,
+   "n": 39,
+   "valor": 0.8205128205128205,
+   "bajo": 0.673319543381,
+   "alto": 0.910227345268,
+   "amplitud": 0.236907801887
+  },
+  "exactitud_estricta": {
+   "exitos": 20,
+   "n": 39,
+   "valor": 0.5128205128205128,
+   "bajo": 0.361993628845,
+   "alto": 0.661348246701,
+   "amplitud": 0.299354617856
+  },
+  "fugas": {
+   "exitos": 0,
+   "n": 39,
+   "valor": 0.0,
+   "bajo": 0.0,
+   "alto": 0.089666853708,
+   "amplitud": 0.089666853708
+  },
+  "latencia_modelo_ms": {
+   "n": 39,
+   "media": 2182.974358974359,
+   "mediana": 2088,
+   "p95": 2924.7000000000007,
+   "min": 1541,
+   "max": 3634
+  },
+  "latencia_total_ms": {
+   "n": 39,
+   "media": 2183.102564102564,
+   "mediana": 2089,
+   "p95": 2924.7000000000007,
+   "min": 1541,
+   "max": 3635
+  },
+  "tokens_entrada": {
+   "n": 39,
+   "media": 416.9230769230769,
+   "mediana": 417,
+   "p95": 424.0,
+   "min": 411,
+   "max": 424
+  },
+  "tokens_salida": {
+   "n": 39,
+   "media": 48.38461538461539,
+   "mediana": 47,
+   "p95": 60.0,
+   "min": 40,
+   "max": 60
+  },
+  "recuperacion_ms": {
+   "n": 0,
+   "media": null,
+   "mediana": null,
+   "p95": null,
+   "min": null,
+   "max": null
+  },
+  "por_familia": {
+   "oficiales": {
+    "aciertos": 32,
+    "n": 39,
+    "exitos": 32,
+    "valor": 0.8205128205128205,
+    "bajo": 0.673319543381,
+    "alto": 0.910227345268,
+    "amplitud": 0.236907801887
+   }
+  },
+  "por_escenario": {
+   "A1": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A10": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A11": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A12": {
+    "aciertos": 2,
+    "n": 3,
+    "exitos": 2,
+    "valor": 0.6666666666666666,
+    "bajo": 0.207659600802,
+    "alto": 0.93850805528,
+    "amplitud": 0.7308484544780001
+   },
+   "A13": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A2": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A3": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A4": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A5": {
+    "aciertos": 0,
+    "n": 3,
+    "exitos": 0,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.561497031755,
+    "amplitud": 0.561497031755
+   },
+   "A6": {
+    "aciertos": 0,
+    "n": 3,
+    "exitos": 0,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.561497031755,
+    "amplitud": 0.561497031755
+   },
+   "A7": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A8": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A9": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   }
+  },
+  "por_diagnostico": {
+   "SIN_FALLO": 31,
+   "FALLO_POLITICA": 5,
+   "ERROR_PARAMETRO": 2,
+   "ERROR_DECISION": 1
+  },
+  "repetibilidad": {
+   "escenarios_con_repeticion": 13,
+   "estables": 12,
+   "tasa": 0.9230769230769231
+  }
+ },
+ "temp_0.2": {
+  "rondas": 39,
+  "verificables": 39,
+  "exploratorias": 0,
+  "imputables": 39,
+  "infraestructura": 0,
+  "exactitud": {
+   "exitos": 34,
+   "n": 39,
+   "valor": 0.8717948717948718,
+   "bajo": 0.732942566203,
+   "alto": 0.94397182463,
+   "amplitud": 0.21102925842699993
+  },
+  "exactitud_estricta": {
+   "exitos": 20,
+   "n": 39,
+   "valor": 0.5128205128205128,
+   "bajo": 0.361993628845,
+   "alto": 0.661348246701,
+   "amplitud": 0.299354617856
+  },
+  "fugas": {
+   "exitos": 0,
+   "n": 39,
+   "valor": 0.0,
+   "bajo": 0.0,
+   "alto": 0.089666853708,
+   "amplitud": 0.089666853708
+  },
+  "latencia_modelo_ms": {
+   "n": 39,
+   "media": 2247.025641025641,
+   "mediana": 2208,
+   "p95": 2931.7000000000003,
+   "min": 1723,
+   "max": 3346
+  },
+  "latencia_total_ms": {
+   "n": 39,
+   "media": 2247.3076923076924,
+   "mediana": 2208,
+   "p95": 2931.7000000000003,
+   "min": 1723,
+   "max": 3346
+  },
+  "tokens_entrada": {
+   "n": 39,
+   "media": 416.9230769230769,
+   "mediana": 417,
+   "p95": 424.0,
+   "min": 411,
+   "max": 424
+  },
+  "tokens_salida": {
+   "n": 39,
+   "media": 48.53846153846154,
+   "mediana": 47,
+   "p95": 61.1,
+   "min": 40,
+   "max": 64
+  },
+  "recuperacion_ms": {
+   "n": 0,
+   "media": null,
+   "mediana": null,
+   "p95": null,
+   "min": null,
+   "max": null
+  },
+  "por_familia": {
+   "oficiales": {
+    "aciertos": 34,
+    "n": 39,
+    "exitos": 34,
+    "valor": 0.8717948717948718,
+    "bajo": 0.732942566203,
+    "alto": 0.94397182463,
+    "amplitud": 0.21102925842699993
+   }
+  },
+  "por_escenario": {
+   "A1": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A10": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A11": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A12": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A13": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A2": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A3": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A4": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A5": {
+    "aciertos": 0,
+    "n": 3,
+    "exitos": 0,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.561497031755,
+    "amplitud": 0.561497031755
+   },
+   "A6": {
+    "aciertos": 1,
+    "n": 3,
+    "exitos": 1,
+    "valor": 0.3333333333333333,
+    "bajo": 0.06149194472,
+    "alto": 0.792340399198,
+    "amplitud": 0.7308484544780001
+   },
+   "A7": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A8": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A9": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   }
+  },
+  "por_diagnostico": {
+   "SIN_FALLO": 31,
+   "FALLO_POLITICA": 4,
+   "ERROR_PARAMETRO": 3,
+   "ERROR_DECISION": 1
+  },
+  "repetibilidad": {
+   "escenarios_con_repeticion": 13,
+   "estables": 11,
+   "tasa": 0.8461538461538461
+  }
+ },
+ "temp_0.7": {
+  "rondas": 39,
+  "verificables": 39,
+  "exploratorias": 0,
+  "imputables": 39,
+  "infraestructura": 0,
+  "exactitud": {
+   "exitos": 28,
+   "n": 39,
+   "valor": 0.717948717948718,
+   "bajo": 0.56224680517,
+   "alto": 0.834565079112,
+   "amplitud": 0.2723182739419999
+  },
+  "exactitud_estricta": {
+   "exitos": 13,
+   "n": 39,
+   "valor": 0.3333333333333333,
+   "bajo": 0.206329561896,
+   "alto": 0.490226056007,
+   "amplitud": 0.283896494111
+  },
+  "fugas": {
+   "exitos": 0,
+   "n": 39,
+   "valor": 0.0,
+   "bajo": 0.0,
+   "alto": 0.089666853708,
+   "amplitud": 0.089666853708
+  },
+  "latencia_modelo_ms": {
+   "n": 39,
+   "media": 2448.74358974359,
+   "mediana": 2417,
+   "p95": 3146.8,
+   "min": 1659,
+   "max": 3703
+  },
+  "latencia_total_ms": {
+   "n": 39,
+   "media": 2448.948717948718,
+   "mediana": 2417,
+   "p95": 3147.7000000000003,
+   "min": 1659,
+   "max": 3703
+  },
+  "tokens_entrada": {
+   "n": 39,
+   "media": 416.9230769230769,
+   "mediana": 417,
+   "p95": 424.0,
+   "min": 411,
+   "max": 424
+  },
+  "tokens_salida": {
+   "n": 39,
+   "media": 51.69230769230769,
+   "mediana": 50,
+   "p95": 63.50000000000001,
+   "min": 40,
+   "max": 70
+  },
+  "recuperacion_ms": {
+   "n": 0,
+   "media": null,
+   "mediana": null,
+   "p95": null,
+   "min": null,
+   "max": null
+  },
+  "por_familia": {
+   "oficiales": {
+    "aciertos": 28,
+    "n": 39,
+    "exitos": 28,
+    "valor": 0.717948717948718,
+    "bajo": 0.56224680517,
+    "alto": 0.834565079112,
+    "amplitud": 0.2723182739419999
+   }
+  },
+  "por_escenario": {
+   "A1": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A10": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A11": {
+    "aciertos": 1,
+    "n": 3,
+    "exitos": 1,
+    "valor": 0.3333333333333333,
+    "bajo": 0.06149194472,
+    "alto": 0.792340399198,
+    "amplitud": 0.7308484544780001
+   },
+   "A12": {
+    "aciertos": 1,
+    "n": 3,
+    "exitos": 1,
+    "valor": 0.3333333333333333,
+    "bajo": 0.06149194472,
+    "alto": 0.792340399198,
+    "amplitud": 0.7308484544780001
+   },
+   "A13": {
+    "aciertos": 1,
+    "n": 3,
+    "exitos": 1,
+    "valor": 0.3333333333333333,
+    "bajo": 0.06149194472,
+    "alto": 0.792340399198,
+    "amplitud": 0.7308484544780001
+   },
+   "A2": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A3": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A4": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A5": {
+    "aciertos": 0,
+    "n": 3,
+    "exitos": 0,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.561497031755,
+    "amplitud": 0.561497031755
+   },
+   "A6": {
+    "aciertos": 1,
+    "n": 3,
+    "exitos": 1,
+    "valor": 0.3333333333333333,
+    "bajo": 0.06149194472,
+    "alto": 0.792340399198,
+    "amplitud": 0.7308484544780001
+   },
+   "A7": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A8": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   },
+   "A9": {
+    "aciertos": 3,
+    "n": 3,
+    "exitos": 3,
+    "valor": 1.0,
+    "bajo": 0.438502968245,
+    "alto": 1.0,
+    "amplitud": 0.561497031755
+   }
+  },
+  "por_diagnostico": {
+   "SIN_FALLO": 30,
+   "FALLO_POLITICA": 3,
+   "ERROR_DECISION": 2,
+   "ERROR_FORMATO": 2,
+   "ERROR_PARAMETRO": 2
+  },
+  "repetibilidad": {
+   "escenarios_con_repeticion": 13,
+   "estables": 6,
+   "tasa": 0.46153846153846156
+  }
+ },
+ "comparacion_temp_0.0": {
+  "a": {
+   "nombre": "T=0.2",
+   "exitos": 34,
+   "n": 39,
+   "valor": 0.8717948717948718,
+   "bajo": 0.732942566203,
+   "alto": 0.94397182463,
+   "amplitud": 0.21102925842699993
+  },
+  "b": {
+   "nombre": "T=0.0",
+   "exitos": 32,
+   "n": 39,
+   "valor": 0.8205128205128205,
+   "bajo": 0.673319543381,
+   "alto": 0.910227345268,
+   "amplitud": 0.236907801887
+  },
+  "diferencia": -0.05128205128205132,
+  "intervalo": {
+   "bajo": -0.20512820512820518,
+   "alto": 0.10256410256410253
+  },
+  "veredicto": "sin_diferencia_concluyente",
+  "explicacion": "El intervalo del 95 % de la diferencia (-0.205, 0.103) incluye el 0: con esta muestra no se puede afirmar que haya diferencia."
+ },
+ "comparacion_temp_0.7": {
+  "a": {
+   "nombre": "T=0.2",
+   "exitos": 34,
+   "n": 39,
+   "valor": 0.8717948717948718,
+   "bajo": 0.732942566203,
+   "alto": 0.94397182463,
+   "amplitud": 0.21102925842699993
+  },
+  "b": {
+   "nombre": "T=0.7",
+   "exitos": 28,
+   "n": 39,
+   "valor": 0.717948717948718,
+   "bajo": 0.56224680517,
+   "alto": 0.834565079112,
+   "amplitud": 0.2723182739419999
+  },
+  "diferencia": -0.15384615384615385,
+  "intervalo": {
+   "bajo": -0.33333333333333337,
+   "alto": 0.02564102564102566
+  },
+  "veredicto": "sin_diferencia_concluyente",
+  "explicacion": "El intervalo del 95 % de la diferencia (-0.333, 0.026) incluye el 0: con esta muestra no se puede afirmar que haya diferencia."
+ }
+}

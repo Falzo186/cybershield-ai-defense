@@ -1,7 +1,7 @@
 """Orquesta rondas reales (atacante -> defensor -> capas deterministas). Sin UI. Nunca lanza."""
 import re
 
-from . import atacante, defensor, filtro_rapido, herramientas, permisos, repositorio, sesion
+from . import atacante, defensor, diagnostico, filtro_rapido, herramientas, permisos, repositorio, sesion
 
 CAPAS = ("catalogo", "validacion", "permisos", "autorizacion", "repositorio")
 RECHAZOS = ("RECHAZAR", "AISLAR", "SOLICITAR_AUTORIZACION", "MARCAR_COMO_RIESGO")
@@ -72,12 +72,25 @@ def resumen_sino(rondas):
 
 
 def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None, resumen_sesion=None,
-                     equipo=None):
-    """Defensor IA -> capas deterministas -> veredicto, para UNA solicitud. Nunca lanza.
+                     equipo=None, tecnica="fewshot", rag_host=None, rag_k=None, rag_umbral=None,
+                     temperatura=None):
+    """Defensor IA -> capas deterministas -> veredicto -> diagnóstico, para UNA solicitud. Nunca lanza.
 
     La decisión del modelo es una PROPUESTA; las capas deciden con la identidad REAL del sistema.
-    -> {defensa, ejecucion, veredicto, error, nota}
+    -> {defensa, ejecucion, veredicto, error, nota, diagnostico}
+
+    `diagnostico` (ver diagnostico.py) explica POR QUÉ salió ese veredicto y separa los fallos de
+    infraestructura de los del modelo. Es informativo: no cambia el veredicto ni el puntaje.
     """
+    out = _procesar_defensa(host, modelo_def, solicitud, identidad, repo, riesgo_sesion, resumen_sesion, equipo,
+                            tecnica, rag_host, rag_k, rag_umbral, temperatura)
+    out["diagnostico"] = diagnostico.diagnosticar(out)
+    return out
+
+
+def _procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_sesion=None, resumen_sesion=None,
+                      equipo=None, tecnica="fewshot", rag_host=None, rag_k=None, rag_umbral=None,
+                      temperatura=None):
     out = {"defensa": None, "ejecucion": None, "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False,
            "nivel_fuga": "NINGUNA", "circuito_sesion": False, "origen_decision": "ia"}
     try:
@@ -88,13 +101,17 @@ def procesar_defensa(host, modelo_def, solicitud, identidad, repo=None, riesgo_s
                               "politica": "FILTRO-RAPIDO:" + f["categoria_detectada"], "herramienta": None,
                               "parametros": None, "parse_ok": True, "tiempo_ms": 0, "tokens": None,
                               "tokens_entrada": None, "carga_ms": None,
-                              "modelo": None, "intentos": 0, "origen_decision": "filtro_rapido"}
+                              "modelo": None, "intentos": 0, "origen_decision": "filtro_rapido",
+                              "tecnica": tecnica, "rag": None}
             out.update(veredicto="DEFENSA_EXITOSA", origen_decision="filtro_rapido")
             return out
         dfn = defensor.analizar(host, modelo_def, solicitud, identidad, herramientas.catalogo(), riesgo_sesion,
-                                resumen_sesion)
-        out["defensa"] = {k: dfn[k] for k in ("decision", "riesgo", "motivo", "politica", "herramienta",
-                                              "parametros", "parse_ok")} | _meta(dfn)
+                                resumen_sesion, tecnica, rag_host, rag_k, rag_umbral, temperatura)
+        # «tecnica» y «rag» se leen con .get: son opcionales, y un defensor sustituido en pruebas puede no
+        # traerlas. Las obligatorias siguen siendo de acceso directo, para que falte lo que debe fallar.
+        out["defensa"] = ({k: dfn[k] for k in ("decision", "riesgo", "motivo", "politica", "herramienta",
+                                               "parametros", "parse_ok")}
+                          | {k: dfn.get(k) for k in ("tecnica", "rag", "temperatura")} | _meta(dfn))
         if not dfn["ok"]:
             out["error"] = "defensor: " + str(dfn["error"])
             return out
@@ -152,13 +169,14 @@ def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=Non
     escenario = clave de atacante.ESCENARIOS (técnica fija por ronda) o None (el atacante elige libremente).
     equipo = a quién se atribuyen las filas de auditoría de la ronda ("rojo" en la batalla IA vs IA)."""
     res = {"ronda": ronda, "ataque": None, "defensa": None, "ejecucion": None,
-           "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False}
+           "veredicto": "ERROR", "error": None, "nota": None, "ia_fallo": False, "diagnostico": None}
     try:
         atq =atacante.generar_ataque(host, modelo_atq, identidad.rol, historial, intensidad, escenario, ronda)
         res["ataque"] = {"prompt": atq["prompt"], "categoria": atq["categoria"], "objetivo": atq["objetivo"],
                          "sensibilidad_objetivo": atq["sensibilidad_objetivo"], **_meta(atq)}
         if not atq["ok"]:
             res["error"] = "atacante: " + str(atq["error"])
+            res["diagnostico"] = diagnostico.diagnosticar(res)
             return res
         res.update(procesar_defensa(host_def or host, modelo_def, atq["prompt"], identidad, repo, riesgo_sesion,
                                     resumen_sesion, equipo))
@@ -169,4 +187,5 @@ def ejecutar_ronda(host, modelo_atq, modelo_def, identidad, ronda, historial=Non
     except Exception as exc:  # noqa: BLE001
         res["veredicto"] = "ERROR"
         res["error"] = f"{type(exc).__name__}: {exc}"
+        res["diagnostico"] = diagnostico.diagnosticar(res)
         return res

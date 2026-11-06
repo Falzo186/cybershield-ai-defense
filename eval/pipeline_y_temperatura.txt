@@ -1,0 +1,13 @@
+== pipeline: directo vs harness ==
+directo   exactitud 0.795 IC[0.645,0.892] n=39 · lat_mediana 2032 ms · infra 0
+harness   exactitud 0.744 IC[0.589,0.854] n=39 · lat_mediana 2029 ms · infra 0
+-> sin_diferencia_concluyente | El intervalo del 95 % de la diferencia (-0.231, 0.128) incluye el 0: con esta muestra no se puede afirmar que haya diferencia.
+
+== temperatura ==
+T=0.0  exactitud 0.821 IC[0.673,0.910] · repetibilidad 0.923 · lat_mediana 2088 ms
+T=0.2  exactitud 0.872 IC[0.733,0.944] · repetibilidad 0.846 · lat_mediana 2208 ms
+T=0.7  exactitud 0.718 IC[0.562,0.835] · repetibilidad 0.462 · lat_mediana 2417 ms
+T=0.2 vs T=0.0: sin_diferencia_concluyente | El intervalo del 95 % de la diferencia (-0.205, 0.103) incluye el 0: con esta muestra no se puede afirmar que haya diferencia.
+T=0.2 vs T=0.7: sin_diferencia_concluyente | El intervalo del 95 % de la diferencia (-0.333, 0.026) incluye el 0: con esta muestra no se puede afirmar que haya diferencia.
+
+listo

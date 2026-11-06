@@ -735,3 +735,11 @@ body.escritorio .informe { max-height: none; }
 .notif-lista li.nueva { border-left-color: var(--def); }
 .notif-lista li.n-alerta { border-left-color: var(--bad); }
 .notif-lista .hora { color: var(--texto-sec); font-family: var(--mono); font-size: 11px; margin-right: 6px; }
+
+/* Acceso al panel de análisis (ui/panel/). Discreto, en la cabecera, sin alterar nada más. */
+.enlace-panel {
+  margin-left: auto; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--borde); color: var(--texto-sec);
+  font-size: 11px; text-decoration: none; white-space: nowrap;
+}
+.enlace-panel:hover { color: var(--texto); border-color: var(--def); }

@@ -18,8 +18,11 @@ DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(DIR.parents[1]))
 
 from src.lab import repositorio  # noqa: E402
+from src.lab.wazuh import reglas as mod_reglas  # noqa: E402
 
-CAMPOS = ("timestamp", "partida", "equipo", "usuario", "rol", "tipo", "accion", "recurso", "resultado", "riesgo", "origen")
+# La carga y la evaluación de reglas viven en src/lab/wazuh/reglas.py: las usan esta prueba y el modo
+# simulado del panel, para que no haya dos modelos de las mismas reglas que se desincronicen.
+CAMPOS = mod_reglas.CAMPOS
 TIPOS = sorted({t for t, _ in repositorio.EVENTOS_SIEM.values()} | {"autorizacion_denegada"})
 resultados = []
 
@@ -29,31 +32,8 @@ def chk(nombre, cond):
     print(("OK    " if cond else "FALLO ") + nombre)
 
 
-def cargar_reglas():
-    raiz = ET.parse(DIR / "local_rules.xml").getroot()
-    reglas = []
-    for r in raiz.iter("rule"):
-        reglas.append({"id": int(r.get("id")), "nivel": int(r.get("level")), "padre": r.findtext("if_sid"),
-                       "correlacion": r.findtext("if_matched_sid"), "json": r.findtext("decoded_as") == "json",
-                       "campos": {f.get("name"): f.text for f in r.findall("field")},
-                       "descripcion": r.findtext("description") or "", "mitre": [m.text for m in r.iter("id")]})
-    return raiz, reglas
-
-
-def coincide(regla, ev):
-    return all(re.search(patron, "" if ev.get(campo) is None else str(ev.get(campo)))
-               for campo, patron in regla["campos"].items())
-
-
-def evaluar(reglas, ev):
-    """-> regla final (la más profunda que coincide) o None. Modelo simplificado (ver la cabecera)."""
-    actual = next((r for r in reglas if r["padre"] is None and r["correlacion"] is None and r["json"] and coincide(r, ev)), None)
-    while actual:
-        hija = next((r for r in reglas if r["padre"] == str(actual["id"]) and coincide(r, ev)), None)
-        if hija is None:
-            return actual
-        actual = hija
-    return None
+cargar_reglas = lambda: mod_reglas.cargar(DIR / "local_rules.xml")  # noqa: E731
+coincide, evaluar = mod_reglas.coincide, mod_reglas.evaluar
 
 
 def sintetico(tipo, resultado="OK"):
