@@ -194,3 +194,73 @@
 - Corregido por la E2E: 403 innecesario del espectador (/api/metricas sin token); aviso que decía "riesgo −10" con el riesgo ya en 0 (ahora muestra el riesgo resultante); falta de la marca "PDF REPORTADO" en la lista del buzón.
 - Limitaciones conocidas (no se tocaron por falta de tiempo para volver a probarlas bien): los avisos de éxito usan el mismo estilo (borde rojo) que los de error; conviven dos marcadores en la cabecera (el de la batalla IA vs IA "0 — 0" y el de la partida Rojo/Azul); una pestaña que pierde su token no puede recuperarlo sin reiniciar la partida.
 - Pendiente / siguiente paso: medir la batalla IA vs IA con modelos reales para la tabla de hallazgos; integrar Wazuh con data/eventos.jsonl.
+
+## Evolución técnica (06/11/2026) - Etapas E0-E9
+
+### E0 - Auditoría
+- Qué se hizo: inspección completa, línea base de pruebas (652/652 en 21 suites) y plan por etapas.
+- Archivos: docs/PLAN_EVOLUCION_TECNICA.md (nuevo)
+- Hallazgo: el informe de partida (DuckDB, Instacart, Streamlit, 31 fases) NO corresponde a este
+  repositorio; se documenta la discrepancia y se toma el código como única fuente de verdad. La única
+  cifra que casi encajaba (649 pruebas) era de aquí.
+- Hardware real comprobado: AMD Radeon integrada (2 GB) y 17.8 GB de RAM, no una RTX 5060. Ollama corre
+  en CPU: 2-7 s por inferencia con qwen2.5:1.5b.
+
+### E1 - Diagnóstico determinista de fallos
+- Qué se hizo: src/lab/diagnostico.py con 12 clases, evidencia, confianza, determinista/heurístico y
+  DIAGNOSTICO_INDETERMINADO cuando no hay demostración.
+- Archivos: src/lab/{diagnostico,test_diagnostico}.py (nuevos), motor.py, server/app.py
+- Decisiones: no hay análisis de SQL porque aquí ningún modelo genera SQL; el equivalente real es por qué
+  falló la defensa. Infraestructura (timeout, Ollama caído) nunca entra en el denominador de exactitud.
+- Pruebas: 50/50. Batería: 702/702.
+
+### E2 - Harness
+- Qué se hizo: src/lab/harness.py con presupuestos (iteraciones, llamadas, tokens, timeouts), detección
+  de bucles, cancelación entre pasos y estado serializable.
+- Archivos: src/lab/{harness,test_harness}.py (nuevos), docs/HARNESS.md
+- Decisiones: un reintento solo se concede ante un error técnico del modelo y NUNCA ante ERROR_PERMISO o
+  ERROR_AUTORIZACION, para que el harness no sea un amplificador de ataque. El timeout por herramienta no
+  mata el hilo (Python no deja); se documenta en vez de disimularlo.
+- Pruebas: 49/49. Batería: 751/751.
+
+### E3 - RAG
+- Qué se hizo: src/lab/rag/ con corpus de 15 documentos, troceado con trazabilidad, índice BM25 en Python
+  puro y embeddings opcionales por Ollama. Cuatro técnicas en el defensor: base, fewshot, rag, fewshot_rag.
+- Archivos: src/lab/rag/{__init__,corpus,indice}.py, src/lab/test_rag.py (nuevos), defensor.py, motor.py
+- Decisiones: sin ChromaDB ni FAISS (17 fragmentos no lo justifican); la interfaz queda aislada para poder
+  cambiar de motor. Lo recuperado pasa por el filtro de inyección antes del prompt: una inyección indirecta
+  se descarta y queda registrada. El corpus no indexa secretos, veredictos ni cargas de ataque literales.
+- Regresión detectada y corregida: motor exigía las claves nuevas con acceso directo y rompía test_eventos,
+  que sustituye el defensor; se pasó a .get para las opcionales.
+- Pruebas: 64/64. Batería: 815/815.
+
+### E4-E5 - Evaluación autónoma y registro de experimentos
+- Qué se hizo: src/lab/evaluacion/ (52 escenarios en 11 familias con referencia determinista, métricas con
+  Wilson y bootstrap, campañas con semilla y cancelación, lanzador contra Ollama) y experimentos.py.
+- Archivos: src/lab/evaluacion/*.py, src/lab/{experimentos,test_evaluacion}.py (nuevos), defensor.py, motor.py
+- Decisiones: la referencia la calcula permisos.evaluar_acceso, nunca un juez LLM. Los ambiguos son
+  exploratorios y salen de la cifra oficial. El comparador responde "muestra insuficiente" por debajo de 20
+  observaciones en vez de declarar mejoras que el ruido explicaría igual.
+- Pruebas: 85/85. Batería: 900/900.
+
+### E6-E7 - Laboratorio adversarial y Wazuh
+- Qué se hizo: src/lab/adversarial.py (28 casos con 9 controles benignos y 4 variantes fuera de patrón) y
+  src/lab/wazuh/ (tres modos, cliente de API de solo lectura, reglas compartidas con la prueba existente).
+- Archivos: src/lab/{adversarial,test_adversarial,test_wazuh}.py, src/lab/wazuh/*.py (nuevos),
+  integraciones/wazuh/test_reglas.py (deja de duplicar el evaluador de reglas)
+- Resultado medido: detección determinista 78.9 % IC95 [56.7, 91.5] sobre 19 maliciosos, 0 falsos positivos
+  sobre 9 benignos. Los 4 fallos son las variantes fuera de patrón y se nombran uno a uno.
+- Decisiones: en modo real sin conexión el error es visible; no se cae a simulado por detrás.
+- Pruebas: 35/35 y 48/48. Batería: 983/983.
+
+### E9 - Correlación, panel y sistema de diseño
+- Qué se hizo: src/lab/correlacion.py (cronología unificada y 7 reglas de correlación), server/panel.py
+  (rutas /api/panel/…) y ui/panel/ (sistema de diseño con tokens y 11 pantallas).
+- Archivos: src/lab/{correlacion,test_correlacion}.py, server/{panel,test_panel}.py, ui/panel/* (nuevos),
+  server/app.py, ui/index.html, ui/styles.css
+- Decisiones: panel nuevo en vez de rehacer la interfaz de la partida (3 800 líneas que funcionan); la
+  interfaz existente solo cambia en una línea, el enlace al panel. Sin CDN: tipografía del sistema, iconos
+  SVG en línea y gráficas dibujadas a mano. Nada de innerHTML con datos.
+- Pruebas: 39/39 y 57/57. Batería completa con navegador: 1187/1187 en 30 suites.
+- Pendiente / siguiente paso: conectar el harness a la batalla de la partida (midiendo antes su coste),
+  implementar la familia de escenarios generados y correr el modo estrés.

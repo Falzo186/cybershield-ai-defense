@@ -397,18 +397,51 @@ ejecutar            arranque en un comando
 ejecutar_pruebas.py todas las pruebas (unitarias, servidor, integración con reinicio, Wazuh y navegador)
 server/             app.py (servidor real) · mock_server.py (simulación) · partida.py (sesiones y partida)
 e2e/                demo_partida.py (4 navegadores) · test_reinicio.py · ollama_falso.py (solo pruebas)
-integraciones/wazuh/  adaptador documentado para Wazuh (no conectado)
-ui/                 interfaz web (HTML + CSS + JS, sin frameworks)
+integraciones/wazuh/  reglas y configuración del agente (el runtime está en src/lab/wazuh/)
+ui/                 interfaz web de la partida (HTML + CSS + JS, sin frameworks)
+ui/panel/           panel de operaciones y análisis (sistema de diseño + 11 pantallas)
+server/panel.py     rutas /api/panel/… del panel (solo lectura; los POST exigen sesión)
 src/lab/            motor real: cliente Ollama, atacante, defensor, capas, SQLite
                     + Red vs Blue: correos.py (plantillas), documentos.py (PDFs), sesion.py (reglas),
                       ataque_ia.py (batalla de la partida), informe.py (cronología y resultados),
                       apps.py (aplicaciones por permiso)
+                    + Evolución técnica: diagnostico.py (por qué falló cada ronda), harness.py
+                      (presupuestos y bucles), rag/ (recuperación documental), evaluacion/ (campañas
+                      reproducibles), experimentos.py (registro), adversarial.py (prompt injection),
+                      wazuh/ (tres modos y cliente de solo lectura), correlacion.py (incidentes)
 data/pdf/           PDFs benignos de entrenamiento (catálogo fijo)
 data/eventos.jsonl  eventos para un SIEM (se genera al jugar; no se versiona)
 src/                prototipo CLI original (Fase 0)
+data/experimentos.jsonl  registro de experimentos (solo se añade; no se versiona)
 docs/CONTRATO_API.md  contrato REST/SSE entre UI y backend
 PROGRESO.md         bitácora de desarrollo
 ```
+
+### Documentación de la evolución técnica
+
+| Documento | Contenido |
+|---|---|
+| [`docs/PLAN_EVOLUCION_TECNICA.md`](docs/PLAN_EVOLUCION_TECNICA.md) | Auditoría, problemas detectados y plan por etapas |
+| [`docs/ARQUITECTURA_ACTUALIZADA.md`](docs/ARQUITECTURA_ACTUALIZADA.md) | Mapa del sistema tras los cambios |
+| [`docs/CLASIFICACION_FALLOS.md`](docs/CLASIFICACION_FALLOS.md) | Las 12 clases de fallo y por qué infraestructura ≠ modelo |
+| [`docs/HARNESS.md`](docs/HARNESS.md) | Presupuestos, bucles y por qué un reintento no sortea un permiso |
+| [`docs/RAG.md`](docs/RAG.md) | Corpus, índice BM25 y defensa contra inyección indirecta |
+| [`docs/EVALUACION_AUTONOMA.md`](docs/EVALUACION_AUTONOMA.md) | Escenarios, referencia determinista, modos y métricas |
+| [`docs/RESULTADOS_EXPERIMENTALES.md`](docs/RESULTADOS_EXPERIMENTALES.md) | **Cifras reales medidas**, con su muestra y su intervalo |
+| [`docs/LABORATORIO_PROMPT_INJECTION.md`](docs/LABORATORIO_PROMPT_INJECTION.md) | Resistencia a prompt injection, medida |
+| [`docs/INTEGRACION_WAZUH.md`](docs/INTEGRACION_WAZUH.md) | Los tres modos y el cliente de solo lectura |
+| [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md) | Revisión de seguridad y riesgos abiertos |
+
+## Panel de operaciones y análisis
+
+Además de la partida, el laboratorio tiene un **panel de análisis** en `http://localhost:8000/panel/`
+(enlace en la cabecera de la aplicación). Once pantallas sobre datos reales:
+
+Dashboard · Consola de defensa (lanza campañas contra Ollama y sigue su progreso real) · Experimentos (con
+comparador estadístico) · Conjunto de evaluación · Clasificación de fallos · RAG · Harness · Centro SOC ·
+Cronología unificada · Correlación de incidentes · Laboratorio adversarial.
+
+Un indicador sin datos dice «sin datos», nunca 0; y todo lo simulado va marcado como simulado.
 
 ## Modo LAN (dos PCs)
 
