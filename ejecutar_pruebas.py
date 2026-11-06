@@ -17,7 +17,7 @@ RAIZ = Path(__file__).resolve().parent
 UNITARIAS = ["test_lab", "test_motor", "test_correos", "test_reglas", "test_misiones", "test_documentos", "test_eventos",
              "test_puntaje", "test_cliente", "test_correo_app", "test_incidentes", "test_ataque_ia", "test_informe",
              "test_apps", "test_diagnostico", "test_harness", "test_rag", "test_evaluacion", "test_adversarial", "test_wazuh", "test_correlacion",
-             "test_control_partida", "test_lotes"]
+             "test_control_partida", "test_lotes", "test_escenarios_empresa"]
 SERVIDOR = ["server/test_partida.py", "server/test_app.py", "server/test_batalla_partida.py", "server/test_resultados.py",
             "server/test_apps.py", "server/test_presupuesto.py"]
 INTEGRACION = ["e2e/test_reinicio.py", "integraciones/wazuh/test_reglas.py", "server/test_panel.py"]

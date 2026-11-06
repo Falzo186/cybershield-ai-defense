@@ -94,6 +94,39 @@ def main():
     chk("azul no detiene", c.post("/api/detener", json={}, headers=H(ta)).status_code == 403)
     chk("general detiene", c.post("/api/detener", json={}, headers=H(tg)).status_code == 200)
 
+    # --- catálogo de escenarios de empresa (Fase D) ---
+    r = c.get("/api/escenarios")
+    chk("el catálogo de escenarios se lee sin sesión (espectador)", r.status_code == 200)
+    j = r.json()
+    chk("trae escenarios con objetivos de los dos equipos",
+        len(j["escenarios"]) >= 3
+        and all(e["objetivo_rojo"] and e["objetivo_azul"] for e in j["escenarios"]))
+    chk("cada escenario declara recursos, reglas, eventos y condiciones de victoria",
+        all(e["recursos_simulados"] and e["reglas"] and e["eventos"] and e["victoria_rojo"]
+            and e["victoria_azul"] and e["criterios_evaluacion"] for e in j["escenarios"]))
+    chk("y la sensibilidad real del objetivo, sacada del catálogo de herramientas",
+        all(e["objetivo"]["sensibilidad"] in ("PUBLICA", "INTERNA", "CONFIDENCIAL", "CRITICA")
+            for e in j["escenarios"]))
+    chk("el catálogo avisa de que describe, no autoriza", "no autoriza" in j["nota"])
+    uno = c.get("/api/escenarios?id=" + j["escenarios"][0]["id"]).json()
+    chk("se puede pedir un escenario concreto", uno["escenario"]["id"] == j["escenarios"][0]["id"])
+    chk("y viene sin problemas de coherencia", uno["problemas"] == [])
+    chk("un escenario inexistente da 404", c.get("/api/escenarios?id=no-existe").status_code == 404)
+
+    # --- misiones: cancelar y reabrir (Fase D) ---
+    chk("rojo no cancela misiones de azul",
+        c.post("/api/misiones/1/cancelar", json={}, headers=H(tr)).status_code == 403)
+    chk("el árbitro tampoco",
+        c.post("/api/misiones/1/cancelar", json={}, headers=H(tg)).status_code == 403)
+    chk("el espectador tampoco",
+        c.post("/api/misiones/1/cancelar", json={}, headers=H(te)).status_code == 403)
+    chk("rojo no reabre misiones de azul",
+        c.post("/api/misiones/1/reabrir", json={}, headers=H(tr)).status_code == 403)
+    chk("cancelar una misión inexistente da 404",
+        c.post("/api/misiones/99999/cancelar", json={}, headers=H(ta)).status_code == 404)
+    chk("reabrir una misión inexistente da 404",
+        c.post("/api/misiones/99999/reabrir", json={}, headers=H(ta)).status_code == 404)
+
     # --- buzón ---
     chk("plantillas visibles con token", len(c.get("/api/correo/plantillas", headers=H(tr)).json()["plantillas"]) >= 2)
     chk("azul no envía correos", c.post("/api/correo", json={"plantilla": "paqueteria"}, headers=H(ta)).status_code == 403)

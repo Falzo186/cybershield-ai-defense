@@ -35,8 +35,10 @@ CREATE TABLE IF NOT EXISTS misiones(
 CREATE TABLE IF NOT EXISTS progreso_mision(
     partida TEXT NOT NULL, usuario TEXT NOT NULL REFERENCES usuarios(usuario),
     mision_id INTEGER NOT NULL REFERENCES misiones(id),
-    estado TEXT NOT NULL CHECK(estado IN ('pendiente','completada')), ts TEXT NOT NULL,
+    estado TEXT NOT NULL CHECK(estado IN ('pendiente','en_progreso','completada','cancelada')),
+    ts TEXT NOT NULL,
     completada_por TEXT, evidencia TEXT, puntos_obtenidos INTEGER, a_tiempo INTEGER,
+    motivo_cancelacion TEXT,
     PRIMARY KEY(partida, usuario, mision_id));
 CREATE TABLE IF NOT EXISTS asignaciones_mision(
     partida TEXT NOT NULL, mision_id INTEGER NOT NULL REFERENCES misiones(id), participante TEXT NOT NULL,
@@ -155,6 +157,43 @@ def _migrar_misiones(conn):
                 conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {col} {tipo}")
 
 
+def _migrar_estados_mision(conn):
+    """Fase D: progreso_mision acepta además 'en_progreso' y 'cancelada'.
+
+    SQLite no permite cambiar un CHECK con ALTER TABLE, así que la tabla se reconstruye. **El progreso
+    existente se copia fila a fila**: esta migración no pierde ningún registro histórico, y si la tabla ya
+    acepta los estados nuevos no hace nada. Se ejecuta DESPUÉS de `DDL` (que crea la tabla si falta) y
+    ANTES de `_migrar_misiones` (que añade columnas sueltas), para que el orden no importe.
+    """
+    fila = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='progreso_mision'").fetchone()
+    if fila is None or "en_progreso" in (fila[0] or ""):
+        return
+    columnas = [f[1] for f in conn.execute("PRAGMA table_info(progreso_mision)")]
+    # Solo se copian las columnas que la tabla vieja tenía de verdad; las nuevas quedan en su valor por defecto.
+    comunes = [c for c in ("partida", "usuario", "mision_id", "estado", "ts", "completada_por", "evidencia",
+                           "puntos_obtenidos", "a_tiempo") if c in columnas]
+    lista = ", ".join(comunes)
+    fk = conn.execute("PRAGMA foreign_keys").fetchone()[0]
+    conn.executescript(f"""
+        PRAGMA foreign_keys = OFF;
+        PRAGMA legacy_alter_table = ON;
+        BEGIN;
+        ALTER TABLE progreso_mision RENAME TO progreso_mision_v1;
+        CREATE TABLE progreso_mision(
+            partida TEXT NOT NULL, usuario TEXT NOT NULL REFERENCES usuarios(usuario),
+            mision_id INTEGER NOT NULL REFERENCES misiones(id),
+            estado TEXT NOT NULL CHECK(estado IN ('pendiente','en_progreso','completada','cancelada')),
+            ts TEXT NOT NULL,
+            completada_por TEXT, evidencia TEXT, puntos_obtenidos INTEGER, a_tiempo INTEGER,
+            motivo_cancelacion TEXT,
+            PRIMARY KEY(partida, usuario, mision_id));
+        INSERT INTO progreso_mision({lista}) SELECT {lista} FROM progreso_mision_v1;
+        DROP TABLE progreso_mision_v1;
+        COMMIT;
+        PRAGMA legacy_alter_table = OFF;""")
+    conn.execute(f"PRAGMA foreign_keys = {'ON' if fk else 'OFF'}")
+
+
 def _migrar_correos(conn):
     """correos ganó la columna adjunto (id de un PDF fijo del catálogo, o NULL)."""
     columnas = {f[1] for f in conn.execute("PRAGMA table_info(correos)")}
@@ -166,6 +205,7 @@ def crear(conn):
     _migrar_roles(conn)
     _migrar_progreso(conn)
     conn.executescript(DDL)
+    _migrar_estados_mision(conn)
     _migrar_correos(conn)
     _migrar_auditoria(conn)
     _migrar_misiones(conn)

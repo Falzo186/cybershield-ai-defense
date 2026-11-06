@@ -28,7 +28,8 @@ from pydantic import BaseModel, Field  # noqa: E402
 import mock_server as ms  # noqa: E402
 import panel as pn  # noqa: E402
 import partida as pt  # noqa: E402
-from src.lab import (apps, ataque_ia, atacante, cliente_ollama, correos, documentos, harness, informe, motor,  # noqa: E402
+from src.lab import (apps, ataque_ia, atacante, cliente_ollama, correos, documentos, escenarios_empresa,  # noqa: E402
+                     harness, informe, motor,
                      repositorio, sesion)
 
 app = ms.app
@@ -59,7 +60,7 @@ RESTO = ["politicas", "autorizacion", "herramienta", "bd"]
 CODIGO_ARBITRO = os.getenv("CS_CODIGO_ARBITRO") or f"{secrets.randbelow(10 ** 6):06d}"
 SALA = pt.Sala(CODIGO_ARBITRO)
 RUTAS_PUBLICAS = ("/api/eventos", "/api/estado", "/api/ia/estado", "/api/cronologia", "/api/resultados", "/api/partidas",
-                  "/api/apps", "/api/recursos", "/api/ayuda", "/api/batalla/presupuesto")
+                  "/api/apps", "/api/recursos", "/api/ayuda", "/api/batalla/presupuesto", "/api/escenarios")
 RUTA_SESION = "/api/sesion"
 # El panel de análisis (/api/panel/...) es una vista de solo lectura del laboratorio: no toca la partida, no
 # expone secretos y se consulta sin unirse a ningún equipo. Sus POST (lanzar o cancelar una campaña) sí
@@ -764,6 +765,47 @@ async def asumir_mision(mision_id: int, request: Request):
                                   "OK", "BAJO"))
     ms.emitir("misiones_cambio", {"mision_id": mision_id})
     return {"asumida": True, "mision_id": mision_id, "responsable": _participante(request)}
+
+
+class CancelarMisionIn(BaseModel):
+    motivo: str | None = Field(None, max_length=200)
+
+
+@app.post("/api/misiones/{mision_id}/cancelar")
+async def cancelar_mision(mision_id: int, body: CancelarMisionIn, request: Request):
+    """Solo Azul: descarta una misión que ya no procede. No da ni quita puntos, y queda en la auditoría."""
+    if err := _accion_azul(request):
+        return err
+    usuario = USUARIO_EQUIPO.get("azul")
+    r = repositorio.por_defecto().cancelar_mision(PARTIDA_ID, usuario, mision_id, _participante(request),
+                                                  body.motivo)
+    if r is None:
+        return _prohibido("Esa misión no existe.", 404)
+    if r == "completada":
+        return _prohibido("Esa misión ya está completada: cancelarla borraría un resultado.", 409)
+    if not r:
+        return _prohibido("Esa misión ya estaba cancelada.", 409)
+    ms.emitir("auditoria", ms.aud("DEFENDER", "MISION_CANCELADA", f"misión {mision_id} · {_participante(request)}",
+                                  (body.motivo or "sin motivo")[:60], "BAJO"))
+    ms.emitir("misiones_cambio", {"mision_id": mision_id, "estado": "cancelada"})
+    return {"cancelada": True, "mision_id": mision_id, "motivo": body.motivo}
+
+
+@app.post("/api/misiones/{mision_id}/reabrir")
+async def reabrir_mision(mision_id: int, request: Request):
+    """Solo Azul: devuelve a pendiente una misión cancelada. Una completada no se reabre."""
+    if err := _accion_azul(request):
+        return err
+    usuario = USUARIO_EQUIPO.get("azul")
+    r = repositorio.por_defecto().reabrir_mision(PARTIDA_ID, usuario, mision_id, _participante(request))
+    if r is None:
+        return _prohibido("Esa misión no existe.", 404)
+    if not r:
+        return _prohibido("Esa misión no está cancelada.", 409)
+    ms.emitir("auditoria", ms.aud("DEFENDER", "MISION_REABIERTA", f"misión {mision_id} · {_participante(request)}",
+                                  "PENDIENTE", "BAJO"))
+    ms.emitir("misiones_cambio", {"mision_id": mision_id, "estado": "pendiente"})
+    return {"reabierta": True, "mision_id": mision_id}
 
 
 # ---------- incidentes de la partida y credenciales ficticias (Fase E) ----------
@@ -1642,6 +1684,26 @@ def _datos_partida(pid):
     if guardado:
         return guardado["inicio"], "finalizada", guardado
     return None
+
+
+@app.get("/api/escenarios")
+async def escenarios_catalogo(id: str | None = None):
+    """Catálogo de escenarios de la empresa ficticia: objetivos de cada equipo, recursos, reglas, eventos y
+    condiciones de victoria.
+
+    Es declarativo y de solo lectura. La sensibilidad del objetivo no sale del texto del escenario: sale del
+    catálogo de herramientas, que es lo que de verdad aplican los permisos."""
+    if id is not None:
+        e = escenarios_empresa.obtener(id)
+        if e is None:
+            return _prohibido(f"No existe el escenario {id}.", 404)
+        return {"escenario": e, "problemas": escenarios_empresa.validar(escenarios_empresa.CATALOGO[id])}
+    return {"escenarios": escenarios_empresa.listar(),
+            "tecnicas_atacante": list(atacante.ESCENARIOS),
+            "acciones": list(escenarios_empresa.ACCIONES),
+            "eventos": list(escenarios_empresa.EVENTOS),
+            "nota": ("El escenario describe la partida; no autoriza nada. Quien autoriza sigue siendo la "
+                     "capa de permisos y el autorizador del repositorio.")}
 
 
 @app.get("/api/batalla/presupuesto")

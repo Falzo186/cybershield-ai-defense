@@ -61,7 +61,7 @@ def main():
         e = wazuh.estado()
         chk("desactivado: no afirma estar conectado", e["conectado"] is False and e["modo"] == "desactivado")
         chk("el estado siempre dice qué modo está activo", e["modo"] in wazuh.MODOS)
-        chk("el estado cuenta las reglas definidas", e["reglas_definidas"] == 18)
+        chk("el estado cuenta las reglas definidas", e["reglas_definidas"] == 19)
 
         # ── Simulado ────────────────────────────────────────────────────────────────────────────────────────
         con_modo("simulado")
@@ -165,7 +165,7 @@ def main():
 
         # ── Reglas compartidas con la prueba del adaptador ──────────────────────────────────────────────────
         _, reglas = mod_reglas.cargar()
-        chk("se cargan las 18 reglas locales", len(reglas) == 18)
+        chk("se cargan las 19 reglas locales", len(reglas) == 19)
         chk("los eventos de ejemplo se leen", len(mod_reglas.eventos_ejemplo()) > 0)
         chk("un archivo de eventos inexistente devuelve lista vacía, no lanza",
             mod_reglas.eventos_ejemplo(mod_reglas.RUTA_EJEMPLOS.parent / "no-existe.jsonl") == [])

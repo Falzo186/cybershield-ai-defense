@@ -38,6 +38,8 @@ ACCIONES = {
     "INCIDENTE_RESUELTO": ("incidente", "Azul resolvió un incidente ({recurso})"),
     "MISION_COMPLETADA": ("mision", "Misión completada ({recurso}): {resultado}"),
     "MISION_ASUMIDA": ("mision", "{resultado} asumió una misión ({recurso})"),
+    "MISION_CANCELADA": ("mision", "Misión cancelada ({recurso}): {resultado}"),
+    "MISION_REABIERTA": ("mision", "Misión reabierta ({recurso}): vuelve a {resultado}"),
     "ATAQUE_IA_LANZADO": ("batalla_ia", "La IA de Rojo lanzó un ataque ({recurso}) como {usuario}: {resultado}"),
     "ATAQUE_IA_RESULTADO": ("batalla_ia", "Resultado del ataque IA ({recurso}): {resultado}"),
     "DEFENSOR_IA_CONFIGURADO": ("batalla_ia", "Azul fijó su defensor IA ({recurso})"),

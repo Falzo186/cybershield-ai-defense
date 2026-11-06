@@ -65,6 +65,14 @@
     <description>CyberShield: verificación o tarea de Azul ($(tipo), $(resultado))</description>
     <group>respuesta,</group>
   </rule>
+  <!-- Fase D: una misión se puede descartar y volver a abrir. Nivel 3: es una decisión de gestión del
+       equipo Azul, no un incidente. Interesa que quede trazada, no que dispare una alerta. -->
+  <rule id="100141" level="3">
+    <if_sid>100100</if_sid>
+    <field name="tipo">^mision_cancelada$|^mision_reabierta$</field>
+    <description>CyberShield: cambio de estado de una misión ($(tipo), $(recurso)): $(resultado)</description>
+    <group>respuesta,</group>
+  </rule>
   <rule id="100122" level="7">
     <if_sid>100100</if_sid>
     <field name="tipo">^incidente_abierto$</field>

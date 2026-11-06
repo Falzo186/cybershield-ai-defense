@@ -36,6 +36,8 @@ EVENTOS_SIEM = {
     "CREDENCIAL_COMPROMETIDA": ("credencial_comprometida", "azul"), "CREDENCIAL_REVOCADA": ("credencial_revocada", "azul"),
     "INCIDENTE_ABIERTO": ("incidente_abierto", "azul"), "INCIDENTE_ACTUALIZADO": ("incidente_actualizado", "azul"),
     "INCIDENTE_RESUELTO": ("incidente_resuelto", "azul"), "MISION_ASUMIDA": ("mision_asumida", "azul"),
+    # Fase D (integración): una misión se puede cancelar y volver a abrir, y las dos cosas se auditan.
+    "MISION_CANCELADA": ("mision_cancelada", "azul"), "MISION_REABIERTA": ("mision_reabierta", "azul"),
     # Fase F: ataques IA dentro de la partida
     "ATAQUE_IA_LANZADO": ("ataque_ia_lanzado", "rojo"), "ATAQUE_IA_RESULTADO": ("ataque_ia_resultado", "rojo"),
     "DEFENSOR_IA_CONFIGURADO": ("defensor_ia_configurado", "azul"),
@@ -660,15 +662,29 @@ class Repositorio:
         return self._incidente(partida, inc_id)
 
     # ---------- misiones del Equipo Azul ----------
+    # Estados GUARDADOS de una misión (los que viven en progreso_mision) y estados DERIVADOS (los que se
+    # calculan al leer, a partir de las dependencias y del reloj). La distinción importa: `estado_registrado`
+    # dice qué decidió una persona, y `estado` qué está pasando ahora.
+    ESTADOS_MISION = ("pendiente", "en_progreso", "completada", "cancelada")
+    ESTADOS_DERIVADOS = ("bloqueada", "vencida")
+    # Terminales: ni una dependencia que falta ni un plazo vencido cambian lo que ya se decidió.
+    TERMINALES = ("completada", "cancelada")
+    # Desde qué estados efectivos se puede completar una misión. `cancelada` no está: una misión cancelada no
+    # se completa sola por un evento, hay que reabrirla primero. `bloqueada` tampoco.
+    COMPLETABLES = ("pendiente", "en_progreso", "vencida")
+
     def misiones(self, partida, usuario, transcurrido_s=None):
-        """Todas las misiones con el progreso de ese usuario EN ESA PARTIDA. estado: completada · bloqueada (falta
-        alguna de depende_de) · vencida (pendiente y pasado su plazo: aún vale la mitad) · pendiente.
+        """Todas las misiones con el progreso de ese usuario EN ESA PARTIDA.
+
+        `estado_registrado`: lo que hay guardado (pendiente · en_progreso · completada · cancelada).
+        `estado`: el efectivo, que además puede ser `bloqueada` (falta alguna de depende_de) o `vencida`
+        (pasado su plazo y aún sin completar: vale la mitad). Los estados terminales no se sobreescriben.
         transcurrido_s = segundos desde el inicio de la partida (None = sin reloj: nada vence)."""
         filas = self.conn.execute(
             "SELECT m.id, m.titulo, m.condicion_evento, m.puntos, m.prioridad, m.plazo_s, m.depende_de, m.descripcion, "
             "COALESCE(p.estado, 'pendiente') AS estado, p.ts, p.completada_por, p.evidencia, "
             "COALESCE(p.puntos_obtenidos, CASE WHEN p.estado = 'completada' THEN m.puntos END) AS puntos_obtenidos, "
-            "p.a_tiempo, s.participante AS responsable "
+            "p.a_tiempo, p.motivo_cancelacion, s.participante AS responsable "
             "FROM misiones m LEFT JOIN progreso_mision p ON p.mision_id = m.id AND p.partida = ? AND p.usuario = ? "
             "LEFT JOIN asignaciones_mision s ON s.mision_id = m.id AND s.partida = ? ORDER BY m.id",
             (partida, usuario, partida)).fetchall()
@@ -676,15 +692,62 @@ class Repositorio:
         hechas = {m["id"] for m in lista if m["estado"] == "completada"}
         titulos = {m["id"]: m["titulo"] for m in lista}
         for m in lista:
+            m["estado_registrado"] = m["estado"]
             m["depende_de"] = [int(x) for x in m["depende_de"].split(",") if x.strip()]
             m["requiere"] = [titulos[d] for d in m["depende_de"] if d not in hechas and d in titulos]
-            if m["estado"] != "completada":
+            if m["estado"] not in self.TERMINALES:
                 if m["requiere"]:
                     m["estado"] = "bloqueada"
                 elif m["plazo_s"] is not None and transcurrido_s is not None and transcurrido_s > m["plazo_s"]:
                     m["estado"] = "vencida"
             m["a_tiempo"] = None if m["a_tiempo"] is None else bool(m["a_tiempo"])
         return lista
+
+    def _marcar_mision(self, partida, usuario, mision_id, estado, desde, motivo=None):
+        """Transición de estado guardado, solo si el estado actual está en `desde`. -> bool (cambió).
+
+        Es la única forma de escribir un estado que no sea 'completada': `_completar` tiene su propia ruta
+        porque además calcula puntos y plazo."""
+        with self.conn:
+            cur = self.conn.execute(
+                "INSERT INTO progreso_mision(partida,usuario,mision_id,estado,ts,motivo_cancelacion) "
+                "VALUES(?,?,?,?,?,?) "
+                "ON CONFLICT(partida, usuario, mision_id) DO UPDATE SET estado=excluded.estado, "
+                "ts=excluded.ts, motivo_cancelacion=excluded.motivo_cancelacion "
+                f"WHERE progreso_mision.estado IN ({','.join('?' * len(desde))})",
+                (partida, usuario, mision_id, estado, _ahora(), motivo, *desde))
+        return bool(cur.rowcount)
+
+    def cancelar_mision(self, partida, usuario, mision_id, participante=None, motivo=None):
+        """Cancela una misión: deja de contar y no se completa por evento. -> True · None (no existe) ·
+        "completada" (ya está hecha: cancelarla sería borrar un resultado) · False (ya estaba cancelada).
+
+        Cancelar NO da ni quita puntos: una misión cancelada vale 0, y los puntos de una completada no se
+        tocan nunca. Queda en la auditoría con su motivo."""
+        m = next((m for m in self.misiones(partida, usuario) if m["id"] == mision_id), None)
+        if m is None:
+            return None
+        if m["estado_registrado"] == "completada":
+            return "completada"
+        if not self._marcar_mision(partida, usuario, mision_id, "cancelada",
+                                   ("pendiente", "en_progreso"), motivo):
+            return False
+        self.registrar(self.identidad(usuario), "MISION_CANCELADA", f"mision:{mision_id}",
+                       f"CANCELADA{': ' + motivo if motivo else ''}"[:120], "BAJO")
+        return True
+
+    def reabrir_mision(self, partida, usuario, mision_id, participante=None):
+        """Devuelve una misión cancelada a 'pendiente'. -> True · None (no existe) · False (no estaba cancelada).
+
+        Existe para que cancelar no sea un callejón sin salida en medio de una partida. Una misión completada
+        no se reabre: eso sería deshacer un resultado."""
+        m = next((m for m in self.misiones(partida, usuario) if m["id"] == mision_id), None)
+        if m is None:
+            return None
+        if not self._marcar_mision(partida, usuario, mision_id, "pendiente", ("cancelada",)):
+            return False
+        self.registrar(self.identidad(usuario), "MISION_REABIERTA", f"mision:{mision_id}", "PENDIENTE", "BAJO")
+        return True
 
     def _completar(self, partida, usuario, mision, participante=None, evidencia=None, transcurrido_s=None):
         """Marca completada si no lo estaba, con quién, la evidencia y los puntos (mitad fuera de plazo).
@@ -714,7 +777,7 @@ class Repositorio:
             return []
         hechas = []
         for m in self.misiones(partida, usuario, transcurrido_s):
-            if m["condicion_evento"] == evento and m["estado"] in ("pendiente", "vencida"):
+            if m["condicion_evento"] == evento and m["estado"] in self.COMPLETABLES:
                 if r := self._completar(partida, usuario, m, participante, evidencia, transcurrido_s):
                     hechas.append(r)
         return hechas
@@ -732,6 +795,8 @@ class Repositorio:
             return None
         if m["estado"] == "bloqueada":
             return "bloqueada"
+        if m["estado"] == "cancelada":
+            return "cancelada"   # hay que reabrirla antes: completar una misión cancelada sería un atajo
         return self._completar(partida, usuario, m, participante, "manual", transcurrido_s) or False
 
     def asumir_mision(self, partida, usuario, mision_id, participante):
@@ -742,10 +807,15 @@ class Repositorio:
             return None
         if m["estado"] == "completada":
             return "completada"
+        if m["estado"] == "cancelada":
+            return "cancelada"   # asumir una misión cancelada no tiene sentido; antes hay que reabrirla
         with self.conn:
             self.conn.execute("INSERT INTO asignaciones_mision(partida,mision_id,participante,ts) VALUES(?,?,?,?) "
                               "ON CONFLICT(partida, mision_id) DO UPDATE SET participante=excluded.participante, "
                               "ts=excluded.ts", (partida, mision_id, participante, _ahora()))
+        # Asumir una misión es ponerla en marcha: pasa a 'en_progreso' si estaba pendiente. Si ya estaba en
+        # progreso (otro participante la tenía), solo cambia el responsable y el estado no se toca.
+        self._marcar_mision(partida, usuario, mision_id, "en_progreso", ("pendiente",))
         self.registrar(self.identidad(usuario), "MISION_ASUMIDA", f"mision:{mision_id}", participante, "BAJO")
         return True
 
