@@ -16,7 +16,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent
 UNITARIAS = ["test_lab", "test_motor", "test_correos", "test_reglas", "test_misiones", "test_documentos", "test_eventos",
              "test_puntaje", "test_cliente", "test_correo_app", "test_incidentes", "test_ataque_ia", "test_informe",
-             "test_apps", "test_diagnostico", "test_harness", "test_rag", "test_evaluacion"]
+             "test_apps", "test_diagnostico", "test_harness", "test_rag", "test_evaluacion", "test_adversarial", "test_wazuh"]
 SERVIDOR = ["server/test_partida.py", "server/test_app.py", "server/test_batalla_partida.py", "server/test_resultados.py",
             "server/test_apps.py"]
 INTEGRACION = ["e2e/test_reinicio.py", "integraciones/wazuh/test_reglas.py"]
