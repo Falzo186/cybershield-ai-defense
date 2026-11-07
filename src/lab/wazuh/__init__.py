@@ -14,7 +14,7 @@ El modo se elige con la variable de entorno `CYBERSHIELD_WAZUH` (por defecto `de
 import os
 import time
 
-from . import cliente as mod_cliente, reglas as mod_reglas
+from . import cliente as mod_cliente, indexador as mod_indexador, reglas as mod_reglas
 
 MODOS = ("real", "simulado", "desactivado")
 VAR_ENTORNO = "CYBERSHIELD_WAZUH"
@@ -26,6 +26,11 @@ def modo():
     """Modo activo. Un valor desconocido en el entorno se trata como «desactivado», nunca como «real»."""
     v = (os.environ.get(VAR_ENTORNO) or "desactivado").strip().lower()
     return v if v in MODOS else "desactivado"
+
+
+def _indexador(**kw):
+    return mod_indexador.ClienteIndexador(
+        verificar_tls=(os.environ.get("WAZUH_TLS", "1") != "0"), **kw)
 
 
 def _cliente(**kw):
@@ -67,7 +72,8 @@ def alertas_simuladas(eventos=None, nivel_minimo=0, limite=100, ruta_reglas=None
             "eventos_leidos": len(evs)}
 
 
-def alertas(nivel_minimo=0, limite=100, eventos=None, cliente=None):
+def alertas(nivel_minimo=0, limite=100, eventos=None, cliente=None, indexador=None,
+            desde=None, partida=None):
     """Alertas según el modo activo. Nunca mezcla orígenes y nunca cae de «real» a «simulado» en silencio."""
     m = modo()
     _ESTADO["consultas"] += 1
@@ -90,12 +96,29 @@ def alertas(nivel_minimo=0, limite=100, eventos=None, cliente=None):
         # Modo real sin conexión: error visible. Devolver alertas simuladas aquí sería mentir.
         return {"ok": False, "modo": m, "alertas": [], "error": r["error"], "simulado": False,
                 "nota": "Modo real sin conexión con Wazuh. No se muestran alertas simuladas en su lugar."}
-    return {"ok": True, "modo": m, "alertas": [], "error": None, "simulado": False,
-            "nota": "Conexión con Wazuh establecida. La consulta de alertas del indexador todavía no está "
-                    "implementada: esta versión solo lee estado, agentes y reglas."}
+    # El manager responde, pero las alertas no viven ahí: viven en el indexador, que es otro servicio con
+    # otro puerto y otras credenciales. Si no está configurado, se dice; no se rellena con nada.
+    if indexador is None and not mod_indexador.configurado():
+        return {"ok": False, "modo": m, "alertas": [], "error": "indexador no configurado", "simulado": False,
+                "manager": True,
+                "nota": "El manager de Wazuh responde, pero faltan las credenciales del indexador "
+                        "(WAZUH_INDEXER_USUARIO / WAZUH_INDEXER_CLAVE), que es donde están las alertas. "
+                        "No se muestran alertas simuladas en su lugar."}
+    ix = indexador or _indexador()
+    ri = ix.alertas(nivel_minimo=nivel_minimo, limite=limite, desde=desde, partida=partida)
+    _ESTADO["ultimo_error"] = ri["error"] or _ESTADO["ultimo_error"]
+    if not ri["ok"]:
+        return {"ok": False, "modo": m, "alertas": [], "error": ri["error"], "simulado": False,
+                "manager": True,
+                "nota": "El manager responde pero el indexador no. No se muestran alertas simuladas en su "
+                        "lugar."}
+    _ESTADO["ultima_sincronizacion"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    return {"ok": True, "modo": m, "alertas": ri["alertas"], "error": None, "simulado": False,
+            "manager": True, "total_indexador": ri["total"], "ms": ri["ms"],
+            "nota": "Alertas leídas del indexador de Wazuh. Son reales: ninguna se ha deducido aquí."}
 
 
-def estado(cliente=None):
+def estado(cliente=None, indexador=None):
     """Estado de la integración, para el panel. Nunca afirma que hay conexión sin haberla comprobado."""
     m = modo()
     base = {"modo": m, "modos": list(MODOS), "variable_entorno": VAR_ENTORNO,
@@ -118,7 +141,20 @@ def estado(cliente=None):
                            "como simuladas. No hay ningún Wazuh conectado."}
     c = (cliente or _cliente()).comprobar()
     _ESTADO["ultimo_error"] = c["error"]
-    return {**base, "conectado": c["conectado"], "version": c["version"], "ultimo_error": c["error"],
-            "ms": c["ms"], "simulado": False,
-            "detalle": ("Conectado a Wazuh." if c["conectado"]
-                        else "Modo real, pero sin conexión con Wazuh.")}
+    # El manager y el indexador son dos servicios: el panel tiene que poder ver cuál de los dos falla, en
+    # vez de un único «conectado» que esconda la mitad del problema.
+    if indexador is not None:
+        ix = indexador.comprobar()
+    elif mod_indexador.configurado():
+        ix = (_indexador()).comprobar()
+    else:
+        ix = {"conectado": False, "version": None, "indice": mod_indexador.INDICE,
+              "error": "indexador no configurado", "ms": 0}
+    return {**base, "conectado": c["conectado"], "version": c["version"],
+            "ultimo_error": c["error"] or ix["error"], "ms": c["ms"], "simulado": False,
+            "indexador": {**ix, "configurado": mod_indexador.configurado() or indexador is not None},
+            "detalle": ("Conectado a Wazuh (manager e indexador)."
+                        if c["conectado"] and ix["conectado"] else
+                        "Manager conectado; el indexador no responde o no está configurado, así que no hay "
+                        "alertas que leer." if c["conectado"] else
+                        "Modo real, pero sin conexión con Wazuh.")}

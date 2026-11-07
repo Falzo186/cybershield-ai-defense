@@ -4,6 +4,7 @@ No hay ningún Wazuh en esta máquina. Lo que se comprueba aquí son los **contr
 alerta simulada nunca se presente como real, que el cliente sea de solo lectura de verdad, y que un fallo de
 conexión se vea en vez de taparse. El transporte HTTP se sustituye por uno falso.
 """
+import json
 import os
 
 from . import wazuh
@@ -182,6 +183,173 @@ def main():
             is False)
     finally:
         con_modo(previo)
+
+    # ══ Indexador: lectura de alertas REALES (Fase F) ══════════════════════════════════════════════════════
+    from src.lab.wazuh import indexador as ix
+    from src.lab.wazuh.cliente import ErrorWazuh as _EW
+
+    DOC = {"_index": "wazuh-alerts-4.x-2026.11.06", "_id": "abc", "_source": {
+        "@timestamp": "2026-11-06T10:00:00Z",
+        "rule": {"id": "100120", "level": 7, "description": "CyberShield: clic en enlace",
+                 "groups": ["cybershield", "phishing"], "mitre": {"id": ["T1566", "T1204"]}},
+        "agent": {"name": "lab01", "id": "001"},
+        "data": {"usuario": "ana.perez", "rol": "empleado", "equipo": "azul", "tipo": "clic_enlace",
+                 "recurso": "correo:3", "resultado": "ABIERTO", "riesgo": "ALTO", "partida": "p1"}}}
+
+    def transporte_ix(estado=200, datos=None, registro=None):
+        def tr(metodo, url, cabeceras, cuerpo):
+            if registro is not None:
+                registro.append({"metodo": metodo, "url": url, "cabeceras": cabeceras,
+                                 "cuerpo": json.loads(cuerpo.decode()) if cuerpo else None})
+            if isinstance(datos, Exception):
+                raise datos
+            return estado, (datos if datos is not None
+                            else {"hits": {"total": {"value": 1}, "hits": [DOC]}})
+        return tr
+
+    reg = []
+    c = ix.ClienteIndexador(usuario="u", clave="s3cr3t", transporte=transporte_ix(registro=reg))
+    r = c.alertas(nivel_minimo=5, limite=10)
+    chk("el indexador devuelve alertas", r["ok"] and len(r["alertas"]) == 1)
+    chk("con el total que informa el indexador", r["total"] == 1)
+    a = r["alertas"][0]
+    chk("una alerta del indexador NUNCA va marcada como simulada",
+        a["simulado"] is False and a["origen"] == "wazuh_real")
+    chk("trae la regla y su nivel", (a["regla_id"], a["nivel"]) == (100120, 7))
+    chk("la descripción es la del indexador, no una deducida aquí",
+        a["descripcion"] == "CyberShield: clic en enlace")
+    chk("trae el agente de origen", (a["agente"], a["agente_id"]) == ("lab01", "001"))
+    chk("los identificadores MITRE se conservan", a["mitre"] == ["T1566", "T1204"])
+    chk("y los grupos de la regla", a["grupos"] == ["cybershield", "phishing"])
+    chk("los campos del laboratorio se leen de data",
+        (a["usuario"], a["rol"], a["tipo"], a["correlacion"]) == ("ana.perez", "empleado", "clic_enlace", "p1"))
+    chk("se guarda de qué documento salió, para poder volver a él",
+        (a["indice"], a["documento"]) == ("wazuh-alerts-4.x-2026.11.06", "abc"))
+    chk("una alerta real tiene la misma forma que una simulada",
+        set(wazuh.alertas_simuladas(limite=1)["alertas"][0]) <= set(a) if
+        wazuh.alertas_simuladas(limite=1)["alertas"] else True)
+
+    # La petición que sale a la red
+    p = reg[0]
+    chk("la búsqueda va al índice de alertas", p["url"].endswith("/wazuh-alerts-*/_search"))
+    chk("se envía autenticación básica", p["cabeceras"]["Authorization"].startswith("Basic "))
+    chk("la clave no aparece en claro en la cabecera", "s3cr3t" not in p["cabeceras"]["Authorization"])
+    chk("la consulta filtra por nivel mínimo",
+        {"range": {"rule.level": {"gte": 5}}} in p["cuerpo"]["query"]["bool"]["filter"])
+    chk("ordena por fecha descendente", p["cuerpo"]["sort"] == [{"@timestamp": {"order": "desc"}}])
+    chk("pide solo los campos que se usan", "rule.level" in p["cuerpo"]["_source"])
+    chk("sin filtros, la consulta es match_all",
+        ix.ClienteIndexador(usuario="u", clave="c").consulta()["query"] == {"match_all": {}})
+    chk("el tamaño está acotado por un techo duro",
+        c.consulta(0, 10 ** 6)["size"] == ix.MAX_RESULTADOS)
+    chk("y nunca es menor que 1", c.consulta(0, 0)["size"] == 1)
+
+    # Solo lectura: lo que NO puede hacer
+    for metodo, ruta in (("POST", "/_bulk"), ("POST", "/wazuh-alerts-*/_delete_by_query"),
+                         ("POST", "/_cluster/settings"), ("POST", "/wazuh-alerts-*/_doc"),
+                         ("GET", "/_cat/indices")):
+        try:
+            c._peticion(metodo, ruta, {})
+            chk(f"debía rechazar {metodo} {ruta}", False)
+        except _EW:
+            chk(f"rechaza {metodo} {ruta} antes de salir a la red", True)
+    for metodo in ("DELETE", "PUT", "PATCH", "HEAD"):
+        try:
+            c._peticion(metodo, "/wazuh-alerts-*/_search", {})
+            chk(f"debía rechazar el método {metodo}", False)
+        except _EW:
+            chk(f"rechaza el método {metodo}", True)
+    chk("el saludo del nodo sí está permitido (es como se comprueba la conexión)",
+        c._ruta_permitida("/") and c._ruta_permitida(""))
+    chk("_count también, porque es una lectura", c._ruta_permitida("/wazuh-alerts-*/_count"))
+    chk("no hay ninguna función de escritura en el módulo",
+        not [n for n in dir(ix.ClienteIndexador)
+             if any(x in n for x in ("borrar", "delete", "crear", "escribir", "indexar", "actualizar"))])
+
+    # Errores: visibles, nunca sustituidos por datos
+    sin_cred = ix.ClienteIndexador(usuario="", clave="", transporte=transporte_ix())
+    r = sin_cred.alertas()
+    chk("sin credenciales no se consulta y el error es visible",
+        r["ok"] is False and "credenciales" in r["error"] and r["alertas"] == [])
+    caido = ix.ClienteIndexador(usuario="u", clave="c",
+                                transporte=transporte_ix(datos=OSError("conexión rechazada")))
+    r = caido.alertas()
+    chk("un indexador caído devuelve error, nunca una alerta inventada",
+        r["ok"] is False and r["alertas"] == [] and "conexión rechazada" in r["error"])
+    malo = ix.ClienteIndexador(usuario="u", clave="c", transporte=transporte_ix(estado=403, datos={}))
+    chk("un HTTP distinto de 200 es un error con su código", "403" in (malo.alertas()["error"] or ""))
+    chk("comprobar() nunca lanza", isinstance(caido.comprobar(), dict))
+    chk("y dice que no está conectado", caido.comprobar()["conectado"] is False)
+    chk("comprobar() informa de la versión del nodo",
+        ix.ClienteIndexador(usuario="u", clave="c",
+                            transporte=transporte_ix(datos={"version": {"number": "2.13.0"}})
+                            ).comprobar()["version"] == "2.13.0")
+
+    # Normalización defensiva: un documento incompleto no rompe nada ni inventa valores
+    vacio = ix.normalizar({"_source": {}})
+    chk("un documento sin campos no inventa valores",
+        vacio["regla_id"] is None and vacio["nivel"] is None and vacio["descripcion"] is None)
+    chk("pero sigue marcado como real, porque viene del indexador",
+        vacio["simulado"] is False and vacio["origen"] == "wazuh_real")
+    chk("normalizar tolera None", ix.normalizar(None)["simulado"] is False)
+    chk("un nivel no numérico queda en None, no en 0",
+        ix.normalizar({"_source": {"rule": {"level": "alto"}}})["nivel"] is None)
+    chk("un id de regla no numérico se conserva tal cual",
+        ix.normalizar({"_source": {"rule": {"id": "abc"}}})["regla_id"] == "abc")
+    chk("mitre y grupos sueltos se normalizan a lista",
+        ix.normalizar({"_source": {"rule": {"groups": "uno", "mitre": {"id": "T1"}}}})["grupos"] == ["uno"])
+    chk("configurado() dice que no cuando faltan credenciales",
+        ix.configurado() in (True, False))
+
+    # ── El modo real usa el indexador y no se cae a simulado ──────────────────────────────────────────────
+    class ManagerOk:
+        def estado_manager(self):
+            return {"ok": True, "datos": {}, "error": None, "ms": 1}
+
+        def comprobar(self):
+            return {"conectado": True, "version": "4.9.0", "error": None, "ms": 1}
+
+    class IxFalso:
+        def __init__(self, ok=True):
+            self.ok = ok
+
+        def alertas(self, **kw):
+            return ({"ok": True, "alertas": [ix.normalizar(DOC)], "total": 1, "error": None, "ms": 2}
+                    if self.ok else
+                    {"ok": False, "alertas": [], "total": None, "error": "OSError: sin ruta", "ms": 2})
+
+        def comprobar(self):
+            return {"conectado": self.ok, "version": "2.13.0", "indice": "wazuh-alerts-*",
+                    "error": None if self.ok else "OSError: sin ruta", "ms": 2}
+
+    previo_modo = os.environ.get(wazuh.VAR_ENTORNO)
+    os.environ[wazuh.VAR_ENTORNO] = "real"
+    try:
+        r = wazuh.alertas(cliente=ManagerOk(), indexador=IxFalso(True))
+        chk("en modo real las alertas salen del indexador", r["ok"] and len(r["alertas"]) == 1)
+        chk("y van marcadas como reales", all(not a["simulado"] for a in r["alertas"]))
+        chk("la nota dice que no se dedujo nada aquí", "ninguna se ha deducido" in r["nota"])
+        chk("se informa del total del indexador", r["total_indexador"] == 1)
+
+        r = wazuh.alertas(cliente=ManagerOk(), indexador=IxFalso(False))
+        chk("si el indexador falla, el error es visible", r["ok"] is False and r["error"])
+        chk("y NO se sustituye por alertas simuladas", r["alertas"] == [] and r["simulado"] is False)
+        chk("la nota lo dice con todas las letras", "No se muestran alertas simuladas" in r["nota"])
+        chk("pero se distingue que el manager sí respondía", r["manager"] is True)
+
+        e = wazuh.estado(cliente=ManagerOk(), indexador=IxFalso(True))
+        chk("el estado distingue manager e indexador",
+            e["conectado"] is True and e["indexador"]["conectado"] is True)
+        chk("y lo dice en el detalle", "manager e indexador" in e["detalle"])
+        e = wazuh.estado(cliente=ManagerOk(), indexador=IxFalso(False))
+        chk("un indexador caído con el manager vivo se ve en el estado",
+            e["conectado"] is True and e["indexador"]["conectado"] is False)
+        chk("y el detalle explica que no hay alertas que leer", "no hay alertas que leer" in e["detalle"])
+    finally:
+        if previo_modo is None:
+            os.environ.pop(wazuh.VAR_ENTORNO, None)
+        else:
+            os.environ[wazuh.VAR_ENTORNO] = previo_modo
 
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)
