@@ -130,3 +130,110 @@ Si en el futuro se quiere abrir el panel a otro dispositivo:
 
 Esto es documentación, no una implementación. Como pide el encargo, el acceso remoto no se priorizó por
 delante de RAG, harness y evaluación.
+
+## 7. Autenticación por persona y protección de sesiones (Fase H)
+
+Hasta esta fase, una sesión era «un nombre libre + un token aleatorio». Eso bastaba para repartir permisos
+en una sala de clase, pero no era autenticación: cualquiera que se adelantara podía quedarse con un nombre,
+y quien perdía su token perdía su identidad hasta que el servidor se reiniciara.
+
+### Lo que hay ahora
+
+**Clave personal opcional.** Al unirse se puede enviar una `clave` de 8 a 128 caracteres. Con ella:
+
+- el nombre queda **reservado** a quien la sepa;
+- se puede volver a entrar desde otro navegador demostrando que se sabe;
+- la ficha pública dice `autenticado: true`, de modo que el árbitro ve quién tiene identidad propia y quién
+  solo declaró un nombre.
+
+Sin clave, el comportamiento anterior no cambia: se entra igual, el nombre vale mientras dure la sesión y
+un duplicado se rechaza con 409. **No se obliga a poner clave** porque el escenario de uso previsto es una
+sala con supervisión directa, y forzarla añadiría fricción sin cerrar ninguna puerta real.
+
+### Cómo se guarda la clave
+
+PBKDF2-HMAC-SHA256, 200 000 vueltas, con una **sal de 16 bytes distinta para cada persona**. Se guarda el
+derivado, nunca la clave. La comparación es en tiempo constante (`hmac.compare_digest`). Ni la clave, ni la
+sal, ni el derivado salen en ninguna respuesta de la API ni en ninguna línea de auditoría: lo que la
+auditoría registra es *si* la persona entró con clave propia o sin ella, y si fue una reautenticación.
+
+200 000 vueltas es una elección para un laboratorio local, no para un servicio expuesto: encarece lo
+suficiente un intento por fuerza bruta en una máquina doméstica, y no hace esperar al participante.
+
+### Protección de la sesión
+
+| Medida | Qué impide |
+|---|---|
+| **Rotación de token** al volver a entrar | Que una sesión abandonada en otro equipo siga siendo válida. El token anterior deja de valer en ese mismo instante. |
+| **Límite de intentos** (5 claves erróneas por cliente, bloqueo de 5 min) | Probar una clave por fuerza bruta. Es el mismo mecanismo que ya protegía el código de árbitro. |
+| **Caducidad por inactividad** (4 h) | Que una credencial viva sin dueño quede abierta. Las sesiones con clave también caducan: su dueño puede volver demostrando que la sabe. |
+| **Cierre de sesión** (`POST /api/sesion/salir`) | Que no haya forma de revocar la propia credencial. Lo puede hacer cualquiera que tenga una, también un espectador: cerrar la sesión de uno mismo no modifica la partida. |
+| **Comparación en tiempo constante** de tokens y derivados | Deducir un token midiendo cuánto tarda la comparación. |
+
+### Lo que esto **no** resuelve
+
+- **No hay TLS**, así que el token y la clave viajan en claro si el servidor se expone en una red. Ver más
+  abajo; mientras no haya TLS, el laboratorio es para `localhost` o una red de confianza.
+- Las sesiones viven en memoria: reiniciar el servidor las borra todas. Es deliberado (no hay base de datos
+  de usuarios que proteger), pero significa que tras un reinicio todo el mundo vuelve a entrar.
+- El código de árbitro sigue siendo **uno solo y compartido**, impreso en la consola al arrancar. Quien lo
+  vea puede ser árbitro. Es aceptable en una sala con supervisión, y no lo es en una red abierta.
+- No hay recuperación de clave. Si alguien la olvida, el árbitro reinicia el servidor o esa persona entra
+  con otro nombre.
+
+## 8. TLS: cómo desplegarlo en red
+
+El laboratorio **no trae TLS y no debe exponerse sin él**. Sin cifrado, cualquiera en la misma red ve el
+token de sesión, la clave personal y el contenido de la partida. No se ha implementado dentro de la
+aplicación a propósito: terminar TLS en la propia aplicación obligaría a gestionar certificados y
+renovaciones desde Python, y eso lo hace mejor un proxy.
+
+### Opción recomendada: proxy inverso delante
+
+```
+navegador ──HTTPS──> nginx / Caddy ──HTTP, en localhost──> uvicorn (puerto 8000)
+```
+
+Caddy es la vía más corta porque obtiene y renueva el certificado solo:
+
+```
+laboratorio.interno {
+    reverse_proxy 127.0.0.1:8000
+}
+```
+
+Con nginx, lo mínimo imprescindible:
+
+```
+server {
+    listen 443 ssl;
+    server_name laboratorio.interno;
+    ssl_certificate     /ruta/fullchain.pem;
+    ssl_certificate_key /ruta/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;       # SSE
+        proxy_set_header Connection "";               # SSE: sin keep-alive cortado
+        proxy_buffering off;                          # SSE: sin acumular eventos
+        proxy_read_timeout 3600s;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+Las tres líneas de SSE importan: la partida se difunde por `text/event-stream`, y un proxy que acumule
+respuesta hace que los eventos lleguen a tirones o no lleguen.
+
+### Al hacerlo
+
+1. **Ata uvicorn a localhost.** Hoy escucha en `0.0.0.0:8000` para que funcione en una red local sin
+   configuración; detrás de un proxy debe ser `127.0.0.1`, o el puerto 8000 seguirá abierto sin cifrar.
+2. **No expongas Ollama.** Escucha en `11434` y no tiene autenticación: no debe salir de la máquina.
+3. **Cambia el código de árbitro** en cada sesión; se imprime al arrancar.
+4. Si el certificado es autofirmado (laboratorio interno), `WAZUH_TLS=0` afecta **solo** a la conexión con
+   Wazuh, nunca a la del navegador con la aplicación.
+
+**Nada de esto está probado aquí**: no hay certificados ni proxy en esta máquina. Es la configuración
+recomendada, no una configuración verificada, y se declara como tal.

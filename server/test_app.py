@@ -94,6 +94,48 @@ def main():
     chk("azul no detiene", c.post("/api/detener", json={}, headers=H(ta)).status_code == 403)
     chk("general detiene", c.post("/api/detener", json={}, headers=H(tg)).status_code == 200)
 
+    # --- autenticación por persona y cierre de sesión (Fase H) ---
+    r = c.post("/api/sesion", json={"nombre": "Zoe", "equipo": "azul", "clave": "clave-de-zoe-1"})
+    chk("se puede entrar con clave personal", r.status_code == 200)
+    tz = r.json()["token"]
+    chk("la respuesta dice que la persona está autenticada",
+        r.json()["participante"]["autenticado"] is True)
+    chk("y nunca devuelve la clave ni el derivado",
+        not ({"clave", "sal", "derivado"} & set(r.json()["participante"])))
+    r2 = c.post("/api/sesion", json={"nombre": "Zoe", "equipo": "azul", "clave": "clave-de-zoe-1"})
+    chk("volver a entrar con la clave correcta funciona", r2.status_code == 200)
+    tz2 = r2.json()["token"]
+    chk("y rota el token", tz2 != tz)
+    chk("el token anterior deja de valer", c.get("/api/sesion", headers=H(tz)).status_code == 403)
+    chk("el nuevo sí vale", c.get("/api/sesion", headers=H(tz2)).status_code == 200)
+    chk("con la clave equivocada se rechaza",
+        c.post("/api/sesion", json={"nombre": "Zoe", "equipo": "azul", "clave": "otra-clave-99"}).status_code == 403)
+    chk("sin clave no se puede reclamar un nombre que la tiene",
+        c.post("/api/sesion", json={"nombre": "Zoe", "equipo": "azul"}).status_code == 403)
+    chk("una clave demasiado corta la rechaza la validación de entrada",
+        c.post("/api/sesion", json={"nombre": "Yago", "equipo": "rojo", "clave": "corta"}).status_code == 422)
+    chk("la sesión informa del plazo de inactividad",
+        c.get("/api/sesion", headers=H(tz2)).json()["inactividad_s"] > 0)
+
+    chk("cerrar sesión sin token se rechaza", c.post("/api/sesion/salir", json={}).status_code == 403)
+    chk("cerrar la propia sesión funciona",
+        c.post("/api/sesion/salir", json={}, headers=H(tz2)).status_code == 200)
+    chk("y el token deja de valer inmediatamente",
+        c.get("/api/sesion", headers=H(tz2)).status_code == 403)
+    chk("cerrar dos veces da 409 o 403",
+        c.post("/api/sesion/salir", json={}, headers=H(tz2)).status_code in (403, 409))
+    r = c.post("/api/sesion", json={"nombre": "Zoe", "equipo": "azul", "clave": "clave-de-zoe-1"})
+    chk("quien tenía clave puede volver tras cerrar sesión", r.status_code == 200)
+    c.post("/api/sesion/salir", json={}, headers=H(r.json()["token"]))
+
+    r = c.post("/api/sesion", json={"nombre": "Mirón", "equipo": "espectador"})
+    tm = r.json()["token"]
+    chk("un espectador no puede modificar la partida",
+        c.post("/api/partida/iniciar", json={"duracion_min": 5}, headers=H(tm)).status_code == 403)
+    chk("pero sí puede cerrar su propia sesión",
+        c.post("/api/sesion/salir", json={}, headers=H(tm)).status_code == 200)
+    chk("y después ya no tiene sesión", c.get("/api/sesion", headers=H(tm)).status_code == 403)
+
     # --- sistema de diseño unificado (Fase G) ---
     from pathlib import Path as _P
     _ui = _P(__file__).resolve().parents[1] / "ui"

@@ -62,6 +62,7 @@ SALA = pt.Sala(CODIGO_ARBITRO)
 RUTAS_PUBLICAS = ("/api/eventos", "/api/estado", "/api/ia/estado", "/api/cronologia", "/api/resultados", "/api/partidas",
                   "/api/apps", "/api/recursos", "/api/ayuda", "/api/batalla/presupuesto", "/api/escenarios")
 RUTA_SESION = "/api/sesion"
+RUTA_SALIR = "/api/sesion/salir"   # cerrar la propia sesión: permitido a cualquiera que tenga una
 # El panel de análisis (/api/panel/...) es una vista de solo lectura del laboratorio: no toca la partida, no
 # expone secretos y se consulta sin unirse a ningún equipo. Sus POST (lanzar o cancelar una campaña) sí
 # exigen sesión, como cualquier otra acción.
@@ -166,6 +167,10 @@ async def _verificar_sesion(request: Request, call_next):
     if p is None and not (request.method == "GET" and publica):
         return _prohibido("Falta una sesión válida: únete a la partida con tu nombre. "
                           "Sin sesión (espectador) solo se puede leer eventos y estado.")
+    # Cerrar la propia sesión no modifica la partida: es revocar la credencial de uno mismo, y tiene que
+    # poder hacerlo cualquiera, también un espectador.
+    if ruta == RUTA_SALIR and request.method == "POST" and p is not None:
+        return await call_next(request)
     if p is not None and p.rol == "espectador" and request.method != "GET":
         return _prohibido("Los espectadores solo observan: no pueden modificar la partida.")
     dueno = SOLO_EQUIPO.get(ruta)
@@ -188,6 +193,9 @@ class SesionIn(BaseModel):
     equipo: str = Field(..., pattern="^(" + "|".join(pt.EQUIPOS) + ")$")
     codigo: str | None = Field(None, max_length=20)    # solo «general»: código de árbitro
     usuario: str | None = Field(None, min_length=1, max_length=50)  # solo azul, el primero: usuario semilla del buzón
+    # Clave personal (Fase H). Opcional: sin ella el nombre vale solo mientras dure la sesión; con ella, el
+    # nombre queda reservado a quien la sepa y se puede volver a entrar desde otro navegador.
+    clave: str | None = Field(None, min_length=pt.CLAVE_MINIMA, max_length=pt.CLAVE_MAXIMA)
 
 
 def _estado_partida():
@@ -211,12 +219,18 @@ async def unirse(body: SesionIn, request: Request):
         except KeyError:
             return _error400(f"Usuario desconocido: {usuario}")
     try:
-        p = SALA.unirse(body.nombre, body.equipo, body.codigo, cliente=request.client.host if request.client else "?")
+        p = SALA.unirse(body.nombre, body.equipo, body.codigo,
+                        cliente=request.client.host if request.client else "?", clave=body.clave)
     except pt.ErrorSesion as e:
         return _prohibido(e.mensaje, e.status)
     if usuario:
         USUARIO_EQUIPO["azul"] = usuario
-    ms.emitir("auditoria", ms.aud("SYSTEM", "PARTICIPANTE_UNIDO", f"{p.nombre} · {p.equipo}", "OK", "BAJO"))
+    # La auditoría registra si la persona se autenticó con clave propia o solo declaró un nombre. Nunca
+    # registra la clave ni el token.
+    ms.emitir("auditoria", ms.aud("SYSTEM", "PARTICIPANTE_UNIDO",
+                                  f"{p.nombre} · {p.equipo}"
+                                  + (" · clave propia" if p.autenticado else " · sin clave"),
+                                  "REAUTENTICADO" if p.sesiones > 1 else "OK", "BAJO"))
     _emitir_partida()
     if p.equipo == "azul":
         _emitir_marcador()  # el marcador ya sabe con qué usuario juega Azul
@@ -227,7 +241,21 @@ async def unirse(body: SesionIn, request: Request):
 @app.get(RUTA_SESION)
 async def mi_sesion(request: Request):
     """Reconexión: con un token válido devuelve el participante y la partida (403 si el token no existe)."""
-    return {"participante": request.state.participante.publico(), "partida": _estado_partida()}
+    return {"participante": request.state.participante.publico(), "partida": _estado_partida(),
+            "inactividad_s": pt.INACTIVIDAD_S}
+
+
+@app.post(RUTA_SALIR)
+async def salir(request: Request):
+    """Cierra la sesión de quien presenta el token: deja de valer inmediatamente.
+
+    Si la persona tenía clave propia puede volver a entrar con ella; si no, su nombre queda libre."""
+    nombre = SALA.cerrar_sesion(request.headers.get("X-Equipo-Token"))
+    if nombre is None:
+        return _prohibido("No hay ninguna sesión que cerrar con ese token.", 409)
+    ms.emitir("auditoria", ms.aud("SYSTEM", "SESION_CERRADA", nombre, "OK", "BAJO"))
+    _emitir_partida()
+    return {"cerrada": True, "nombre": nombre}
 
 
 @app.get("/api/partida")
