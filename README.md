@@ -444,6 +444,30 @@ Cronología unificada · Correlación de incidentes · Laboratorio adversarial.
 
 Un indicador sin datos dice «sin datos», nunca 0; y todo lo simulado va marcado como simulado.
 
+Desde la etapa de integración, el panel y la pantalla de la partida comparten el **mismo sistema de
+diseño** (`ui/tokens.css`): una sola definición de color, tipografía y espaciado, iconos SVG en línea y
+ningún emoji haciendo de icono. El violeta `--p-simulado` está reservado a datos que no son reales.
+
+### Medir el modelo, no solo el filtro
+
+Las tres cosas que antes se confundían en una cifra ahora tienen ruta propia:
+
+| Qué mide | Ruta | Necesita Ollama |
+|---|---|---|
+| Detección del **filtro determinista** | `/api/panel/adversarial` | No |
+| Resistencia del **modelo defensor**, sin el filtro delante | `/api/panel/adversarial/modelo` | Sí |
+| Objetivo conseguido por el **modelo atacante** (medido sobre la ejecución) | `/api/panel/adversarial/atacante` | Sí |
+
+Para validar la metodología con una muestra pequeña:
+
+```bash
+python experimentos/validar_metodologia.py llama3.2:3b
+```
+
+Para una medición seria (n ≥ 200 por condición), las campañas se ejecutan **por lotes reanudables** con
+`/api/panel/lotes`: el plan es determinista, cada ronda se añade a su archivo con su índice y reanudar con
+otro plan u otra condición se rechaza en vez de mezclar resultados.
+
 ## Modo LAN (dos PCs)
 
 Dos PCs en la misma red local, **cada una con su propio Ollama** (inferencia distribuida):

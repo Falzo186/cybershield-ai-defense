@@ -264,3 +264,94 @@
 - Pruebas: 39/39 y 57/57. Batería completa con navegador: 1187/1187 en 30 suites.
 - Pendiente / siguiente paso: conectar el harness a la batalla de la partida (midiendo antes su coste),
   implementar la familia de escenarios generados y correr el modo estrés.
+
+---
+
+# Etapa de integración (06/11/2026)
+
+Punto de partida: `29434f2`, 30 suites y 1 187 comprobaciones, avance 76,2 % con los criterios de
+`docs/AUDITORIA_INTEGRACION.md` §5. El diagnóstico de esa auditoría fue que el proyecto no tenía un
+problema de funcionalidad ausente sino de **acoplamiento insuficiente** entre módulos que ya funcionaban.
+
+### Fase B - El harness controla la partida (`073cb66`)
+- Qué se hizo: `harness.ControlPartida` / `PresupuestoPartida` (techos de rondas, llamadas al modelo,
+  tokens, tiempo y errores seguidos, más detección de prompts repetidos) y `harness.procesador()`, que
+  conecta el harness con `motor.ejecutar_ronda(procesar=…)` sin crear un ciclo de imports.
+- Archivos: `src/lab/harness.py`, `src/lab/motor.py`, `server/app.py` (nuevos:
+  `src/lab/test_control_partida.py`, `server/test_presupuesto.py`).
+- Decisiones: el control **solo cuenta y corta**; no cambia veredictos, no reintenta y no concede permisos.
+  El presupuesto por defecto deja una sola corrección de un error técnico del modelo, así que una partida
+  normal gasta la misma inferencia que antes. Una denegación de permiso sigue sin reintentarse, y ahora hay
+  prueba de eso **en el camino de la batalla**, no solo en el harness aislado.
+- Pruebas: 56/56 y 28/28. Batería: 1 271/1 271 en 32 suites.
+
+### Fase E1 - Campañas reanudables (`073cb66`)
+- Qué se hizo: `evaluacion/lotes.py`. El plan es determinista, cada ronda se añade a un JSONL propio con su
+  índice, y al reanudar se saltan los índices ya hechos.
+- Decisiones: reanudar con otro plan u otra condición se **rechaza** en vez de mezclar dos series y
+  presentarlas como una. Un resumen incompleto se publica como incompleto, no se extrapola.
+- Pruebas: 49/49.
+
+### Fase E2 - Tres medidas separadas (`e9efc0a`)
+- Qué se hizo: `campana_modelo` (el defensor IA **sin** el filtro delante, con precisión, recall, F1,
+  especificidad, repetibilidad y desglose por vector), `campana_atacante` (objetivo conseguido medido sobre
+  la ejecución) y `comparar_filtro_y_modelo`. Más `metricas.clasificacion` y la familia `generado`.
+- Archivos: `src/lab/adversarial.py`, `src/lab/evaluacion/{metricas,escenarios,campana}.py`,
+  `src/lab/experimentos.py`, `server/panel.py`.
+- Decisiones: el 78,9 % que se publicaba era la detección del **filtro**; un caso que el filtro bloquea
+  nunca llega al modelo, así que no decía nada de él. Ahora son tres rutas distintas para que no se
+  confundan. La familia `generado` se produce por recombinación determinista y no con un LLM: si la
+  escribiera un modelo, dos campañas con la misma semilla medirían conjuntos distintos y la
+  reproducibilidad sería falsa. La técnica `escalar_privilegios` queda fuera de la generación porque su
+  referencia no se deduce de la herramienta pedida.
+- Pruebas: 77/77, 121/121 y 83/83. Batería: 1 422/1 422 en 33 suites.
+
+### Fase D - Escenarios de empresa y estados de misión (`888cc16`)
+- Qué se hizo: `src/lab/escenarios_empresa.py` con tres escenarios (fácil/media/difícil) y las 15 claves
+  del encargo, más los estados `en_progreso` y `cancelada` en `progreso_mision`.
+- Archivos: `src/lab/escenarios_empresa.py`, `src/lab/{repositorio,schema,informe}.py`, `server/app.py`,
+  `integraciones/wazuh/local_rules.xml`.
+- Decisiones: el catálogo es **declarativo**; `validar()` comprueba que lo que declara existe de verdad
+  (rol en permisos, técnica en `atacante.ESCENARIOS`, eventos en `repositorio.EVENTOS_SIEM`, acciones con
+  ruta real), y la sensibilidad que muestra sale del catálogo de herramientas, no de la descripción. El
+  CHECK de SQLite no se puede alterar: la migración reconstruye la tabla copiando fila a fila, es
+  idempotente y hay prueba de las dos cosas.
+- Lo que cazó la batería: dos tipos de evento nuevos sin regla de Wazuh. Añadida la regla 100141.
+- Pruebas: 75/75. Batería: 1 511/1 511 en 34 suites.
+
+### Fase G - El sistema de diseño, en la pantalla de la partida (`940304a`)
+- Qué se hizo: `ui/tokens.css` como capa compartida; `ui/styles.css` mapea sus variables históricas sobre
+  esos tokens; 43 emojis del marcado pasan a SVG en línea o a puntos de estado, y 149 más se quitan de las
+  cadenas de los tres archivos de JavaScript.
+- Decisiones: mapear en vez de renombrar ~700 selectores. El lenguaje visual cambia entero y el JavaScript
+  y la E2E siguen viendo la misma página. Los colores de equipo siguen siendo propios porque son
+  información. MOCK pasa al violeta reservado a lo simulado: un dato de prueba no es una advertencia sobre
+  algo real.
+- E2E de navegador **antes**: 106/106. **Después**: 106/106, en las cuatro fases del cambio.
+- Batería: 1 527/1 527.
+
+### Fase F - Alertas del indexador de Wazuh (`98dc51f`)
+- Qué se hizo: `src/lab/wazuh/indexador.py` (OpenSearch, solo `_search` y `_count` sobre `wazuh-alerts-*`),
+  normalización a la misma forma que una alerta del laboratorio, y
+  `integraciones/wazuh/test_indexador_real.py`.
+- Decisiones: una búsqueda es un POST porque la consulta va en el cuerpo; es la única excepción al «solo
+  GET» y está acotada. Si el manager responde pero el indexador no, el error distingue cuál falló y **no**
+  se sustituye por alertas simuladas. La prueba de integración **no está en la batería** a propósito: aquí
+  no hay Wazuh, e incluirla «saltada en verde» haría que el informe dijera que está probada.
+- Pruebas: 105/105 (57 nuevas, todas con transporte sustituido). Batería: 1 584/1 584.
+
+### Fase H - Autenticación por persona y TLS documentado (`fad0776`)
+- Qué se hizo: clave personal opcional (PBKDF2-HMAC-SHA256, 200 000 vueltas, sal por persona), rotación de
+  token al volver a entrar, límite de intentos, caducidad por inactividad y `POST /api/sesion/salir`.
+- Decisiones: la clave es opcional porque el uso previsto es una sala supervisada. Cerrar la propia sesión
+  lo puede hacer cualquiera, también un espectador: revocar la propia credencial no modifica la partida.
+  TLS **no** se implementa dentro de la aplicación; se documenta con proxy inverso, incluidas las tres
+  líneas de configuración de SSE que suelen fallar.
+- Pruebas: 73/73 y 206/206. Batería: 1 646/1 646 en 34 suites.
+
+### Estado al cerrar la etapa
+- Batería: **34/34 suites · 1 646/1 646 comprobaciones** (línea base 30/30 · 1 187/1 187).
+- Avance con la fórmula de `AUDITORIA_INTEGRACION.md` §5, sin cambiar pesos ni criterios: **93,4 %**.
+- Pendiente / siguiente paso: ejecutar campañas grandes (n ≥ 200 por condición) con `evaluacion/lotes.py`;
+  probar la integración de Wazuh contra una instalación real; medir el coste real del harness en una
+  partida larga.
