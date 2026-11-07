@@ -1,0 +1,78 @@
+/* ──────────────────────────────────────────────────────────────────────────────────────────────────────
+   Sistema de diseño · CyberShield · capa de tokens COMPARTIDA
+
+   Este archivo es la única definición de color, tipografía, espacio, radio y sombra del proyecto. Lo usan
+   las dos pantallas:
+     - la partida (ui/index.html + ui/styles.css), que además mapea sus variables históricas sobre estos
+       tokens, de modo que sus selectores no cambiaron al unificar el lenguaje visual;
+     - el panel de análisis (ui/panel/).
+
+   Decisiones que no se tocan:
+   - Sin CDN y sin build. La tipografía es la pila del sistema (en Windows resuelve a Segoe UI, que es
+     exactamente la clase de tipo neutro que se buscaba) en vez de cargar Inter desde Google Fonts: traer
+     una fuente externa rompería que la aplicación funcione sin red.
+   - Ningún componente escribe un color literal: todo sale de aquí.
+   - El color tiene función informativa. No hay degradados decorativos ni sombras marcadas.
+   - --p-simulado está reservado a datos que NO son reales, y a nada más.
+   - Los iconos son SVG en línea, nunca emojis.
+   ────────────────────────────────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Superficies: gris azulado muy oscuro, con tres niveles bien diferenciados pero sin saltos bruscos */
+  --p-fondo:        #0b0f16;
+  --p-superficie:   #111823;
+  --p-superficie-2: #16202e;
+  --p-superficie-3: #1c2838;
+  --p-borde:        #233044;
+  --p-borde-suave:  #1a2434;
+
+  /* Texto */
+  --p-texto:        #e6edf6;
+  --p-texto-2:      #9aabc2;
+  --p-texto-3:      #6b7d95;
+
+  /* Acento: azul tecnológico moderado, no eléctrico */
+  --p-acento:       #4c8dff;
+  --p-acento-2:     #2f6ddb;
+  --p-acento-flojo: rgba(76, 141, 255, 0.12);
+
+  /* Estados: informativos, nunca decorativos */
+  --p-ok:      #3fbf7f;
+  --p-ok-flojo:   rgba(63, 191, 127, 0.14);
+  --p-aviso:   #e0a63a;
+  --p-aviso-flojo: rgba(224, 166, 58, 0.14);
+  --p-error:   #e5565b;
+  --p-error-flojo: rgba(229, 86, 91, 0.14);
+  --p-info:    #4c8dff;
+  --p-neutro:  #6b7d95;
+  --p-neutro-flojo: rgba(107, 125, 149, 0.14);
+  /* Simulado / no real: violeta apagado, para que nunca se confunda con un estado real */
+  --p-simulado: #9b7fd4;
+  --p-simulado-flojo: rgba(155, 127, 212, 0.16);
+
+  /* Severidad (SOC) */
+  --p-sev-critica: #e5565b;
+  --p-sev-alta:    #e0863a;
+  --p-sev-media:   #e0c13a;
+  --p-sev-baja:    #4c8dff;
+  --p-sev-info:    #6b7d95;
+
+  /* Tipografía */
+  --p-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --p-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+  --p-t-xs: 11px;  --p-t-sm: 12px;  --p-t-md: 13px;  --p-t-lg: 15px;
+  --p-t-xl: 19px;  --p-t-2xl: 26px; --p-t-3xl: 34px;
+
+  /* Espaciado: escala de 4 */
+  --p-e1: 4px; --p-e2: 8px; --p-e3: 12px; --p-e4: 16px; --p-e5: 20px;
+  --p-e6: 24px; --p-e8: 32px; --p-e10: 40px;
+
+  /* Radios y sombras: discretos */
+  --p-r-sm: 4px; --p-r-md: 6px; --p-r-lg: 10px;
+  --p-sombra: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --p-sombra-flotante: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  --p-lateral: 232px;
+  --p-superior: 52px;
+  --p-transicion: 120ms ease;
+}

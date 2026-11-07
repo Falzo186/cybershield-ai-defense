@@ -96,11 +96,11 @@
   // Etiqueta de origen: solo dice OLLAMA en batalla y, mientras corre, únicamente si llegan eventos reales.
   function actualizarOrigen() {
     let r;
-    if (!usaOllama()) r = ["🟡 MOCK", "origen-mock"];
+    if (!usaOllama()) r = ["MOCK", "origen-mock"];
     else if (estado.corriendo) {
-      r = estado.origen === "ollama" ? ["🟢 OLLAMA", "origen-real"]
-        : estado.origen === "mock" ? ["🟡 MOCK", "origen-mock"] : ["⏳ INICIANDO…", "origen-wait"];
-    } else r = ollamaListo() ? ["🟢 OLLAMA", "origen-real"] : ["🔴 SIN OLLAMA", "origen-off"];
+      r = estado.origen === "ollama" ? ["OLLAMA", "origen-real"]
+        : estado.origen === "mock" ? ["MOCK", "origen-mock"] : ["⏳ INICIANDO…", "origen-wait"];
+    } else r = ollamaListo() ? ["OLLAMA", "origen-real"] : ["SIN OLLAMA", "origen-off"];
     R.setOrigen(r[0], r[1]);
   }
 
@@ -190,7 +190,7 @@
     $("btn-correo").disabled = true;
     try {
       const c = await API.enviarCorreo(plantilla, R.valorSelect("sel-destinatario"));
-      R.toast("✓ Correo enviado a " + c.para_usuario + ": «" + c.asunto + "»");
+      R.toast("Correo enviado a " + c.para_usuario + ": «" + c.asunto + "»");
     } catch (e) { R.toast(e.message); }
     $("btn-correo").disabled = false;
     cargarEnviadosRojo();
@@ -222,20 +222,20 @@
       reportar: () => accionCorreo("reportar", c.id), contener: () => accionCorreo("contener", c.id),
       incidente: () => incidenteDesdeCorreo(c),
       abrirPdf: () => accionPdf("pdf_abierto", c.id), reportarPdf: () => accionPdf("pdf_reportado", c.id),
-      aislar: () => accionSimple(() => API.aislarAdjunto(c.id), "🧪 Adjunto aislado"),
-      archivar: (si) => accionSimple(() => API.archivarCorreo(c.id, si), si ? "🗄 Correo archivado" : "📥 De vuelta en la entrada"),
-      responder: (texto) => accionSimple(() => API.responderCorreo(c.id, texto), "↩ Respuesta registrada (no sale del laboratorio)"),
+      aislar: () => accionSimple(() => API.aislarAdjunto(c.id), "Adjunto aislado"),
+      archivar: (si) => accionSimple(() => API.archivarCorreo(c.id, si), si ? "Correo archivado" : "De vuelta en la entrada"),
+      responder: (texto) => accionSimple(() => API.responderCorreo(c.id, texto), "Respuesta registrada (no sale del laboratorio)"),
       verificar: async () => {
         try {
           const v = await API.verificarRemitente(c.id);
-          R.mostrarResultadoCorreo(v.oficial ? "✓ Remitente de la organización" : v.parecido ? "⚠ El remitente IMITA al dominio oficial"
-            : "⚠ Remitente externo", [v.detalle].concat(v.indicadores.length ? ["Indicadores: " + v.indicadores.join(" · ")] : []), v.oficial);
+          R.mostrarResultadoCorreo(v.oficial ? "Remitente de la organización" : v.parecido ? "El remitente IMITA al dominio oficial"
+            : "Remitente externo", [v.detalle].concat(v.indicadores.length ? ["Indicadores: " + v.indicadores.join(" · ")] : []), v.oficial);
         } catch (e) { R.toast(e.message); }
       },
       inspeccionar: async () => {
         try {
           const i = await API.inspeccionarEnlace(c.id);
-          R.mostrarResultadoCorreo(i.coincide ? "✓ El enlace va a donde dice" : "⚠ El enlace NO va a donde dice",
+          R.mostrarResultadoCorreo(i.coincide ? "El enlace va a donde dice" : "El enlace NO va a donde dice",
             ["Texto visible: " + i.texto_mostrado, "Destino real: " + i.destino_real, i.explicacion], i.coincide);
         } catch (e) { R.toast(e.message); }
       },
@@ -256,7 +256,7 @@
     try {
       const r = await llamada();
       const g = r.regla || {};  // una consecuencia negativa explica qué control falló
-      R.toast((g.riesgo > 0 ? "⚠ " : "✓ ") + aviso + textoRegla(g) + (g.riesgo > 0 && g.explicacion ? " — " + g.explicacion : ""));
+      R.toast((g.riesgo > 0 ? "" : "") + aviso + textoRegla(g) + (g.riesgo > 0 && g.explicacion ? " — " + g.explicacion : ""));
     } catch (e) { R.toast(e.message); }
     cargarBuzon();
     cargarMisiones();
@@ -266,7 +266,7 @@
   // así que "−10" con la partida ya en 0 no se lee como una bajada que no ocurrió) + misiones completadas.
   function textoRegla(g) {
     const riesgo = g.riesgo ? " · regla " + (g.riesgo > 0 ? "+" : "") + g.riesgo +
-      (typeof g.riesgo_acumulado === "number" ? " → riesgo de la partida " + Math.round(g.riesgo_acumulado) + "/100" : "") : "";
+      (typeof g.riesgo_acumulado === "number" ? "riesgo de la partida " + Math.round(g.riesgo_acumulado) + "/100" : "") : "";
     const misiones = (g.misiones_completadas || []).map((m) => "«" + m.titulo + "» +" + m.puntos + " pts" +
       (m.a_tiempo === false ? " (fuera de plazo)" : ""));
     const bloqueadas = (g.misiones_bloqueadas || []).map((m) => "«" + m.titulo + "» (requiere " + m.requiere.join(", ") + ")");
@@ -278,7 +278,7 @@
   async function accionCorreo(tipo, id) {
     try {
       const r = await (tipo === "reportar" ? API.reportarCorreo(id) : API.contenerCorreo(id));
-      R.toast((tipo === "reportar" ? "✓ Correo reportado" : "✓ Enlace contenido") + textoRegla(r.regla || {}));
+      R.toast((tipo === "reportar" ? "Correo reportado" : "Enlace contenido") + textoRegla(r.regla || {}));
     } catch (e) { R.toast(e.message); }
     cargarBuzon();
     cargarMisiones();
@@ -289,7 +289,7 @@
   async function accionPdf(tipo, id) {
     try {
       const r = await API.eventoPdf(tipo, id);
-      R.toast((tipo === "pdf_abierto" ? "📎 PDF previsualizado (evento registrado)" : "✓ PDF reportado") + textoRegla(r.regla || {}));
+      R.toast((tipo === "pdf_abierto" ? "PDF previsualizado (evento registrado)" : "PDF reportado") + textoRegla(r.regla || {}));
       if (r.vista) R.mostrarVisor(r.vista);
     } catch (e) { R.toast(e.message); }
     cargarBuzon();
@@ -304,7 +304,7 @@
   }
 
   async function asumirMision(id) {
-    try { await API.asumirMision(id); R.toast("✓ Ahora eres responsable de esa misión"); } catch (e) { R.toast(e.message); }
+    try { await API.asumirMision(id); R.toast("Ahora eres responsable de esa misión"); } catch (e) { R.toast(e.message); }
     cargarMisiones();
   }
 
@@ -313,10 +313,10 @@
     try {
       const [i, c] = await Promise.all([API.incidentes(), API.credenciales()]);
       R.setIncidentes(i.incidentes || [], {
-        investigar: (id) => accionIncidente(() => API.estadoIncidente(id, "en_investigacion"), "🔎 Incidente en investigación"),
-        resolver: (id, texto) => accionIncidente(() => API.estadoIncidente(id, "resuelto", texto), "✓ Incidente resuelto"),
+        investigar: (id) => accionIncidente(() => API.estadoIncidente(id, "en_investigacion"), "Incidente en investigación"),
+        resolver: (id, texto) => accionIncidente(() => API.estadoIncidente(id, "resuelto", texto), "Incidente resuelto"),
       });
-      R.setCredencial(c, () => accionIncidente(() => API.revocarCredencial(), "✓ Credencial revocada"));
+      R.setCredencial(c, () => accionIncidente(() => API.revocarCredencial(), "Credencial revocada"));
       R.setCorreosIncidente(estado.correos || []);
     } catch (e) { /* p. ej. sin sesión azul */ }
   }
@@ -336,7 +336,7 @@
     try {
       const r = await API.abrirIncidente(titulo, $("inc-severidad").value, correo ? Number(correo) : null);
       $("inc-titulo").value = "";
-      R.toast("🚨 Incidente #" + r.incidente.id + " abierto" + textoRegla(r.regla || {}));
+      R.toast("Incidente #" + r.incidente.id + " abierto" + textoRegla(r.regla || {}));
     } catch (e) { R.toast(e.message); }
     cargarIncidentes();
     cargarMisiones();
@@ -353,7 +353,7 @@
   }
 
   async function completarMision(id) {
-    try { await API.completarMision(id); R.toast("✓ Misión completada"); } catch (e) { R.toast(e.message); }
+    try { await API.completarMision(id); R.toast("Misión completada"); } catch (e) { R.toast(e.message); }
     cargarMisiones();
   }
 
@@ -427,7 +427,7 @@
       R.addHistorial(registrarRonda(d));
       contarRonda(d.resultado, d.ia_fallo);
       if (typeof d.riesgo_acumulado === "number") mostrarSospecha(d.riesgo_acumulado, d.circuito_sesion === true);
-      if (d.circuito_sesion) R.toast("🔒 Autorización forzada por patrón de sesión sospechoso (capa determinista, no la IA)");
+      if (d.circuito_sesion) R.toast("Autorización forzada por patrón de sesión sospechoso (capa determinista, no la IA)");
       if (d.marcador) {
         estado.marcador = d.marcador;
         R.setMarcador(d.marcador.atacante, d.marcador.defensor);
@@ -508,8 +508,8 @@
     credenciales_cambio(d) {
       if (estado.rol !== "azul" || !API.tieneToken()) return;
       if (d.estado === "comprometida") {
-        R.toast("⚠ La credencial de " + d.usuario + " está COMPROMETIDA: revócala en Incidentes");
-        notificar("⚠ Credencial de " + d.usuario + " COMPROMETIDA: revócala", "alerta");
+        R.toast("La credencial de " + d.usuario + " está COMPROMETIDA: revócala en Incidentes");
+        notificar("Credencial de " + d.usuario + " COMPROMETIDA: revócala", "alerta");
       }
       cargarIncidentes();
     },
@@ -520,8 +520,8 @@
       const a = d.terminado;
       if (a) {
         const pts = [a.puntos_rojo && "Rojo +" + a.puntos_rojo, a.puntos_azul && "Azul +" + a.puntos_azul].filter(Boolean).join(" · ");
-        R.toast("⚔ Ataque IA #" + a.n + ": " + a.titulo + (pts ? " (" + pts + ")" : "") + " — " + a.explicacion);
-        notificar("⚔ Ataque IA #" + a.n + ": " + a.titulo + (pts ? " (" + pts + ")" : ""),
+        R.toast("Ataque IA #" + a.n + ": " + a.titulo + (pts ? " (" + pts + ")" : "") + " — " + a.explicacion);
+        notificar("Ataque IA #" + a.n + ": " + a.titulo + (pts ? " (" + pts + ")" : ""),
           a.resultado === "datos_expuestos" || a.resultado === "fallo_seguro" ? "alerta" : "info");
       }
     },
@@ -628,7 +628,7 @@
       const d = real ? await API.manualReal(cuerpoReal) : await API.manual(texto);
       R.terminalAdd(CLASE_TERM[d.decision] || "ok",
         "[" + (real ? "REAL" : "MOCK") + "] [" + d.decision + "] riesgo " + d.riesgo + " — " + d.motivo +
-        (real && d.resultado ? " → " + d.resultado : ""));
+        (real && d.resultado ? d.resultado : ""));
       if (Array.isArray(d.datos_devueltos)) R.terminalDatos(d.datos_devueltos);
     } catch (e) {
       R.terminalAdd("err", "Error: " + e.message);
@@ -654,8 +654,8 @@
       n.textContent = "Atacante: " + a.atacante.modelo + " @ " + hostCorto(a.atacante.host) +
         " · Defensor: " + a.defensor.modelo + " @ " + hostCorto(a.defensor.host);
       // Vista de solo lectura del equipo contrario: el servidor ya verificó ambos modelos antes de la ronda.
-      $("ro-atq-txt").textContent = "🟢 " + a.atacante.modelo + " @ " + hostCorto(a.atacante.host);
-      $("ro-def-txt").textContent = "🟢 " + a.defensor.modelo + " @ " + hostCorto(a.defensor.host);
+      $("ro-atq-txt").textContent = a.atacante.modelo + " @ " + hostCorto(a.atacante.host);
+      $("ro-def-txt").textContent = a.defensor.modelo + " @ " + hostCorto(a.defensor.host);
     }
   }
 
@@ -685,7 +685,7 @@
     $("sospecha-relleno").style.width = v + "%";
     $("sospecha-relleno").className = "sospecha-" + zona;
     $("sospecha-txt").textContent = v + "/100" + (v > 70 ? " · circuito de sesión ACTIVO" : "") +
-      (circuito ? " · 🔒 autorización forzada en esta ronda" : "");
+      (circuito ? " · autorización forzada en esta ronda" : "");
   }
 
   // ---------- listo / aceptar, sonido, diagnóstico de modelo ----------
@@ -750,10 +750,10 @@
     try {
       const r = await API.ollamaProbar(hostDe(rol), modelo, rol === "def" ? "azul" : "rojo");
       const seg = (r.tiempo_ms / 1000).toFixed(2) + " s";
-      R.setProbe(rol, r.ok ? "✓ " + modelo + " respondió en " + seg + (r.respuesta ? " · «" + r.respuesta + "»" : "")
-        : "✕ " + (r.error || "error desconocido") + " (" + seg + ")", !!r.ok);
+      R.setProbe(rol, r.ok ? modelo + " respondió en " + seg + (r.respuesta ? " · «" + r.respuesta + "»" : "")
+        : (r.error || "error desconocido") + " (" + seg + ")", !!r.ok);
     } catch (e) {
-      R.setProbe(rol, "✕ " + e.message, false);
+      R.setProbe(rol, e.message, false);
     }
   }
 
@@ -832,7 +832,7 @@
       refrescarApps();
       if (nueva || notif.clave !== claveNotif()) cargarNotif(); // cada partida tiene sus notificaciones
       if (p.fase === "en_curso") notificar("▶ La partida ha empezado", "info");
-      if (p.fase === "finalizada") notificar("🏁 La partida ha terminado: mira Resultados", "info");
+      if (p.fase === "finalizada") notificar("La partida ha terminado: mira Resultados", "info");
     }
     if (estado.batalla && estado.batalla.fase_partida !== p.fase && !nueva) pintarBatalla({ ...estado.batalla, fase_partida: p.fase });
     if (nueva) {
@@ -861,7 +861,7 @@
     if (!modelo) { R.toast("Elige primero el modelo del defensor en la ventana IA Defensora."); return; }
     try {
       await API.configurarDefensorIA(modelo, hostDe("def"));
-      R.toast("🛡 Defensor IA activo y verificado: " + modelo);
+      R.toast("Defensor IA activo y verificado: " + modelo);
     } catch (e) { R.toast(e.message); }
   }
 
@@ -873,7 +873,7 @@
         R.setArchivos(await API.archivos(), {
           ver: (id) => accionPdf("pdf_abierto", id).then(cargarAppsVisibles),
           reportar: (id) => accionPdf("pdf_reportado", id).then(cargarAppsVisibles),
-          aislar: (id) => accionSimple(() => API.aislarAdjunto(id), "🧪 Adjunto aislado").then(cargarAppsVisibles),
+          aislar: (id) => accionSimple(() => API.aislarAdjunto(id), "Adjunto aislado").then(cargarAppsVisibles),
         });
       } catch (e) { R.setArchivos({ bloqueado: e.message }); }
     },
@@ -882,7 +882,7 @@
         R.setSeguridad(await API.seguridad(), { revocar: async () => {
           try {
             const r = await API.revocarCredencial();
-            R.toast("🔒 Credencial revocada" + textoRegla(r.regla || {}));
+            R.toast("Credencial revocada" + textoRegla(r.regla || {}));
           } catch (e) { R.toast(e.message); }
           cargarAppsVisibles();
         } });
@@ -926,15 +926,15 @@
   }
   // acción de auditoría (SSE) -> {equipo: [texto, nivel]}
   const NOTIF_AUDITORIA = {
-    CORREO_ENVIADO: { azul: ["📬 Ha llegado un correo nuevo al buzón", "info"] },
-    CLIC_ENLACE: { rojo: ["🔗 Alguien pulsó el enlace de uno de tus correos", "info"], azul: ["⚠ Un empleado pulsó el enlace de un correo: contenlo", "alerta"],
-      general: ["🔗 Clic en un enlace de phishing", "alerta"] },
-    PDF_ABIERTO: { rojo: ["📎 Abrieron uno de tus adjuntos", "info"] },
-    CREDENCIAL_COMPROMETIDA: { rojo: ["🔑 Has obtenido una credencial", "info"], general: ["🔑 Credencial comprometida", "alerta"] },
-    CREDENCIAL_REVOCADA: { general: ["🔒 Azul revocó la credencial", "info"] },
-    MISION_COMPLETADA: { azul: ["🎯 Misión completada", "info"] },
-    INCIDENTE_ABIERTO: { general: ["🚨 Azul abrió un incidente", "info"] },
-    INCIDENTE_RESUELTO: { general: ["✓ Azul resolvió un incidente", "info"] },
+    CORREO_ENVIADO: { azul: ["Ha llegado un correo nuevo al buzón", "info"] },
+    CLIC_ENLACE: { rojo: ["Alguien pulsó el enlace de uno de tus correos", "info"], azul: ["Un empleado pulsó el enlace de un correo: contenlo", "alerta"],
+      general: ["Clic en un enlace de phishing", "alerta"] },
+    PDF_ABIERTO: { rojo: ["Abrieron uno de tus adjuntos", "info"] },
+    CREDENCIAL_COMPROMETIDA: { rojo: ["Has obtenido una credencial", "info"], general: ["Credencial comprometida", "alerta"] },
+    CREDENCIAL_REVOCADA: { general: ["Azul revocó la credencial", "info"] },
+    MISION_COMPLETADA: { azul: ["Misión completada", "info"] },
+    INCIDENTE_ABIERTO: { general: ["Azul abrió un incidente", "info"] },
+    INCIDENTE_RESUELTO: { general: ["Azul resolvió un incidente", "info"] },
   };
 
   // ---------- resultados y cronología (Fase G) ----------
@@ -1084,7 +1084,7 @@
       new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) cargarInforme(); })
         .observe(document.querySelector("section.panel.informe"));
     }
-    // Esc cierra el buzón solo cuando es un modal; como ventana del escritorio se cierra con su ✕.
+    // Esc cierra el buzón solo cuando es un modal; como ventana del escritorio se cierra con su.
     document.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape" && R.buzonEsModal() && R.buzonAbierto()) R.mostrarBuzon(false);
     });
@@ -1136,7 +1136,7 @@
       R.setPermisos(conToken, estado.rol);
       if (estado.batalla) pintarBatalla(estado.batalla); // ya con token: muestra los controles del equipo
       if (conToken) cargarUsuarios();
-      if (conToken && estado.rol === "azul") cargarBuzon(); // contador inicial del botón ✉ BUZÓN (n)
+      if (conToken && estado.rol === "azul") cargarBuzon(); // contador inicial del botón BUZÓN (n)
       API.conectar(handlers, (est) => {
         const antes = estado.conexion;
         estado.conexion = est;

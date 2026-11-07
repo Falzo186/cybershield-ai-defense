@@ -94,6 +94,61 @@ def main():
     chk("azul no detiene", c.post("/api/detener", json={}, headers=H(ta)).status_code == 403)
     chk("general detiene", c.post("/api/detener", json={}, headers=H(tg)).status_code == 200)
 
+    # --- sistema de diseño unificado (Fase G) ---
+    from pathlib import Path as _P
+    _ui = _P(__file__).resolve().parents[1] / "ui"
+    _tokens = (_ui / "tokens.css").read_text(encoding="utf-8")
+    _estilos = (_ui / "styles.css").read_text(encoding="utf-8")
+    _indice = (_ui / "index.html").read_text(encoding="utf-8")
+    _panel_css = (_ui / "panel" / "panel.css").read_text(encoding="utf-8")
+    _panel_html = (_ui / "panel" / "index.html").read_text(encoding="utf-8")
+
+    chk("los tokens de diseño viven en un único archivo compartido",
+        "--p-fondo" in _tokens and "--p-acento" in _tokens and "--p-simulado" in _tokens)
+    chk("y ya no están duplicados en el CSS del panel", "--p-fondo:" not in _panel_css)
+    chk("las dos pantallas cargan los tokens antes que su hoja propia",
+        _indice.index("tokens.css") < _indice.index("styles.css")
+        and _panel_html.index("tokens.css") < _panel_html.index("panel.css"))
+    chk("la pantalla de la partida mapea sus variables sobre los tokens",
+        "--bg:        var(--p-fondo)" in _estilos and "--acento:    var(--p-acento)" in _estilos)
+    chk("el servidor sirve la hoja de tokens",
+        c.get("/tokens.css").status_code == 200 and "--p-acento" in c.get("/tokens.css").text)
+    chk("el violeta de «simulado» sigue reservado a datos que no son reales",
+        "--p-simulado" in _tokens and "--simulado: var(--p-simulado)" in _estilos)
+    chk("MOCK se pinta con ese violeta, no con el ámbar de aviso",
+        ".origen-mock { color: var(--simulado)" in _estilos)
+
+    _emoji = __import__("re").compile(
+        "[\U0001F000-\U0001FAFF☀-➿←-⇿⬀-⯿⃣]")
+    chk("no queda ningún emoji en el marcado de la partida", _emoji.search(_indice) is None)
+    chk("ni en el marcado del panel", _emoji.search(_panel_html) is None)
+    # Tampoco en el JavaScript que pinta la pantalla. Las dos únicas excepciones están justificadas y se
+    # nombran aquí: el patrón MARCA_EXITO (una marca interna que render.js QUITA antes de mostrar el aviso)
+    # y un comentario. Si apareciera cualquier otro emoji, esta comprobación lo caza.
+    _js = {f: (_ui / f).read_text(encoding="utf-8") for f in ("render.js", "app.js", "escritorio.js", "api.js")}
+    _sobran = {f: [l.strip() for l in t.split("\n")
+                   if _emoji.search(l) and "MARCA_EXITO" not in l and not l.strip().startswith("//")]
+               for f, t in _js.items()}
+    chk("el JavaScript de la partida no pinta ningún emoji",
+        all(v == [] for v in _sobran.values()))
+    chk("la marca interna de los avisos de éxito nunca llega al texto mostrado",
+        'textContent = texto.replace(MARCA_EXITO, "")' in _js["render.js"])
+    chk("los iconos de la partida son SVG en línea del sprite de la página",
+        _indice.count('<use href="#i-') >= 20 and "<defs>" in _indice)
+    chk("y cada icono referenciado existe en el sprite",
+        all(f'id="{i}"' in _indice
+            for i in set(__import__("re").findall(r'<use href="#(i-[a-z-]+)"', _indice))))
+    chk("los puntos de estado usan los tokens de color, no un emoji de círculo",
+        ".pt-rojo { background: var(--atq); }" in _estilos
+        and ".pt-azul { background: var(--def); }" in _estilos)
+    chk("el marcador se construye con nodos y puntos de color, no con una cadena con emojis",
+        "pintarMarcador" in (_ui / "render.js").read_text(encoding="utf-8"))
+    # Se busca la ASIGNACIÓN, no la palabra: los comentarios del propio archivo explican por qué no se usa.
+    chk("la pantalla de la partida sigue sin asignar innerHTML",
+        not __import__("re").search(r"\.innerHTML\s*(=|\+=)",
+                                    "\n".join((_ui / f).read_text(encoding="utf-8")
+                                              for f in ("render.js", "app.js", "escritorio.js"))))
+
     # --- catálogo de escenarios de empresa (Fase D) ---
     r = c.get("/api/escenarios")
     chk("el catálogo de escenarios se lee sin sesión (espectador)", r.status_code == 200)

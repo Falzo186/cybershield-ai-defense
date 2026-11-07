@@ -15,10 +15,12 @@ const R = (() => {
     ["atacante", "Atacante"], ["prompt", "Prompt"], ["analisis", "Análisis"], ["defensor", "Defensor"],
     ["politicas", "Políticas"], ["autorizacion", "Autorización"], ["herramienta", "Herramienta"], ["bd", "Base de datos"],
   ];
+  // Marcas geométricas, no emojis: la familia completa (○ ◉ ● ◆ ■ ◈ ▲ –) se lee igual en cualquier fuente y
+  // el color lo pone la clase CSS. El texto que va al lado dice lo mismo sin depender del símbolo.
   const ESTADO_NODO = {
-    pendiente: ["○", "PENDIENTE"], activo: ["◉", "ACTIVO"], ok: ["✓", "OK"],
-    bloqueado: ["✕", "BLOQUEADO"], omitido: ["–", "OMITIDO"],
-    ejecucion_real: ["✓", "EJECUCIÓN REAL"], error: ["⚠", "ERROR"],
+    pendiente: ["○", "PENDIENTE"], activo: ["◉", "ACTIVO"], ok: ["●", "OK"],
+    bloqueado: ["■", "BLOQUEADO"], omitido: ["–", "OMITIDO"],
+    ejecucion_real: ["●", "EJECUCIÓN REAL"], error: ["▲", "ERROR"],
   };
   const VEREDICTO = {
     PERMITIR: ["v-ok", "●", "PERMITIDA"],
@@ -28,10 +30,10 @@ const R = (() => {
     AISLAR: ["v-bad", "■", "AISLADA"],
   };
   const RESULTADO = {
-    DEFENSA_EXITOSA: ["r-ok", "✓", "DEFENSA EXITOSA"],
+    DEFENSA_EXITOSA: ["r-ok", "●", "DEFENSA EXITOSA"],
     PERMITIDO_CORRECTO: ["r-ok", "●", "PERMITIDO CORRECTO"],
     FALSO_POSITIVO: ["r-warn", "◆", "FALSO POSITIVO"],
-    FALLA_DEFENSA: ["r-bad", "✕", "VICTORIA DEL ATACANTE"],
+    FALLA_DEFENSA: ["r-bad", "■", "VICTORIA DEL ATACANTE"],
     DEFENSA_EN_PROFUNDIDAD: ["r-depth", "◈", "IA ENGAÑADA · CAPAS CONTUVIERON"],
   };
   const SENS_ICONO = { PUBLICA: "○", INTERNA: "◐", CONFIDENCIAL: "◆", CRITICA: "▲" };
@@ -78,7 +80,7 @@ const R = (() => {
     const v = $("veredicto");
     v.className = "veredicto v-err";
     v.replaceChildren();
-    v.append(document.createTextNode("⚠ ERROR DE RONDA"),
+    v.append(document.createTextNode("ERROR DE RONDA"),
       el("small", null, (modelo ? modelo + " · " : "") + error + " — no cuenta en las métricas"));
   }
   // nota (opcional): texto de la ronda que llega del servidor; solo se pinta si no está vacía.
@@ -89,7 +91,7 @@ const R = (() => {
     if (!decision) { v.textContent = "SIN EVALUAR"; return; }
     if (resultado === "FALLA_DEFENSA") {
       v.classList.add("v-fail");
-      v.append(document.createTextNode("✕ VICTORIA DEL ATACANTE"),
+      v.append(document.createTextNode("VICTORIA DEL ATACANTE"),
         el("small", null, "Salieron datos sensibles a quien no tenía derecho · condición experimental, no compromiso real"));
     } else if (resultado === "DEFENSA_EN_PROFUNDIDAD") {
       v.classList.add("v-depth");
@@ -201,8 +203,8 @@ const R = (() => {
     $("def-herr").textContent = d.herramienta || "—";
     $("def-tiempo").textContent = d.tiempo_ms + " ms" + (typeof d.tokens === "number" ? " · " + d.tokens + " tokens" : "");
     $("def-ia").textContent = d.decision_ia || "—";
-    $("def-origen").textContent = d.origen_decision === "filtro_rapido" ? "⚡ Filtro rápido (sin inferencia)"
-      : d.origen === "ollama" ? "🟢 REAL (Ollama" + (d.modelo ? " · " + d.modelo : "") + ")" : "🟡 MOCK";
+    $("def-origen").textContent = d.origen_decision === "filtro_rapido" ? "Filtro rápido (sin inferencia)"
+      : d.origen === "ollama" ? "REAL (Ollama" + (d.modelo ? " · " + d.modelo : "") + ")" : "MOCK";
     $("def-parse").hidden = d.parse_ok !== false;
   }
 
@@ -217,7 +219,7 @@ const R = (() => {
   // reg = registro de ronda (ver app.js). Cabecera clicable que despliega el prompt completo y la respuesta del defensor.
   function addHistorial(reg) {
     const esError = reg.veredicto === "ERROR";
-    const [cls, ico, txt] = esError ? ["r-err", "⚠", "ERROR"]
+    const [cls, ico, txt] = esError ? ["r-err", "▲", "ERROR"]
       : (RESULTADO[reg.veredicto] || ["", "?", String(reg.veredicto)]);
     const parcial = reg.nivel_fuga === "PARCIAL";
     const li = el("li", "hist " + cls + (parcial ? " r-parcial" : ""));
@@ -239,7 +241,7 @@ const R = (() => {
       li.append(el("div", "hist-nota", "No cuenta como bloqueo ni como éxito."));
     }
     if (reg.circuito_sesion) {
-      li.append(el("div", "hist-nota hist-nota-circuito", "🔒 Autorización forzada por patrón de sesión sospechoso"));
+      li.append(el("div", "hist-nota hist-nota-circuito", "Autorización forzada por patrón de sesión sospechoso"));
     }
     if (parcial) {
       li.append(el("div", "hist-nota hist-nota-parcial", "Fuga parcial: el defensor confirmó/nombró un secreto sin entregarlo (no puntúa, se registra)."));
@@ -387,25 +389,44 @@ const R = (() => {
     $("def-modelo").textContent = e.modelo_def || "—";
   }
   let toastTimer = null;
-  // Los avisos de éxito de la app empiezan por ✓ (o 📎 al abrir un PDF): se pintan con borde verde; el resto, rojo.
+  // Los avisos de éxito de la app llevan una marca al principio (la del patrón MARCA_EXITO). Es INTERNA
+  // entre quien llama y esta función: sirve para pintar el borde verde y SE QUITA del texto que se muestra.
+  // El estado se ve por el color del borde y por la propia frase, no por un emoji.
+  const MARCA_EXITO = /^(✓|📎)\s*/;
   function toast(msg) {
     const t = $("toast");
-    t.textContent = String(msg);
-    t.classList.toggle("toast-ok", /^(✓|📎)/.test(t.textContent));
+    const texto = String(msg);
+    t.textContent = texto.replace(MARCA_EXITO, "");
+    t.classList.toggle("toast-ok", MARCA_EXITO.test(texto));
     t.hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
   }
 
   // ---------- marcador, reto (listo/aceptar), resultado de partida, diagnóstico ----------
+  // El marcador se construye con nodos, no con una cadena: los equipos se identifican con un punto de
+  // color (clase .pt-rojo / .pt-azul, los mismos tokens que el resto de la aplicación) en vez de con un
+  // emoji. Se usa replaceChildren + textContent, nunca innerHTML.
+  function puntoEquipo(equipo) {
+    const s = document.createElement("span");
+    s.className = "pt pt-" + equipo;
+    s.setAttribute("aria-hidden", "true");
+    return s;
+  }
+  function pintarMarcador(texto) {
+    const n = $("marcador");
+    const t = document.createElement("span");
+    t.textContent = texto;
+    n.replaceChildren(puntoEquipo("rojo"), t, puntoEquipo("azul"));
+  }
   function setMarcador(atq, def) {
-    $("marcador").textContent = "🔴 " + (atq | 0) + " — " + (def | 0) + " 🔵";
+    pintarMarcador(" " + (atq | 0) + " — " + (def | 0) + " ");
   }
   // Modo demostración (admin): etiqueta visible y marcador desactivado; no puntúa porque el acceso es legítimo.
   function setDemo(on) {
     $("demo-tag").hidden = !on;
     $("sel-dificultad").disabled = on;
-    if (on) $("marcador").textContent = "🔴 sin puntaje 🔵";
+    if (on) pintarMarcador(" sin puntaje ");
   }
   function setProbe(rol, texto, ok) { // ok: true | false | null (probando)
     const n = $("probe-" + (rol === "def" ? "def" : "atq"));
@@ -417,7 +438,7 @@ const R = (() => {
   function mostrarReto(visible, d) {
     $("reto-modal").hidden = !visible;
     if (!visible || !d) return;
-    $("reto-t").textContent = "⚔ EQUIPO " + (EQ[d.de_rol] || "?") + " QUIERE INICIAR COMBATE";
+    $("reto-t").textContent = "EQUIPO " + (EQ[d.de_rol] || "?") + " QUIERE INICIAR COMBATE";
     $("reto-det").textContent = "Rondas: " + d.rondas + " · Intensidad: " + d.intensidad + " · " +
       (d.demo ? "MODO DEMOSTRACIÓN (admin, sin puntaje)" : "Dificultad: " + (DIF[d.dificultad] || "—")) +
       " · Escenario: " + (d.escenario || "libre");
@@ -431,11 +452,11 @@ const R = (() => {
   }
   function mostrarPartida(d, hayMetricas) {
     const a = d.puntos_atacante | 0, df = d.puntos_defensor | 0;
-    const t = d.ganador === "atacante" ? "🏆 GANÓ EL EQUIPO ROJO · " + a + "-" + df
-      : d.ganador === "defensor" ? "🏆 GANÓ EL EQUIPO AZUL · " + df + "-" + a : "🤝 EMPATE · " + a + "-" + df;
+    const t = d.ganador === "atacante" ? "GANÓ EL EQUIPO ROJO · " + a + "-" + df
+      : d.ganador === "defensor" ? "GANÓ EL EQUIPO AZUL · " + df + "-" + a : "EMPATE · " + a + "-" + df;
     $("partida-t").textContent = (d.detenida ? "PARTIDA DETENIDA · " : "") + t;
     $("partida-sub").textContent = "Rondas jugadas: " + d.rondas_jugadas + (d.errores ? " · rondas con error (no puntúan): " + d.errores : "") +
-      " · 🔴 atacante " + a + " — " + df + " defensor 🔵";
+      " · atacante " + a + " — " + df + " defensor";
     // Resumen sí/no derivado del informe (solo si el servidor lo envió).
     const inf = d.informe, res = $("partida-resumen");
     res.replaceChildren();
@@ -573,7 +594,7 @@ const R = (() => {
     clearTimeout(esperaOllama[r]);
     esperaOllama[r] = setTimeout(() => {
       document.querySelectorAll('[data-ollama-ind="' + r + '"].ind-wait').forEach((n) => {
-        n.textContent = "⚪ SIN RESPUESTA · usa «Probar conexión»";
+        n.textContent = "SIN RESPUESTA · usa «Probar conexión»";
         n.className = "ollama-ind ind-sin";
       });
     }, 12000);
@@ -583,7 +604,7 @@ const R = (() => {
     clearTimeout(esperaOllama[rol === "def" ? "def" : "atq"]);
     const on = !!est.disponible;
     document.querySelectorAll('[data-ollama-ind="' + (rol === "def" ? "def" : "atq") + '"]').forEach((n) => {
-      n.textContent = on ? "🟢 OLLAMA CONECTADO" : "🔴 OLLAMA DESCONECTADO";
+      n.textContent = on ? "OLLAMA CONECTADO" : "OLLAMA DESCONECTADO";
       n.className = "ollama-ind " + (on ? "ind-on" : "ind-off");
     });
     llenarSelect(rol === "def" ? "sel-def" : "sel-atq", Array.isArray(est.modelos) ? est.modelos : [], "(sin modelos)");
@@ -620,7 +641,7 @@ const R = (() => {
     const m = $("buzon-modal");
     if (visible) {
       focoBuzon = document.activeElement;
-      $("buzon-t").textContent = rol === "rojo" ? "✉ ENVIAR CORREO DE ENTRENAMIENTO" : "✉ BUZÓN DEL EQUIPO AZUL";
+      $("buzon-t").textContent = rol === "rojo" ? "ENVIAR CORREO DE ENTRENAMIENTO" : "BUZÓN DEL EQUIPO AZUL";
       $("correo-form").hidden = rol !== "rojo";
       $("buzon-azul").hidden = rol !== "azul";
       if (ventanaBuzon) ventanaBuzon.abrir(); else m.hidden = false;
@@ -653,7 +674,7 @@ const R = (() => {
 
   // n = correos sin leer de la bandeja de entrada (o null antes de cargar).
   function setBotonBuzon(n) {
-    $("btn-buzon").textContent = typeof n === "number" ? "✉ BUZÓN (" + n + ")" : "✉ CORREOS";
+    $("btn-buzon").textContent = typeof n === "number" ? "BUZÓN (" + n + ")" : "CORREOS";
   }
 
   // Carpetas: entrada · sospechosos (reportados) · archivados · enviados (respuestas de Azul). La carpeta la calcula el
@@ -692,7 +713,7 @@ const R = (() => {
       b.dataset.correo = c.id;
       b.append(el("b", null, c.asunto), el("span", "fecha", fechaCorta(c.ts)), el("span", "de", c.de));
       const marcas = [[c.prioridad === "alta", "marca-prioridad", "PRIORIDAD ALTA"], [!c.leido, "marca-nuevo", "SIN LEER"],
-        [c.adjunto, "marca-pdf", "📎 PDF"], [c.clicado && !c.contenido, "marca-clic", "ENLACE CLICADO"],
+        [c.adjunto, "marca-pdf", "PDF"], [c.clicado && !c.contenido, "marca-clic", "ENLACE CLICADO"],
         [c.contenido, "marca-contenido", "CONTENIDO"], [c.reportado, "marca-reportado", "REPORTADO"],
         [c.pdf_reportado, "marca-reportado", "PDF REPORTADO"], [c.aislado, "marca-contenido", "ADJUNTO AISLADO"]]
         .filter(([si]) => si);
@@ -747,12 +768,12 @@ const R = (() => {
     d.append(el("h3", null, c.asunto), el("div", "meta", meta));
     if (acciones) {
       const t = el("div", "buzon-acciones buzon-herramientas");
-      t.append(botonAccion("🔎 Verificar remitente", "", false, "", acciones.verificar),
-        botonAccion("🔗 Inspeccionar enlace", "", false, "", acciones.inspeccionar));
-      const resp = el("button", "btn btn-mini", "↩ Responder");
+      t.append(botonAccion("Verificar remitente", "", false, "", acciones.verificar),
+        botonAccion("Inspeccionar enlace", "", false, "", acciones.inspeccionar));
+      const resp = el("button", "btn btn-mini", "Responder");
       resp.type = "button";
       resp.addEventListener("click", () => { form.hidden = !form.hidden; if (!form.hidden) area.focus(); });
-      t.append(resp, botonAccion(c.archivado ? "📥 Devolver a la entrada" : "🗄 Archivar", "", false, "",
+      t.append(resp, botonAccion(c.archivado ? "Devolver a la entrada" : "Archivar", "", false, "",
         () => acciones.archivar(!c.archivado)));
       d.append(t);
       var form = el("form", "buzon-responder");
@@ -782,19 +803,19 @@ const R = (() => {
     }
     if (c.adjunto) { // PDF benigno del catálogo fijo: se ve en el visor seguro; aislar/reportar son eventos
       const adj = el("div", "buzon-adjunto");
-      adj.append(el("span", null, "📎 " + c.adjunto.titulo + " · " + c.adjunto.archivo + " · riesgo " + c.adjunto.riesgo));
+      adj.append(el("span", null, c.adjunto.titulo + " · " + c.adjunto.archivo + " · riesgo " + c.adjunto.riesgo));
       if (acciones) {
-        adj.append(botonAccion("👁 Previsualizar", "", c.aislado, "Aislado", acciones.abrirPdf),
-          botonAccion("🧪 Aislar", "", c.aislado, "✓ Aislado", acciones.aislar),
-          botonAccion("⚑ Reportar PDF", "", c.pdf_reportado, "✓ PDF reportado", acciones.reportarPdf));
+        adj.append(botonAccion("Previsualizar", "", c.aislado, "Aislado", acciones.abrirPdf),
+          botonAccion("Aislar", "", c.aislado, "Aislado", acciones.aislar),
+          botonAccion("Reportar PDF", "", c.pdf_reportado, "PDF reportado", acciones.reportarPdf));
       }
       d.append(adj);
     }
     if (!acciones) return;
     const f = el("div", "buzon-acciones");
-    f.append(botonAccion("⚑ Reportar", "", c.reportado, "✓ Reportado", acciones.reportar));
-    if (c.clicado) f.append(botonAccion("⛔ Contener", "btn-danger", c.contenido, "✓ Contenido", acciones.contener));
-    if (acciones.incidente) f.append(botonAccion("🚨 Abrir incidente", "", false, "", acciones.incidente));
+    f.append(botonAccion("Reportar", "", c.reportado, "Reportado", acciones.reportar));
+    if (c.clicado) f.append(botonAccion("Contener", "btn-danger", c.contenido, "Contenido", acciones.contener));
+    if (acciones.incidente) f.append(botonAccion("Abrir incidente", "", false, "", acciones.incidente));
     d.append(f);
   }
 
@@ -813,7 +834,7 @@ const R = (() => {
   let focoVisor = null;
   function mostrarVisor(v) {
     focoVisor = document.activeElement;
-    $("visor-t").textContent = "👁 VISOR SEGURO · " + v.titulo;
+    $("visor-t").textContent = "VISOR SEGURO · " + v.titulo;
     const dl = $("visor-meta");
     dl.replaceChildren();
     [["Archivo", v.archivo], ["Tipo", v.tipo], ["Tamaño", v.tamano_bytes + " bytes"], ["SHA-256", v.sha256],
@@ -850,12 +871,12 @@ const R = (() => {
       const li = el("li", "buzon-enviado");
       li.append(el("b", null, c.asunto), el("span", "fecha", fechaCorta(c.ts)), el("span", "de", "Para: " + c.para_usuario));
       const m = el("span", "buzon-marcas");
-      m.append(el("span", "marca " + (c.clicado ? "marca-clic" : "marca-gris"), c.clicado ? "🔗 ENLACE CLICADO" : "🔗 sin clic"));
+      m.append(el("span", "marca " + (c.clicado ? "marca-clic" : "marca-gris"), c.clicado ? "ENLACE CLICADO" : "sin clic"));
       if (c.con_adjunto) {
         m.append(el("span", "marca " + (c.adjunto_abierto ? "marca-pdf" : "marca-gris"),
-          c.adjunto_abierto ? "📎 ADJUNTO ABIERTO" : "📎 sin abrir"));
+          c.adjunto_abierto ? "ADJUNTO ABIERTO" : "sin abrir"));
       }
-      if (c.credencial_obtenida) m.append(el("span", "marca marca-contenido", "🔑 CREDENCIAL OBTENIDA"));
+      if (c.credencial_obtenida) m.append(el("span", "marca marca-contenido", "CREDENCIAL OBTENIDA"));
       li.append(m);
       ul.append(li);
     });
@@ -899,7 +920,7 @@ const R = (() => {
     const li = el("li", "bp-ataque " + (RES_IA[a.resultado] || ""));
     const cab = el("div", "bp-fila");
     cab.append(el("b", null, "#" + a.n), el("span", "bp-titulo", a.titulo || a.resultado || "—"),
-      el("span", null, a.usuario + (a.origen_identidad === "credencial_robada" ? " 🔑 credencial robada" : " · invitado")),
+      el("span", null, a.usuario + (a.origen_identidad === "credencial_robada" ? "credencial robada" : " · invitado")),
       el("span", "muted", "técnica " + TECNICA(a.categoria || a.tecnica) + " · intensidad " + a.intensidad +
         (a.lanzado_por ? " · lanzado por " + a.lanzado_por : "")),
       el("b", null, (a.puntos_rojo ? "Rojo +" + a.puntos_rojo : "") + (a.puntos_rojo && a.puntos_azul ? " · " : "") +
@@ -914,7 +935,7 @@ const R = (() => {
     const linea = (etq, modelo, ms, tin, tout, carga) => el("span", null, etq + " " + (modelo || "—") + " · " + segs(ms) +
       " · tokens " + nd(tin) + " entrada / " + nd(tout) + " salida" + (carga ? " · incluye " + segs(carga) + " de carga del modelo" : ""));
     m.append(linea("Atacante", a.modelo_atq, a.atq_ms, a.atq_tokens_entrada, a.atq_tokens_salida, a.atq_carga_ms));
-    if (a.origen_decision === "filtro_rapido") m.append(el("span", null, "Defensor ⚡ filtro rápido determinista: sin inferencia"));
+    if (a.origen_decision === "filtro_rapido") m.append(el("span", null, "Defensor filtro rápido determinista: sin inferencia"));
     else if (a.resultado !== "error_atacante" && a.estado !== "cancelado") {
       m.append(linea("Defensor", a.modelo_def, a.def_ms, a.def_tokens_entrada, a.def_tokens_salida, a.def_carga_ms));
     }
@@ -933,12 +954,12 @@ const R = (() => {
     const d = e.defensor || {};
     const def = $("bp-defensor");
     def.textContent = d.modelo
-      ? d.modelo + " @ " + hostCorto(d.host) + (d.ok === true ? " · ✓ verificado" : d.ok === false ? " · ⚠ " + (d.error || "no responde") : "")
-      : "⚠ sin configurar: cada ataque se deniega por fallo seguro y Azul no puntúa";
+      ? d.modelo + " @ " + hostCorto(d.host) + (d.ok === true ? " · verificado" : d.ok === false ? " ·" + (d.error || "no responde") : "")
+      : "sin configurar: cada ataque se deniega por fallo seguro y Azul no puntúa";
     def.className = d.modelo && d.ok !== false ? "ok" : "warn";
     const id = e.identidad || {};
     $("bp-identidad").textContent = id.origen === "credencial_robada"
-      ? "🔑 " + id.usuario + " (" + id.rol + ") · credencial robada sin revocar"
+      ? id.usuario + " (" + id.rol + ") · credencial robada sin revocar"
       : id.usuario + " (" + id.rol + ") · sin credencial robada";
     $("bp-identidad").className = id.origen === "credencial_robada" ? "warn" : "";
     $("bp-puntos").textContent = "Rojo " + e.puntos.rojo + " · Azul " + e.puntos.azul;
@@ -971,7 +992,7 @@ const R = (() => {
         "Como en una campaña real, no sabes si se reportaron o aislaron.";
       d.catalogo.forEach((c) => {
         const li = el("li", "app-item riesgo-" + c.adjunto.riesgo);
-        li.append(el("b", null, "📎 " + c.adjunto.titulo), el("span", "muted", "Plantilla «" + c.nombre + "» · " + c.adjunto.archivo +
+        li.append(el("b", null, c.adjunto.titulo), el("span", "muted", "Plantilla «" + c.nombre + "» · " + c.adjunto.archivo +
           " · riesgo del contexto: " + c.adjunto.riesgo));
         ul.append(li);
       });
@@ -979,7 +1000,7 @@ const R = (() => {
         const li = el("li", "app-item");
         const f = el("div", "app-fila");
         f.append(el("b", null, "Enviado: " + e.asunto), el("span", "fecha", fechaCorta(e.ts)),
-          chip(e.adjunto_abierto ? "marca-pdf" : "marca-gris", e.adjunto_abierto ? "📎 ADJUNTO ABIERTO" : "📎 sin abrir"));
+          chip(e.adjunto_abierto ? "marca-pdf" : "marca-gris", e.adjunto_abierto ? "ADJUNTO ABIERTO" : "sin abrir"));
         li.append(f);
         ul.append(li);
       });
@@ -991,15 +1012,15 @@ const R = (() => {
     d.adjuntos.forEach((c) => {
       const li = el("li", "app-item riesgo-" + c.adjunto.riesgo);
       const f = el("div", "app-fila");
-      f.append(el("b", null, "📎 " + c.adjunto.titulo), el("span", "muted", c.adjunto.archivo + " · riesgo " + c.adjunto.riesgo),
+      f.append(el("b", null, c.adjunto.titulo), el("span", "muted", c.adjunto.archivo + " · riesgo " + c.adjunto.riesgo),
         c.pdf_abierto ? chip("marca-pdf", "ABIERTO") : chip("marca-gris", "sin abrir"),
         ...(c.pdf_reportado ? [chip("marca-contenido", "REPORTADO")] : []), ...(c.aislado ? [chip("marca-contenido", "AISLADO")] : []));
       li.append(f, el("span", "muted", "De " + c.de + " · «" + c.asunto + "» · " + fechaCorta(c.ts)));
       if (d.puede_actuar) {
         const b = el("div", "app-botones");
         const boton = (t, fn, off) => { const x = el("button", "btn btn-mini", t); x.type = "button"; x.disabled = !!off; x.addEventListener("click", () => fn(c.id)); return x; };
-        b.append(boton("👁 Previsualizar", acciones.ver), boton("⚑ Reportar PDF", acciones.reportar, c.pdf_reportado),
-          boton("🧪 Aislar", acciones.aislar, c.aislado));
+        b.append(boton("Previsualizar", acciones.ver), boton("Reportar PDF", acciones.reportar, c.pdf_reportado),
+          boton("Aislar", acciones.aislar, c.aislado));
         li.append(b);
       }
       ul.append(li);
@@ -1016,18 +1037,18 @@ const R = (() => {
     const cred = d.credencial.estado;
     let revocar = null;
     if (cred === "comprometida" && d.puede_actuar) {
-      revocar = el("button", "btn btn-mini btn-danger", "🔒 Revocar credencial");
+      revocar = el("button", "btn btn-mini btn-danger", "Revocar credencial");
       revocar.type = "button";
       revocar.addEventListener("click", acciones.revocar);
     }
     const df = d.defensor;
     res.append(caja("Riesgo de la partida", r + "/100", r > 70 ? "bad" : r >= 30 ? "warn" : "ok"),
       caja("Credencial de " + (d.usuario || "Azul"), cred.toUpperCase(), cred === "comprometida" ? "bad" : "ok", revocar),
-      caja("Defensor IA", df.modelo ? df.modelo + (df.ok === true ? " · ✓" : df.ok === false ? " · ⚠ falló" : " · sin comprobar") : "SIN CONFIGURAR",
+      caja("Defensor IA", df.modelo ? df.modelo + (df.ok === true ? " ·" : df.ok === false ? " · falló" : " · sin comprobar") : "SIN CONFIGURAR",
         df.modelo && df.ok !== false ? "ok" : "warn"));
     $("seg-recos").replaceChildren(...d.recomendaciones.map((x) => {
       const li = el("li", "app-item niv-" + x.nivel);
-      li.append(el("b", null, x.texto), el("span", "muted", "→ " + x.accion));
+      li.append(el("b", null, x.texto), el("span", "muted", x.accion));
       return li;
     }));
     const c = d.controles;
@@ -1067,7 +1088,7 @@ const R = (() => {
       const td = el("td", null, r.tabla);
       td.append(el("span", "inf-formula", r.descripcion));
       tr.append(td, el("td", null, (SENS_ICONO[r.sensibilidad] || "") + " " + r.sensibilidad), el("td", "mono", r.herramienta),
-        ...d.roles.map((rol) => el("td", null, { "sí": "✓ sí", "no": "✕ no", "con autorización": "◆ con autorización" }[r.acceso[rol]])));
+        ...d.roles.map((rol) => el("td", null, { "sí": "sí", "no": "no", "con autorización": "◆ con autorización" }[r.acceso[rol]])));
       return tr;
     }));
   }
@@ -1166,10 +1187,10 @@ const R = (() => {
     if (d.bloqueado) { $("inf-aviso").textContent = d.bloqueado; return; }
     $("inf-partida").textContent = d.partida + (d.guardado ? " · guardado" : " · en vivo");
     const f = d.final;
-    $("inf-aviso").textContent = (f ? "🏁 " + (f.ganador === "empate" ? "Empate" : "Gana " + f.ganador.toUpperCase()) +
+    $("inf-aviso").textContent = (f ? (f.ganador === "empate" ? "Empate" : "Gana " + f.ganador.toUpperCase()) +
       " · " + f.puntos_rojo + "-" + f.puntos_azul + " · resultado guardado en el servidor. " : "Partida " +
       String(d.fase).replace("_", " ") + ": cálculo en vivo con el estado actual. ") + d.formula_ganador;
-    eqs.append(tablaEquipo("🔴 Equipo Rojo", "rojo", d.rojo), tablaEquipo("🔵 Equipo Azul" + (d.usuario_azul ? " (" + d.usuario_azul + ")" : ""), "azul", d.azul));
+    eqs.append(tablaEquipo("Equipo Rojo", "rojo", d.rojo), tablaEquipo("Equipo Azul" + (d.usuario_azul ? " (" + d.usuario_azul + ")" : ""), "azul", d.azul));
     const r = d.riesgo;
     const sr = el("section");
     sr.append(el("b", null, "Riesgo final: " + Math.round(r.final) + "/100"), el("p", "muted", r.explicacion));
@@ -1236,9 +1257,9 @@ const R = (() => {
       return s;
     };
     m.append(
-      item("mp-rojo-eq", "🔴 Rojo", d.puntos_rojo + " pts · " + d.rojo_enlaces_sin_contener + " enlaces / " +
+      item("mp-rojo-eq", "Rojo", d.puntos_rojo + " pts · " + d.rojo_enlaces_sin_contener + " enlaces / " +
         d.rojo_pdfs_sin_reportar + " PDF" + (d.rojo_credenciales_sin_revocar ? " / " + d.rojo_credenciales_sin_revocar + " cred." : "")),
-      item("mp-azul", "🔵 Azul" + (d.usuario_azul ? " (" + d.usuario_azul + ")" : ""),
+      item("mp-azul", "Azul" + (d.usuario_azul ? " (" + d.usuario_azul + ")" : ""),
         d.puntos_azul + " pts · " + d.misiones_completadas + "/" + d.misiones_total + " misiones"),
       item("mp-riesgo mp-" + zona, "Riesgo", r + "/100"),
       item(null, "Clics", d.clics), item(null, "Contenciones", d.contenciones),
@@ -1247,7 +1268,7 @@ const R = (() => {
       ...(d.incidentes_abiertos ? [item(null, "Incidentes", d.incidentes_abiertos)] : []),
       ...(d.ataques_ia ? [item(null, "Ataques IA", d.ataques_ia + " · Rojo +" + d.puntos_rojo_ia + " / Azul +" + d.puntos_azul_ia)] : []),
       item(null, "Accesos de Rojo denegados", d.denegaciones_rojo));
-    if (d.final) m.prepend(item("mp-final", "🏁 FINAL", d.final.ganador === "empate" ? "EMPATE" : "GANA " + d.final.ganador.toUpperCase()));
+    if (d.final) m.prepend(item("mp-final", "FINAL", d.final.ganador === "empate" ? "EMPATE" : "GANA " + d.final.ganador.toUpperCase()));
   }
 
   // Pantalla de resultado (general / espectador). marcador = marcador congelado al finalizar.
@@ -1293,7 +1314,7 @@ const R = (() => {
     incidente_resuelto: "Se completa al resolver un incidente" };
 
   // acciones = {completar(id), asumir(id)}. Estado, plazo, dependencias y puntos los calcula el servidor.
-  const ETIQUETA_ESTADO = { completada: "✓ COMPLETADA", pendiente: "○ PENDIENTE", bloqueada: "🔒 BLOQUEADA",
+  const ETIQUETA_ESTADO = { completada: "COMPLETADA", pendiente: "○ PENDIENTE", bloqueada: "BLOQUEADA",
     vencida: "⌛ FUERA DE PLAZO (vale la mitad)" };
   function setMisiones(d, acciones) {
     const hechas = d.misiones.filter((m) => m.estado === "completada").length;
@@ -1316,7 +1337,7 @@ const R = (() => {
       }
       det.append(el("span", null, CONDICION[m.condicion_evento] || m.condicion_evento));
       if (m.requiere && m.requiere.length) det.append(el("span", "requiere", "Requiere: " + m.requiere.join(", ")));
-      if (m.responsable && !hecha) det.append(el("span", "responsable", "👤 Responsable: " + m.responsable));
+      if (m.responsable && !hecha) det.append(el("span", "responsable", "Responsable: " + m.responsable));
       const pts = hecha ? "+" + m.puntos_obtenidos + " pts" + (m.a_tiempo === false ? " (fuera de plazo)" : "")
         : m.puntos + " pts";
       li.append(el("b", null, m.titulo), el("span", "pts", pts), det);
@@ -1326,7 +1347,7 @@ const R = (() => {
           (m.ts ? " · " + fechaCorta(m.ts) : "") + (m.evidencia ? " · evidencia: " + m.evidencia : "")));
       } else if (acciones) {
         const b = el("div", "mision-botones");
-        if (m.responsable !== yo) b.append(botonAccion("👤 Asumir", "", false, "", () => acciones.asumir(m.id)));
+        if (m.responsable !== yo) b.append(botonAccion("Asumir", "", false, "", () => acciones.asumir(m.id)));
         if (m.condicion_evento === "manual") {
           b.append(botonAccion("Marcar completada", "", m.estado === "bloqueada", "Bloqueada", () => acciones.completar(m.id)));
         }
@@ -1337,19 +1358,19 @@ const R = (() => {
   }
 
   // ---------- incidentes y credencial ficticia (Fase E) ----------
-  const ESTADO_CRED = { segura: ["✓ SEGURA", "cred-segura"], comprometida: ["⚠ COMPROMETIDA", "cred-comprometida"],
-    revocada: ["✓ REVOCADA (contraseña cambiada)", "cred-revocada"] };
+  const ESTADO_CRED = { segura: ["SEGURA", "cred-segura"], comprometida: ["COMPROMETIDA", "cred-comprometida"],
+    revocada: ["REVOCADA (contraseña cambiada)", "cred-revocada"] };
   function setCredencial(c, onRevocar) {
     const s = $("credencial");
     s.replaceChildren();
     const [txt, cls] = ESTADO_CRED[c.estado] || [c.estado, ""];
     s.className = "credencial " + cls;
-    s.append(el("b", null, "🔑 " + (c.cuenta || "Credencial ficticia")), el("span", "cred-estado", txt));
+    s.append(el("b", null, (c.cuenta || "Credencial ficticia")), el("span", "cred-estado", txt));
     const ult = (c.historial || [])[0];
     if (c.estado === "comprometida" && ult) {
       s.append(el("p", null, "Se entregó en la página falsa del correo «" + ult.asunto + "» (" + fechaCorta(ult.ts) +
         "). Contener el enlace no basta: hay que revocarla."));
-      s.append(botonAccion("🔒 Revocar credencial", "btn-danger", false, "", onRevocar));
+      s.append(botonAccion("Revocar credencial", "btn-danger", false, "", onRevocar));
     } else if (c.estado === "revocada" && ult) {
       s.append(el("p", "muted", "Revocada por " + (ult.revocada_por || "—") + " · " + fechaCorta(ult.revocada_ts)));
     }
@@ -1368,7 +1389,7 @@ const R = (() => {
     sel.value = [...sel.options].some((o) => o.value === actual) ? actual : "";
   }
 
-  const ESTADO_INC = { abierto: "🟠 ABIERTO", en_investigacion: "🔎 EN INVESTIGACIÓN", resuelto: "✓ RESUELTO" };
+  const ESTADO_INC = { abierto: "ABIERTO", en_investigacion: "EN INVESTIGACIÓN", resuelto: "RESUELTO" };
   // acciones = {investigar(id), resolver(id, texto)}. La lista se redibuja con cada cambio (SSE): el texto de
   // resolución que se está escribiendo se guarda por incidente para no perderlo.
   const borradores = {};
@@ -1391,7 +1412,7 @@ const R = (() => {
       } else {
         if ((i.pendiente || []).length) li.append(el("p", "requiere", "Para resolverlo falta: " + i.pendiente.join("; ") + "."));
         const b = el("div", "mision-botones");
-        if (i.estado === "abierto") b.append(botonAccion("🔎 Investigar", "", false, "", () => acciones.investigar(i.id)));
+        if (i.estado === "abierto") b.append(botonAccion("Investigar", "", false, "", () => acciones.investigar(i.id)));
         if (i.estado === "en_investigacion") {
           const t = el("textarea", "sel");
           t.rows = 2;
@@ -1400,7 +1421,7 @@ const R = (() => {
           t.setAttribute("aria-label", "Resolución del incidente #" + i.id);
           t.value = borradores[i.id] || "";
           t.addEventListener("input", () => { borradores[i.id] = t.value; });
-          b.append(t, botonAccion("✓ Resolver", "btn-primary", false, "", () => acciones.resolver(i.id, t.value.trim())));
+          b.append(t, botonAccion("Resolver", "btn-primary", false, "", () => acciones.resolver(i.id, t.value.trim())));
         }
         li.append(b);
       }

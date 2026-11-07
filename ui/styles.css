@@ -1,17 +1,49 @@
+/* Pantalla de la partida · CyberShield
+   -------------------------------------------------------------------------------------------------------
+   Los tokens de diseño viven en tokens.css, que esta página carga ANTES que este archivo. Lo que hay aquí
+   abajo es el mapeo de las variables históricas de esta pantalla sobre esos tokens.
+
+   Por qué un mapeo y no un reemplazo masivo: los ~700 selectores de este archivo y los tres archivos de
+   JavaScript que los usan ya funcionan y están cubiertos por una E2E de navegador de 106 comprobaciones.
+   Reescribirlos para renombrar variables sería arriesgar la partida entera para no cambiar nada que se vea.
+   Mapeando, el lenguaje visual pasa a ser el mismo que el del panel sin tocar un solo selector.
+
+   Los dos colores de equipo (--atq rojo, --def azul) NO salen de la paleta neutra del panel: son
+   información, identifican a Rojo y a Azul, y tienen que distinguirse de un vistazo. Se armonizan con la
+   paleta (menos saturados que antes) pero siguen siendo propios.
+   ------------------------------------------------------------------------------------------------------- */
 :root {
-  --bg: #0e1621;
-  --panel: #151f2e;
-  --panel2: #1b283b;
-  --borde: #2a3a52;
-  --texto: #e3eaf3;
-  --texto-sec: #9fb0c5;
-  --atq: #ff7a6b;
-  --def: #4cc9e8;
-  --ok: #4cd08a;
-  --warn: #f2b84b;
-  --bad: #ff6464;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --bg:        var(--p-fondo);
+  --panel:     var(--p-superficie);
+  --panel2:    var(--p-superficie-2);
+  --panel3:    var(--p-superficie-3);
+  --borde:     var(--p-borde);
+  --borde-suave: var(--p-borde-suave);
+  --texto:     var(--p-texto);
+  --texto-sec: var(--p-texto-2);
+  --texto-ter: var(--p-texto-3);
+  --acento:    var(--p-acento);
+
+  /* Identidad de los equipos: rojo atacante, azul defensor. */
+  --atq: #e5565b;
+  --def: #4c8dff;
+  --atq-flojo: rgba(229, 86, 91, 0.14);
+  --def-flojo: rgba(76, 141, 255, 0.12);
+
+  --ok:   var(--p-ok);
+  --warn: var(--p-aviso);
+  --bad:  var(--p-error);
+  /* Reservado a datos que no son reales. Nunca se usa para un estado real. */
+  --simulado: var(--p-simulado);
+  --simulado-flojo: var(--p-simulado-flojo);
+
+  --mono: var(--p-mono);
+  --sans: var(--p-sans);
+  --r-sm: var(--p-r-sm);
+  --r-md: var(--p-r-md);
+  --r-lg: var(--p-r-lg);
+  --sombra: var(--p-sombra);
+  --transicion: var(--p-transicion);
 }
 
 * { box-sizing: border-box; }
@@ -743,3 +775,79 @@ body.escritorio .informe { max-height: none; }
   font-size: 11px; text-decoration: none; white-space: nowrap;
 }
 .enlace-panel:hover { color: var(--texto); border-color: var(--def); }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+   Lenguaje visual unificado con el panel (Fase G)
+   -------------------------------------------------------------------------------------------------------
+   Estas reglas van al final a propósito: refinan componentes que ya existen sin cambiar su selector ni su
+   estructura, de modo que el JavaScript y la E2E de navegador siguen viendo la misma página.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Iconos: SVG en línea del sprite de la página, nunca emojis ─────────────────────────────────────── */
+.ico {
+  width: 15px; height: 15px; flex: 0 0 auto;
+  vertical-align: -2px; display: inline-block;
+  color: currentColor;      /* hereda el color del texto: un icono nunca introduce un color propio */
+}
+h2 > .ico, h1 > .ico { width: 16px; height: 16px; }
+.btn > .ico { width: 14px; height: 14px; }
+
+/* ── Punto de estado: sustituye a los círculos de emoji. El color ES la información. ────────────────── */
+.pt {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block; vertical-align: 1px; flex: 0 0 auto;
+  background: var(--texto-ter);
+}
+.pt-rojo { background: var(--atq); }
+.pt-azul { background: var(--def); }
+.pt-ok { background: var(--ok); }
+.pt-aviso { background: var(--warn); }
+.pt-error { background: var(--bad); }
+/* Violeta apagado, reservado a datos que no son reales. No se usa en ningún estado real. */
+.pt-simulado { background: var(--simulado); }
+
+/* ── Tipografía: misma escala que el panel ──────────────────────────────────────────────────────────── */
+body { font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--texto-2, var(--texto)); }
+h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+
+/* ── Superficies: tres niveles, bordes de 1px, radios discretos, sin sombras marcadas ───────────────── */
+.hdr, .panel, .card, .caja, .modal, .dlg, .zona {
+  border-radius: var(--r-lg); box-shadow: none;
+}
+.hdr { box-shadow: var(--sombra); }
+
+/* ── Controles ──────────────────────────────────────────────────────────────────────────────────────── */
+.btn, .tab, .subtab, .tog, .carpeta {
+  border-radius: var(--r-md);
+  transition: background var(--transicion), border-color var(--transicion), color var(--transicion);
+}
+.btn:hover:not(:disabled), .tab:hover, .subtab:hover, .tog:hover, .carpeta:hover {
+  background: var(--panel3); border-color: var(--p-borde);
+}
+.tab[aria-selected="true"], .subtab[aria-selected="true"], .carpeta[aria-selected="true"] {
+  background: var(--p-acento-flojo); color: var(--texto); border-color: var(--acento);
+}
+.tog[aria-pressed="true"] { background: var(--p-acento-flojo); border-color: var(--acento); color: var(--texto); }
+:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+/* ── Indicadores de origen: el estado se lee por color Y por texto, no solo por color ───────────────── */
+.origen, .conn, .badge, .ollama-ind {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 999px; font-size: 11px; letter-spacing: .04em;
+}
+.origen-mock { color: var(--simulado); border-color: var(--simulado); background: var(--simulado-flojo); }
+.origen-real { color: var(--ok); border-color: var(--ok); background: var(--p-ok-flojo); }
+.origen-off { color: var(--bad); border-color: var(--bad); background: var(--p-error-flojo); }
+.origen-wait { color: var(--texto-ter); border-color: var(--borde); background: transparent; }
+/* MOCK es dato simulado: toma el violeta reservado, no el ámbar de «aviso». Así nunca se confunde un
+   dato de prueba con una advertencia de algo real. */
+.origen-mock .pt-aviso { background: var(--simulado); }
+
+/* ── Identidad de los equipos ───────────────────────────────────────────────────────────────────────── */
+.atq, .final-rojo, .final-eq.final-rojo { --equipo: var(--atq); }
+.def, .final-azul, .final-eq.final-azul { --equipo: var(--def); }
+.final-eq { border-left: 3px solid var(--equipo, var(--borde)); padding-left: 10px; }
+
+/* ── Enlace al panel de análisis: ya existía; aquí solo se alinea con el resto ──────────────────────── */
+.enlace-panel { border-radius: var(--r-md); }

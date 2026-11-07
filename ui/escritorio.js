@@ -24,7 +24,7 @@
   lnk.className = "lnk";
   lnk.id = "lnk-vista";
   lnk.href = "#";
-  lnk.textContent = quiereEscritorio ? "☰ Vista clásica" : "🖥 Vista escritorio";
+  lnk.textContent = quiereEscritorio ? "Vista clásica" : "Vista escritorio";
   lnk.addEventListener("click", (ev) => {
     ev.preventDefault();
     LS.set("cs_vista", quiereEscritorio ? "clasica" : "escritorio");
@@ -53,38 +53,38 @@
     // ---------- catálogo de ventanas (paneles existentes) y de accesos directos ----------
     // abierta: en qué vistas arranca abierta la ventana (el resto queda como icono).
     const VENTANAS = [
-      { id: "atacante", titulo: "IA Atacante", icono: "🗡️", sel: "section.panel.atq", abierta: ["rojo", "general", "espectador", ""] },
-      { id: "control", titulo: "Centro de control", icono: "🎛️", sel: "section.panel.ctr", abierta: ["rojo", "azul", "general", "espectador", ""] },
-      { id: "defensor", titulo: "IA Defensora", icono: "🛡️", sel: "section.panel.def", abierta: ["azul", "general", "espectador", ""] },
-      { id: "batalla", titulo: "Batalla de la partida", icono: "⚔️", sel: "section.panel.bpartida", abierta: ["rojo", "azul", "general", "espectador", ""] },
+      { id: "atacante", titulo: "IA Atacante", icono: "", sel: "section.panel.atq", abierta: ["rojo", "general", "espectador", ""] },
+      { id: "control", titulo: "Centro de control", icono: "", sel: "section.panel.ctr", abierta: ["rojo", "azul", "general", "espectador", ""] },
+      { id: "defensor", titulo: "IA Defensora", icono: "", sel: "section.panel.def", abierta: ["azul", "general", "espectador", ""] },
+      { id: "batalla", titulo: "Batalla de la partida", icono: "", sel: "section.panel.bpartida", abierta: ["rojo", "azul", "general", "espectador", ""] },
       // Resultados: flotante y más grande (tablas y cronología); se abre desde su icono o desde la pantalla final.
-      { id: "resultados", titulo: "Resultados", icono: "📊", sel: "section.panel.informe", abierta: [], flotante: true, tam: [780, 540] },
+      { id: "resultados", titulo: "Resultados", icono: "", sel: "section.panel.informe", abierta: [], flotante: true, tam: [780, 540] },
       // Fase B: aplicaciones por permiso (flotantes; empiezan cerradas). Qué equipo ve cada una lo dice /api/apps.
-      { id: "archivos", titulo: "Archivos", icono: "🗂️", sel: "section.panel.archivos", abierta: [], flotante: true, tam: [620, 480] },
-      { id: "seguridad", titulo: "Seguridad", icono: "🔐", sel: "section.panel.seguridad", abierta: [], flotante: true, tam: [700, 560] },
-      { id: "incidentes", titulo: "Incidentes", icono: "🚨", sel: "section.panel.incidentes-gen", abierta: [], flotante: true,
+      { id: "archivos", titulo: "Archivos", icono: "", sel: "section.panel.archivos", abierta: [], flotante: true, tam: [620, 480] },
+      { id: "seguridad", titulo: "Seguridad", icono: "", sel: "section.panel.seguridad", abierta: [], flotante: true, tam: [700, 560] },
+      { id: "incidentes", titulo: "Incidentes", icono: "", sel: "section.panel.incidentes-gen", abierta: [], flotante: true,
         tam: [600, 460], roles: ["general", "espectador", ""] },
-      { id: "recursos", titulo: "Recursos", icono: "🏢", sel: "section.panel.recursos", abierta: [], flotante: true, tam: [720, 380] },
-      { id: "ayuda", titulo: "Ayuda", icono: "❓", sel: "section.panel.ayuda", abierta: [], flotante: true, tam: [760, 560] },
-      { id: "auditoria", titulo: "Auditoría", icono: "📜", sel: "section.panel.aud", abierta: ["rojo", "azul", "general", "espectador", ""], minH: 100 },
+      { id: "recursos", titulo: "Recursos", icono: "", sel: "section.panel.recursos", abierta: [], flotante: true, tam: [720, 380] },
+      { id: "ayuda", titulo: "Ayuda", icono: "", sel: "section.panel.ayuda", abierta: [], flotante: true, tam: [760, 560] },
+      { id: "auditoria", titulo: "Auditoría", icono: "", sel: "section.panel.aud", abierta: ["rojo", "azul", "general", "espectador", ""], minH: 100 },
       // Buzón: la MISMA tarjeta del modal (render.js delega abrir/cerrar en esta ventana con R.alojarBuzon).
       // Se abre desde el acceso «Correo/Buzón» (que carga los datos), nunca sola al recargar, y flota fuera del mosaico.
-      { id: "buzon", titulo: rol === "azul" ? "Buzón" : "Correo", icono: "📬", sel: "#buzon-modal .buzon-card",
+      { id: "buzon", titulo: rol === "azul" ? "Buzón" : "Correo", icono: "", sel: "#buzon-modal .buzon-card",
         abierta: [], roles: ["rojo", "azul"], sinIcono: true, efimera: true, flotante: true, tam: [680, 560] },
     ].filter((d) => !d.roles || d.roles.includes(rol));
     // Accesos directos: reutilizan los botones y modales que ya existen (mismo código, mismos permisos).
     const ACCESOS = [
-      { id: "correo", titulo: rol === "azul" ? "Buzón" : "Correo", icono: "📬", roles: ["rojo", "azul"],
+      { id: "correo", titulo: rol === "azul" ? "Buzón" : "Correo", icono: "", roles: ["rojo", "azul"],
         ayuda: rol === "azul" ? "Abrir el buzón de correos de entrenamiento" : "Enviar un correo de entrenamiento al Equipo Azul",
         accion: () => pulsar("btn-buzon", "Tu vista aún no tiene token de equipo.") },
-      { id: "misiones", titulo: "Misiones", icono: "🎯", roles: ["azul"],
+      { id: "misiones", titulo: "Misiones", icono: "", roles: ["azul"],
         ayuda: "Ver el progreso de las misiones del Equipo Azul",
         accion: () => { if (pulsar("btn-buzon", "Tu vista aún no tiene token de equipo.")) clicEn('[data-azul="misiones"]'); } },
       // Azul gestiona los incidentes en su buzón (pestaña Incidentes); General los supervisa en su propia ventana.
-      { id: "incidentes", titulo: "Incidentes", icono: "🚨", roles: ["azul"],
+      { id: "incidentes", titulo: "Incidentes", icono: "", roles: ["azul"],
         ayuda: "Abrir, investigar y resolver incidentes",
         accion: () => { if (pulsar("btn-buzon", "Tu vista aún no tiene token de equipo.")) clicEn('[data-azul="incidentes"]'); } },
-      { id: "finalizar", titulo: "Finalizar partida", icono: "🏁", roles: ["general"],
+      { id: "finalizar", titulo: "Finalizar partida", icono: "", roles: ["general"],
         ayuda: "Finalizar la partida: congela los puntajes y muestra el resultado",
         accion: () => pulsar("btn-finalizar", "Solo el árbitro puede finalizar, y solo con la partida en curso.") },
     ];
@@ -169,7 +169,7 @@
       };
       const minimizar = boton("ventana-minimizar", "–", "Minimizar");
       const maximizar = boton("ventana-maximizar", "□", "Maximizar");
-      const cerrar = boton("ventana-cerrar", "✕", "Cerrar");
+      const cerrar = boton("ventana-cerrar", "", "Cerrar");
       const botones = document.createElement("span");
       botones.className = "ventana-botones";
       botones.append(minimizar, maximizar, cerrar);
@@ -213,7 +213,7 @@
       m.style.width = (L ? L.w : v.w) + "px";
       m.style.height = (L ? L.h : v.h) + "px";
       m.classList.toggle("maximizada", v.maximizada);
-      v.btnMax.textContent = v.maximizada ? "❐" : "□";
+      v.btnMax.textContent = v.maximizada ? "" : "□";
       v.btnMax.title = v.maximizada ? "Restaurar" : "Maximizar";
       v.btnMax.setAttribute("aria-label", (v.maximizada ? "Restaurar " : "Maximizar ") + v.def.titulo);
       m.hidden = !v.abierta || v.minimizada;

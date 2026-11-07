@@ -4,9 +4,32 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Security Laboratory</title>
+<link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
+  <g id="i-cambiar"><path d="M4 8h13l-3-3M20 16H7l3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-correo"><rect x="3" y="5.5" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m3.5 7 8.5 6 8.5-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></g>
+  <g id="i-aviso-campana"><path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 13 6 9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 18a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.6"/></g>
+  <g id="i-bandera"><path d="M6 3v18M6 4h11l-2 4 2 4H6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></g>
+  <g id="i-refrescar"><path d="M20 11a8 8 0 1 0-1.5 6M20 5v6h-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-documento"><path d="M6 3h8l4 4v14H6V3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v4h4M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+  <g id="i-aviso"><path d="M12 3.5 2.8 20h18.4L12 3.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 9.5v4.5M12 17.2v.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></g>
+  <g id="i-combate"><path d="M4 4l10 10M4 8V4h4M20 4L10 14M20 8V4h-4M6.5 16.5l3 3M17.5 16.5l-3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-escudo"><path d="M12 3 5 5.6v5.9c0 4.2 2.9 7.6 7 9.5 4.1-1.9 7-5.3 7-9.5V5.6L12 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></g>
+  <g id="i-grafica"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+  <g id="i-descargar"><path d="M12 4v10M8 10.5l4 4 4-4M4.5 19.5h15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-archivos"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h5L11 8h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></g>
+  <g id="i-candado"><rect x="5" y="10.5" width="14" height="9.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="1.6"/></g>
+  <g id="i-sirena"><path d="M7 19v-6a5 5 0 0 1 10 0v6M4.5 19.5h15M12 4V2M5.5 6 4 4.6M18.5 6 20 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-edificio"><path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h7A1.5 1.5 0 0 1 15 4.5V21M15 9h3.5A1.5 1.5 0 0 1 20 10.5V21M3 21h18M8 7h4M8 11h4M8 15h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-ayuda"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9.5 9.3a2.6 2.6 0 1 1 3.4 2.5c-.6.2-.9.7-.9 1.4v.5M12 16.6v.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+  <g id="i-entrada"><path d="M4 13v5.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V13h-5l-1.5 2.5h-3L9 13H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 4v7M9 8.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-salida"><path d="M4 13v5.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V13h-5l-1.5 2.5h-3L9 13H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 11V4M9 6.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-archivador"><rect x="3.5" y="4" width="17" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9M10 13h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+  <g id="i-ojo"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" stroke-width="1.6"/></g>
+</defs></svg>
 <div class="app">
 
   <header class="hdr">
@@ -14,18 +37,13 @@
       <!-- 1. Identidad y estado -->
       <div class="hdr-grupo hdr-identidad">
         <h1>AI SECURITY LABORATORY</h1>
-        <span class="tag-lab">LABORATORIO LOCAL · DATOS FICTICIOS</span>
-        <span id="conn" class="conn conn-warn" role="status">
-          <span id="conn-ico" aria-hidden="true">◐</span><span id="conn-txt">Reconectando…</span>
-        </span>
-        <span id="equipo-tag" class="equipo-tag eq-ninguno" title="Equipo de esta sesión">SIN EQUIPO</span>
-        <span id="partida-estado" class="partida-estado pe-preparacion" role="status" title="Estado de la partida (lo cuenta el servidor)">PREPARACIÓN</span>
-      </div>
+        <span class="tag-lab">LABORATORIO LOCAL · DATOS FICTICIOS</span> <span id="conn" class="conn conn-warn" role="status">
+          <span id="conn-ico" aria-hidden="true">◐</span><span id="conn-txt">Reconectando…</span> </span> <span id="equipo-tag" class="equipo-tag eq-ninguno" title="Equipo de esta sesión">SIN EQUIPO</span> <span id="partida-estado" class="partida-estado pe-preparacion" role="status" title="Estado de la partida (lo cuenta el servidor)">PREPARACIÓN</span> </div>
       <!-- 2. Acciones de la sesión (escritorio.js añade «Vista clásica» tras «Cambiar de equipo») -->
       <div class="hdr-grupo hdr-acciones">
-        <a id="lnk-equipo" class="lnk" href="?cambiar=1">⇄ Cambiar de equipo</a>
-        <button type="button" id="btn-buzon" class="btn btn-mini" aria-haspopup="dialog">✉ CORREOS</button>
-        <button type="button" id="btn-notif" class="btn btn-mini" aria-haspopup="dialog" aria-expanded="false" aria-controls="notif-panel" title="Notificaciones de la partida">🔔 <b id="notif-cuenta" class="notif-cuenta" hidden></b></button>
+        <a id="lnk-equipo" class="lnk" href="?cambiar=1"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cambiar"></use></svg> Cambiar de equipo</a>
+        <button type="button" id="btn-buzon" class="btn btn-mini" aria-haspopup="dialog"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-correo"></use></svg> CORREOS</button>
+        <button type="button" id="btn-notif" class="btn btn-mini" aria-haspopup="dialog" aria-expanded="false" aria-controls="notif-panel" title="Notificaciones de la partida"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-aviso-campana"></use></svg> <b id="notif-cuenta" class="notif-cuenta" hidden></b></button>
         <label id="duracion-wrap" class="rondas" title="Duración de la partida (la cuenta el servidor)">Duración
           <select id="sel-duracion" class="sel" aria-label="Duración de la partida">
             <option value="5">5 min</option>
@@ -34,16 +52,13 @@
           </select>
         </label>
         <button type="button" id="btn-iniciar-partida" class="btn btn-mini btn-primary" title="Empieza la partida: desde ahora cuentan correos, clics, reportes y misiones">▶ INICIAR PARTIDA</button>
-        <button type="button" id="btn-finalizar" class="btn btn-mini btn-danger" title="Congela los puntajes de Rojo y Azul y declara el ganador">🏁 FINALIZAR PARTIDA</button>
-        <button type="button" id="btn-nueva-partida" class="btn btn-mini" title="Prepara otra partida con los mismos participantes">↻ NUEVA PARTIDA</button>
+        <button type="button" id="btn-finalizar" class="btn btn-mini btn-danger" title="Congela los puntajes de Rojo y Azul y declara el ganador"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bandera"></use></svg> FINALIZAR PARTIDA</button>
+        <button type="button" id="btn-nueva-partida" class="btn btn-mini" title="Prepara otra partida con los mismos participantes"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refrescar"></use></svg> NUEVA PARTIDA</button>
       </div>
       <!-- 3. Marcadores -->
       <div class="hdr-grupo hdr-marcadores">
-        <span id="marcador" class="marcador" role="status" aria-live="polite" title="Marcador de la batalla IA vs IA: atacante — defensor (no es la partida Rojo/Azul del buzón)">🔴 0 — 0 🔵</span>
-        <span id="demo-tag" class="demo-tag" hidden>DEMOSTRACIÓN · NO SUMA AL MARCADOR (admin: acceso legítimo por diseño)</span>
-      </div>
-      <span id="marcador-partida" class="marcador-partida" role="status" aria-live="polite" hidden title="Partida Rojo/Azul del buzón: puntos de misiones de Azul, riesgo acumulado y eventos clave"></span>
-      <!-- Único cambio en esta interfaz: el acceso al panel de análisis (dashboard, experimentos, SOC,
+        <span id="marcador" class="marcador" role="status" aria-live="polite" title="Marcador de la batalla IA vs IA: atacante — defensor (no es la partida Rojo/Azul del buzón)"><span class="pt pt-rojo" aria-hidden="true"></span> 0 — 0 <span class="pt pt-azul" aria-hidden="true"></span></span> <span id="demo-tag" class="demo-tag" hidden>DEMOSTRACIÓN · NO SUMA AL MARCADOR (admin: acceso legítimo por diseño)</span> </div>
+      <span id="marcador-partida" class="marcador-partida" role="status" aria-live="polite" hidden title="Partida Rojo/Azul del buzón: puntos de misiones de Azul, riesgo acumulado y eventos clave"></span> <!-- Único cambio en esta interfaz: el acceso al panel de análisis (dashboard, experimentos, SOC,
            cronología y correlación). Sin él la funcionalidad nueva no sería alcanzable desde la app. -->
       <a id="enlace-panel" class="enlace-panel" href="/panel/" title="Panel de operaciones y análisis: experimentos, RAG, harness, SOC, cronología y correlación">Panel de análisis</a>
     </div>
@@ -53,8 +68,7 @@
         <button type="button" role="tab" class="tab" data-modo="manual" aria-selected="false">PRUEBA MANUAL</button>
         <button type="button" role="tab" class="tab" data-modo="batalla" aria-selected="false">BATALLA IA VS IA</button>
       </div>
-      <span id="origen" class="origen origen-mock" role="status" title="Origen de los datos del modo activo">🟡 MOCK</span>
-      <div class="actions">
+      <span id="origen" class="origen origen-mock" role="status" title="Origen de los datos del modo activo"><span class="pt pt-aviso" aria-hidden="true"></span> MOCK</span> <div class="actions">
         <label id="usuario-wrap" class="rondas" hidden title="El rol lo fija el sistema, nunca el prompt">Sesión (rol fijado por el sistema)
           <select id="sel-usuario" class="sel" aria-label="Usuario de la sesión"></select>
         </label>
@@ -86,8 +100,7 @@
         <label id="rondas-wrap" class="rondas" hidden>Rondas
           <input id="rondas" type="number" min="1" max="50" value="6">
         </label>
-        <span id="main-wrap"><button type="button" id="btn-main" class="btn btn-primary">INICIAR SIMULACIÓN</button></span>
-        <button type="button" id="btn-stop" class="btn btn-danger" disabled>DETENER</button>
+        <span id="main-wrap"><button type="button" id="btn-main" class="btn btn-primary">INICIAR SIMULACIÓN</button></span> <button type="button" id="btn-stop" class="btn btn-danger" disabled>DETENER</button>
       </div>
     </div>
   </header>
@@ -99,16 +112,14 @@
       <div class="kv">Modelo <b id="atq-modelo">—</b></div>
       <div id="sel-atq-box" class="sel-box" hidden>
         <label>Modelo del atacante <select id="sel-atq" class="sel" aria-label="Modelo del atacante"></select></label>
-        <button type="button" class="btn btn-mini" data-refrescar>↻ Actualizar modelos</button>
-        <span class="ollama-ind ind-wait" data-ollama-ind="atq" role="status">COMPROBANDO OLLAMA…</span>
-        <label class="host">IP Ollama del equipo rojo
+        <button type="button" class="btn btn-mini" data-refrescar><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refrescar"></use></svg> Actualizar modelos</button>
+        <span class="ollama-ind ind-wait" data-ollama-ind="atq" role="status">COMPROBANDO OLLAMA…</span> <label class="host">IP Ollama del equipo rojo
           <input id="host-atq" class="sel mono" type="text" spellcheck="false" autocomplete="off" value="http://localhost:11434" aria-label="IP de Ollama del equipo rojo">
         </label>
         <button type="button" class="btn btn-mini" data-probar="atq">Probar conexión</button>
         <button type="button" class="btn btn-mini" data-probar-modelo="atq" title="Hace una llamada mínima real al modelo seleccionado (fuerza su carga inicial)">Probar modelo</button>
-        <span id="probe-atq" class="probe-res" aria-live="polite"></span>
-      </div>
-      <div id="ro-atq" class="ro-modelo mono" hidden>Modelo del equipo rojo (solo lectura): <b id="ro-atq-txt">🔴 pendiente · lo configura el equipo rojo</b></div>
+        <span id="probe-atq" class="probe-res" aria-live="polite"></span> </div>
+      <div id="ro-atq" class="ro-modelo mono" hidden>Modelo del equipo rojo (solo lectura): <b id="ro-atq-txt"><span class="pt pt-rojo" aria-hidden="true"></span> pendiente · lo configura el equipo rojo</b></div>
 
       <div id="atq-vista">
         <div class="lbl">PROMPT ACTUAL</div>
@@ -121,8 +132,8 @@
       <div id="term" hidden>
         <div class="lbl">TERMINAL DE PRUEBA MANUAL</div>
         <div class="tog-grupo" role="group" aria-label="Origen de la prueba manual">
-          <button type="button" class="tog" data-origen="mock" aria-pressed="true">🟡 MOCK</button>
-          <button type="button" class="tog" data-origen="real" aria-pressed="false">🟢 REAL (Ollama)</button>
+          <button type="button" class="tog" data-origen="mock" aria-pressed="true"><span class="pt pt-aviso" aria-hidden="true"></span> MOCK</button>
+          <button type="button" class="tog" data-origen="real" aria-pressed="false"><span class="pt pt-ok" aria-hidden="true"></span> REAL (Ollama)</button>
         </div>
         <div id="term-log" class="mono term-log" role="log" aria-live="polite" data-vacio="Escribe un prompt abajo y pulsa Enter para probar al defensor."></div>
         <form id="term-form" class="term-form" autocomplete="off">
@@ -143,16 +154,13 @@
     <section class="panel ctr" aria-labelledby="t-ctr">
       <h2 id="t-ctr">CENTRO DE CONTROL</h2>
       <div class="ronda">
-        <span class="lbl">RONDA</span>
-        <span id="ronda-num" class="ronda-num">00</span>
-        <span id="ronda-esc" class="muted"></span>
-      </div>
+        <span class="lbl">RONDA</span> <span id="ronda-num" class="ronda-num">00</span> <span id="ronda-esc" class="muted"></span> </div>
       <ol id="pipeline" class="pipeline" aria-label="Pipeline de defensa"></ol>
       <div id="veredicto" class="veredicto" aria-live="polite">SIN EVALUAR</div>
       <div class="hist-head">
         <h3>HISTORIAL DE RONDAS</h3>
         <button type="button" id="btn-export" class="btn btn-mini">Exportar historial (JSON)</button>
-        <button type="button" id="btn-informe" class="btn btn-mini" disabled title="Disponible al terminar una partida">📄 Exportar informe de sesión</button>
+        <button type="button" id="btn-informe" class="btn btn-mini" disabled title="Disponible al terminar una partida"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-documento"></use></svg> Exportar informe de sesión</button>
       </div>
       <ul id="historial" class="historial" data-vacio="Aún no hay rondas: inicia una simulación o una batalla."></ul>
     </section>
@@ -162,16 +170,14 @@
       <div class="kv">Modelo <b id="def-modelo">—</b></div>
       <div id="sel-def-box" class="sel-box" hidden>
         <label>Modelo del defensor <select id="sel-def" class="sel" aria-label="Modelo del defensor"></select></label>
-        <button type="button" class="btn btn-mini" data-refrescar>↻ Actualizar modelos</button>
-        <span class="ollama-ind ind-wait" data-ollama-ind="def" role="status">COMPROBANDO OLLAMA…</span>
-        <label class="host">IP Ollama del equipo azul
+        <button type="button" class="btn btn-mini" data-refrescar><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refrescar"></use></svg> Actualizar modelos</button>
+        <span class="ollama-ind ind-wait" data-ollama-ind="def" role="status">COMPROBANDO OLLAMA…</span> <label class="host">IP Ollama del equipo azul
           <input id="host-def" class="sel mono" type="text" spellcheck="false" autocomplete="off" value="http://localhost:11434" aria-label="IP de Ollama del equipo azul">
         </label>
         <button type="button" class="btn btn-mini" data-probar="def">Probar conexión</button>
         <button type="button" class="btn btn-mini" data-probar-modelo="def" title="Hace una llamada mínima real al modelo seleccionado (fuerza su carga inicial)">Probar modelo</button>
-        <span id="probe-def" class="probe-res" aria-live="polite"></span>
-      </div>
-      <div id="ro-def" class="ro-modelo mono" hidden>Modelo del equipo azul (solo lectura): <b id="ro-def-txt">🔴 pendiente · lo configura el equipo azul</b></div>
+        <span id="probe-def" class="probe-res" aria-live="polite"></span> </div>
+      <div id="ro-def" class="ro-modelo mono" hidden>Modelo del equipo azul (solo lectura): <b id="ro-def-txt"><span class="pt pt-rojo" aria-hidden="true"></span> pendiente · lo configura el equipo azul</b></div>
       <div class="gauge-wrap">
         <svg id="gauge" class="gauge g-ok" viewBox="0 0 200 120" role="img" aria-label="Medidor de riesgo">
           <path d="M 20 100 A 80 80 0 0 1 180 100" pathLength="100" class="g-fondo"/>
@@ -190,13 +196,13 @@
         <dt>Herramienta usada</dt><dd id="def-herr">—</dd>
         <dt>Tiempo</dt><dd id="def-tiempo">—</dd>
       </dl>
-      <div id="def-parse" class="aviso" hidden>⚠ respuesta del modelo no estructurada</div>
+      <div id="def-parse" class="aviso" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-aviso"></use></svg> respuesta del modelo no estructurada</div>
     </section>
   </main>
 
   <!-- Fase F: batalla integrada en la partida. Rojo lanza ataques IA cuando quiere; el defensor de Azul responde siempre. -->
   <section class="panel bpartida" aria-labelledby="t-bp">
-    <h2 id="t-bp">⚔ BATALLA DE LA PARTIDA <span id="bp-cupo" class="badge">0/8 ataques</span></h2>
+    <h2 id="t-bp"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-combate"></use></svg> BATALLA DE LA PARTIDA <span id="bp-cupo" class="badge">0/8 ataques</span></h2>
     <div class="bp-cab">
       <div class="kv">Defensor IA de Azul <b id="bp-defensor">—</b></div>
       <div class="kv">La IA de Rojo ataca como <b id="bp-identidad">—</b></div>
@@ -207,27 +213,26 @@
       <label>Intensidad <select id="bp-intensidad" class="sel" aria-label="Intensidad del ataque IA">
         <option value="1">1 · directo</option><option value="2" selected>2 · contexto y rol</option><option value="3">3 · sofisticado</option>
       </select></label>
-      <button type="submit" id="bp-lanzar" class="btn btn-primary btn-mini" title="Usa el modelo y la Ollama de la ventana IA Atacante">⚔ LANZAR ATAQUE IA</button>
+      <button type="submit" id="bp-lanzar" class="btn btn-primary btn-mini" title="Usa el modelo y la Ollama de la ventana IA Atacante"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-combate"></use></svg> LANZAR ATAQUE IA</button>
     </form>
     <div id="bp-azul" class="bp-form" hidden>
-      <button type="button" id="bp-defender" class="btn btn-mini" title="Usa el modelo y la Ollama de la ventana IA Defensora; el servidor comprueba que existen">🛡 USAR MI MODELO COMO DEFENSOR</button>
-      <span class="muted">El defensor responde solo a cada ataque: no hay que aceptar nada.</span>
-    </div>
+      <button type="button" id="bp-defender" class="btn btn-mini" title="Usa el modelo y la Ollama de la ventana IA Defensora; el servidor comprueba que existen"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-escudo"></use></svg> USAR MI MODELO COMO DEFENSOR</button>
+      <span class="muted">El defensor responde solo a cada ataque: no hay que aceptar nada.</span> </div>
     <div id="bp-encurso" class="bp-encurso" role="status" aria-live="polite"><span class="muted">Sin ataque en curso.</span></div>
     <ol id="bp-lista" class="bp-lista" data-vacio="Aún no hay ataques IA en esta partida."></ol>
   </section>
 
   <!-- Fase G: resultados con fórmulas y cronología filtrable (datos guardados en el servidor) -->
   <section class="panel informe" aria-labelledby="t-inf">
-    <h2 id="t-inf">📊 RESULTADOS Y CRONOLOGÍA <span id="inf-partida" class="badge">—</span></h2>
+    <h2 id="t-inf"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-grafica"></use></svg> RESULTADOS Y CRONOLOGÍA <span id="inf-partida" class="badge">—</span></h2>
     <div class="inf-barra">
       <div class="tabs" role="tablist" aria-label="Resultados o cronología">
         <button type="button" role="tab" class="tab" data-inf="resultados" aria-selected="true">RESULTADOS</button>
         <button type="button" role="tab" class="tab" data-inf="cronologia" aria-selected="false">CRONOLOGÍA</button>
       </div>
       <label>Partida <select id="inf-sel-partida" class="sel" aria-label="Partida"></select></label>
-      <button type="button" id="inf-actualizar" class="btn btn-mini">↻ Actualizar</button>
-      <button type="button" id="inf-exportar" class="btn btn-mini" title="Resultados y cronología tal como los devuelve el servidor">⬇ Exportar informe (JSON)</button>
+      <button type="button" id="inf-actualizar" class="btn btn-mini"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refrescar"></use></svg> Actualizar</button>
+      <button type="button" id="inf-exportar" class="btn btn-mini" title="Resultados y cronología tal como los devuelve el servidor"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-descargar"></use></svg> Exportar informe (JSON)</button>
     </div>
     <div id="inf-resultados" role="tabpanel">
       <p id="inf-aviso" class="muted" aria-live="polite"></p>
@@ -248,12 +253,12 @@
 
   <!-- Fase B: aplicaciones del escritorio por permiso (solo en la vista escritorio; el catálogo lo da el servidor) -->
   <section class="panel app-ventana archivos" aria-labelledby="t-arch">
-    <h2 id="t-arch">🗂️ ARCHIVOS <span id="arch-permiso" class="badge"></span></h2>
+    <h2 id="t-arch"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-archivos"></use></svg> ARCHIVOS <span id="arch-permiso" class="badge"></span></h2>
     <p id="arch-info" class="muted"></p>
     <ul id="arch-lista" class="app-lista" data-vacio="No hay adjuntos en esta partida."></ul>
   </section>
   <section class="panel app-ventana seguridad" aria-labelledby="t-seg">
-    <h2 id="t-seg">🔐 SEGURIDAD <span id="seg-permiso" class="badge"></span></h2>
+    <h2 id="t-seg"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-candado"></use></svg> SEGURIDAD <span id="seg-permiso" class="badge"></span></h2>
     <div id="seg-resumen" class="seg-resumen"></div>
     <h3>QUÉ FALTA (DE LO MÁS GRAVE A LO MENOS)</h3>
     <ul id="seg-recos" class="app-lista" data-vacio="Nada pendiente."></ul>
@@ -261,16 +266,16 @@
     <dl id="seg-controles" class="det seg-controles"></dl>
   </section>
   <section class="panel app-ventana incidentes-gen" aria-labelledby="t-incg">
-    <h2 id="t-incg">🚨 INCIDENTES <span class="badge">SUPERVISIÓN · SOLO LECTURA</span></h2>
+    <h2 id="t-incg"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sirena"></use></svg> INCIDENTES <span class="badge">SUPERVISIÓN · SOLO LECTURA</span></h2>
     <ul id="incg-lista" class="app-lista" data-vacio="No hay incidentes en esta partida."></ul>
   </section>
   <section class="panel app-ventana recursos" aria-labelledby="t-rec">
-    <h2 id="t-rec">🏢 RECURSOS DE LA EMPRESA</h2>
+    <h2 id="t-rec"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-edificio"></use></svg> RECURSOS DE LA EMPRESA</h2>
     <p id="rec-nota" class="muted"></p>
     <table id="rec-tabla" class="inf-tabla"></table>
   </section>
   <section class="panel app-ventana ayuda" aria-labelledby="t-ayu">
-    <h2 id="t-ayu">❓ AYUDA</h2>
+    <h2 id="t-ayu"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-ayuda"></use></svg> AYUDA</h2>
     <div id="ayuda-cuerpo" class="ayuda-cuerpo"></div>
   </section>
 
@@ -278,8 +283,7 @@
     <div class="aud-head">
       <h2 id="t-aud">AUDITORÍA</h2>
       <div id="filtros" class="filtros" role="group" aria-label="Filtrar por agente"></div>
-      <span id="aud-pausa" class="muted" hidden>⏸ autoscroll en pausa</span>
-    </div>
+      <span id="aud-pausa" class="muted" hidden>⏸ autoscroll en pausa</span> </div>
     <div id="aud-log" class="mono log" role="log" aria-live="polite" tabindex="0" data-vacio="Aún no hay eventos registrados."></div>
   </section>
 </div>
@@ -306,7 +310,7 @@
 
 <div id="reto-modal" class="modal reto" hidden role="alertdialog" aria-modal="true" aria-labelledby="reto-t">
   <div class="modal-card reto-card">
-    <h2 id="reto-t">⚔ QUIEREN INICIAR COMBATE</h2>
+    <h2 id="reto-t"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-combate"></use></svg> QUIEREN INICIAR COMBATE</h2>
     <p id="reto-det" class="muted"></p>
     <p class="reto-cuenta">Responde en <b id="reto-cuenta">30</b> s o el reto se cancela</p>
     <div class="reto-botones">
@@ -324,7 +328,7 @@
     <div class="reto-botones">
       <button type="button" id="partida-revancha" class="btn btn-primary">REVANCHA</button>
       <button type="button" id="partida-metricas" class="btn">VER MÉTRICAS</button>
-      <button type="button" id="partida-informe" class="btn">📄 Exportar informe de sesión</button>
+      <button type="button" id="partida-informe" class="btn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-documento"></use></svg> Exportar informe de sesión</button>
       <button type="button" id="partida-cerrar" class="btn">CERRAR</button>
     </div>
   </div>
@@ -346,7 +350,7 @@
 
 <div id="buzon-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="buzon-t">
   <div class="modal-card buzon-card">
-    <h2 id="buzon-t">✉ CORREOS DE ENTRENAMIENTO</h2>
+    <h2 id="buzon-t"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-correo"></use></svg> CORREOS DE ENTRENAMIENTO</h2>
     <p class="nota">Laboratorio: nada se envía fuera. Los enlaces son locales y solo registran el clic.</p>
     <form id="correo-form" class="correo-form" hidden>
       <label>Plantilla <select id="sel-plantilla" class="sel" aria-label="Plantilla del correo"></select></label>
@@ -356,7 +360,7 @@
     <section id="rojo-enviados" class="rojo-enviados" hidden aria-label="Correos enviados por el Equipo Rojo">
       <div class="buzon-head">
         <h3>ENVIADOS · SEGUIMIENTO DE LA CAMPAÑA</h3>
-        <button type="button" id="btn-enviados-refrescar" class="btn btn-mini">↻ Actualizar</button>
+        <button type="button" id="btn-enviados-refrescar" class="btn btn-mini"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refrescar"></use></svg> Actualizar</button>
       </div>
       <p class="muted">Una campaña de phishing real puede medir clics y aperturas de adjuntos, no si se leyó o se reportó.</p>
       <ul id="rojo-enviados-lista" class="buzon-lista" data-vacio="Aún no has enviado ningún correo en esta partida."></ul>
@@ -369,22 +373,20 @@
       </div>
       <div id="azul-correos" role="tabpanel">
         <div class="buzon-head">
-          <span id="buzon-usuario" class="muted"></span>
-          <button type="button" id="btn-buzon-refrescar" class="btn btn-mini">↻ Actualizar</button>
+          <span id="buzon-usuario" class="muted"></span> <button type="button" id="btn-buzon-refrescar" class="btn btn-mini"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refrescar"></use></svg> Actualizar</button>
         </div>
         <div class="carpetas" role="tablist" aria-label="Carpetas del correo">
-          <button type="button" role="tab" class="carpeta" data-carpeta="entrada" aria-selected="true">📥 Entrada <b data-cuenta="entrada"></b></button>
-          <button type="button" role="tab" class="carpeta" data-carpeta="sospechosos" aria-selected="false">⚠ Sospechosos <b data-cuenta="sospechosos"></b></button>
-          <button type="button" role="tab" class="carpeta" data-carpeta="archivados" aria-selected="false">🗄 Archivados <b data-cuenta="archivados"></b></button>
-          <button type="button" role="tab" class="carpeta" data-carpeta="enviados" aria-selected="false">📤 Enviados <b data-cuenta="enviados"></b></button>
+          <button type="button" role="tab" class="carpeta" data-carpeta="entrada" aria-selected="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-entrada"></use></svg> Entrada <b data-cuenta="entrada"></b></button>
+          <button type="button" role="tab" class="carpeta" data-carpeta="sospechosos" aria-selected="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-aviso"></use></svg> Sospechosos <b data-cuenta="sospechosos"></b></button>
+          <button type="button" role="tab" class="carpeta" data-carpeta="archivados" aria-selected="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-archivador"></use></svg> Archivados <b data-cuenta="archivados"></b></button>
+          <button type="button" role="tab" class="carpeta" data-carpeta="enviados" aria-selected="false"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-salida"></use></svg> Enviados <b data-cuenta="enviados"></b></button>
         </div>
         <ul id="buzon-lista" class="buzon-lista" aria-label="Correos de la carpeta"></ul>
         <article id="buzon-detalle" class="buzon-detalle" hidden aria-live="polite"></article>
       </div>
       <div id="azul-misiones" role="tabpanel" hidden>
         <div class="buzon-head">
-          <span id="misiones-resumen" class="muted"></span>
-          <button type="button" id="btn-misiones-refrescar" class="btn btn-mini">↻ Actualizar</button>
+          <span id="misiones-resumen" class="muted"></span> <button type="button" id="btn-misiones-refrescar" class="btn btn-mini"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refrescar"></use></svg> Actualizar</button>
         </div>
         <ul id="misiones-lista" class="misiones-lista" aria-label="Misiones del Equipo Azul"></ul>
       </div>
@@ -400,7 +402,7 @@
             </select>
           </label>
           <label>Correo relacionado <select id="inc-correo" class="sel"><option value="">— ninguno —</option></select></label>
-          <button type="submit" class="btn btn-mini btn-primary">🚨 Abrir incidente</button>
+          <button type="submit" class="btn btn-mini btn-primary"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sirena"></use></svg> Abrir incidente</button>
         </form>
         <ul id="incidentes-lista" class="misiones-lista" aria-label="Incidentes de la partida"></ul>
       </div>
@@ -411,7 +413,7 @@
 
 <div id="visor-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="visor-t">
   <div class="modal-card visor-card">
-    <h2 id="visor-t">👁 VISOR SEGURO</h2>
+    <h2 id="visor-t"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-ojo"></use></svg> VISOR SEGURO</h2>
     <p class="nota">El documento se muestra como texto dentro del laboratorio: no se descarga ni se ejecuta nada en tu equipo.</p>
     <dl id="visor-meta" class="visor-meta"></dl>
     <div id="visor-indicadores"></div>
@@ -441,14 +443,14 @@
 
 <div id="final-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="final-t">
   <div class="modal-card reto-card final-card">
-    <h2 id="final-t" class="partida-titulo">🏁 PARTIDA FINALIZADA</h2>
+    <h2 id="final-t" class="partida-titulo"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bandera"></use></svg> PARTIDA FINALIZADA</h2>
     <p id="final-ganador" class="final-ganador"></p>
     <div class="final-marcador">
-      <div class="final-eq final-rojo"><span>🔴 EQUIPO ROJO</span><b id="final-rojo">0</b></div>
-      <div class="final-eq final-azul"><span>🔵 EQUIPO AZUL</span><b id="final-azul">0</b></div>
+      <div class="final-eq final-rojo"><span><span class="pt pt-rojo" aria-hidden="true"></span> EQUIPO ROJO</span><b id="final-rojo">0</b></div>
+      <div class="final-eq final-azul"><span><span class="pt pt-azul" aria-hidden="true"></span> EQUIPO AZUL</span><b id="final-azul">0</b></div>
     </div>
     <ul id="final-detalle" class="final-detalle"></ul>
-    <div class="reto-botones"><button type="button" id="final-desglose" class="btn btn-primary">📊 VER DESGLOSE Y CRONOLOGÍA</button><button type="button" id="final-cerrar" class="btn">CERRAR (Esc)</button></div>
+    <div class="reto-botones"><button type="button" id="final-desglose" class="btn btn-primary"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-grafica"></use></svg> VER DESGLOSE Y CRONOLOGÍA</button><button type="button" id="final-cerrar" class="btn">CERRAR (Esc)</button></div>
   </div>
 </div>
 
