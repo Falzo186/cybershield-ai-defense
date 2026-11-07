@@ -79,8 +79,110 @@ def bootstrap_diferencia(exitos_a, n_a, exitos_b, n_b, repeticiones=2000, semill
             "repeticiones": repeticiones, "n_a": n_a, "n_b": n_b}
 
 
+def bootstrap_agrupado(grupos, repeticiones=2000, semilla=0):
+    """Intervalo de una proporción cuando las observaciones vienen AGRUPADAS y no son independientes.
+
+    Por qué hace falta: en una sesión de 12 rondas, el atacante recibe el historial de las anteriores. Las 12
+    rondas no son 12 observaciones independientes; comparten sesión, técnica y deriva del modelo. Un Wilson
+    sobre 240 rondas asume independencia y por eso sale **demasiado estrecho**: exagera la precisión.
+
+    Este bootstrap remuestrea **sesiones completas** con reemplazo (cluster bootstrap), que es la forma
+    estándar de respetar la agrupación: si una sesión entra, entra con todas sus rondas.
+
+    `grupos` = [(exitos, n), ...], una tupla por sesión.
+    -> {valor, bajo, alto, grupos, n, exitos, repeticiones, efecto_diseno}
+
+    `efecto_diseno` es cuánto más ancho sale este intervalo que el de Wilson: por encima de 1, Wilson estaba
+    siendo optimista. Es None si no se puede calcular.
+    """
+    gs = [(int(e), int(n)) for e, n in (grupos or []) if int(n) > 0]
+    exitos, n = sum(e for e, _ in gs), sum(n for _, n in gs)
+    base = {"grupos": len(gs), "n": n, "exitos": exitos,
+            "valor": (exitos / n) if n else None, "repeticiones": 0,
+            "bajo": None, "alto": None, "efecto_diseno": None}
+    # Con menos de dos sesiones no hay variación entre grupos que remuestrear: no se inventa un intervalo.
+    if len(gs) < 2:
+        return base
+    rnd = random.Random(semilla)
+    tasas = []
+    for _ in range(repeticiones):
+        muestra = [gs[rnd.randrange(len(gs))] for _ in range(len(gs))]
+        tn = sum(x[1] for x in muestra)
+        if tn:
+            tasas.append(sum(x[0] for x in muestra) / tn)
+    if not tasas:
+        return base
+    tasas.sort()
+    bajo, alto = percentil(tasas, 2.5), percentil(tasas, 97.5)
+    # Si todas las sesiones dieron la misma tasa (p. ej. todas 0 éxitos), cada réplica del bootstrap sale
+    # idéntica y el percentil da un intervalo de amplitud CERO. Eso no es «no hay incertidumbre»: es que
+    # este método no puede estimarla sin variación entre grupos. Publicar [0,0 · 0,0] como intervalo del
+    # 95 % sería afirmar una precisión que no existe, así que se devuelve None y se dice por qué. Para esos
+    # casos el intervalo que sí significa algo es el de la tasa POR SESIÓN (Wilson sobre el nº de sesiones).
+    if alto - bajo <= 0:
+        return {**base, "repeticiones": repeticiones, "bajo": None, "alto": None,
+                "degenerado": True,
+                "nota": ("Todas las sesiones dieron la misma tasa: el bootstrap de clústeres no puede "
+                         "estimar el intervalo. Cite la tasa por sesión, que sí lo tiene.")}
+    w = wilson(exitos, n)
+    efecto = None
+    if w["amplitud"] and w["amplitud"] > 0:
+        efecto = (alto - bajo) / w["amplitud"]
+    return {**base, "bajo": bajo, "alto": alto, "repeticiones": repeticiones,
+            "efecto_diseno": efecto, "degenerado": False, "nota": None}
+
+
 # Por debajo de esta muestra por grupo, una diferencia de proporciones no se interpreta.
 MUESTRA_MINIMA = 20
+# Y por debajo de este número de grupos (sesiones), un intervalo agrupado no se interpreta: el bootstrap de
+# clústeres necesita bastantes clústeres para que su percentil signifique algo.
+GRUPOS_MINIMOS = 10
+
+
+def comparar_agrupado(nombre_a, grupos_a, nombre_b, grupos_b, repeticiones=2000, semilla=0):
+    """Compara dos proporciones agrupadas remuestreando sesiones completas en cada lado.
+
+    Mismo contrato que `comparar`, pero respetando la agrupación: -> {a, b, diferencia, intervalo, veredicto,
+    explicacion}. Es más conservador que `comparar` a propósito."""
+    ga = [(int(e), int(n)) for e, n in (grupos_a or []) if int(n) > 0]
+    gb = [(int(e), int(n)) for e, n in (grupos_b or []) if int(n) > 0]
+    ba, bb = bootstrap_agrupado(ga, repeticiones, semilla), bootstrap_agrupado(gb, repeticiones, semilla)
+    base = {"a": {"nombre": nombre_a, **ba}, "b": {"nombre": nombre_b, **bb},
+            "diferencia": None, "intervalo": {"bajo": None, "alto": None}}
+    if not ga or not gb:
+        return {**base, "veredicto": "muestra_insuficiente",
+                "explicacion": "Uno de los dos grupos no tiene ninguna sesión."}
+    if min(len(ga), len(gb)) < GRUPOS_MINIMOS:
+        return {**base, "diferencia": (bb["valor"] or 0) - (ba["valor"] or 0),
+                "veredicto": "muestra_insuficiente",
+                "explicacion": (f"Con {min(len(ga), len(gb))} sesiones en el lado menor (mínimo "
+                                f"{GRUPOS_MINIMOS}) la diferencia agrupada no se interpreta.")}
+    rnd = random.Random(semilla)
+    difs = []
+    for _ in range(repeticiones):
+        ma = [ga[rnd.randrange(len(ga))] for _ in range(len(ga))]
+        mb = [gb[rnd.randrange(len(gb))] for _ in range(len(gb))]
+        na, nb = sum(x[1] for x in ma), sum(x[1] for x in mb)
+        if na and nb:
+            difs.append(sum(x[0] for x in mb) / nb - sum(x[0] for x in ma) / na)
+    if not difs:
+        return {**base, "veredicto": "muestra_insuficiente", "explicacion": "El remuestreo no dio ninguna "
+                "réplica utilizable."}
+    difs.sort()
+    bajo, alto = percentil(difs, 2.5), percentil(difs, 97.5)
+    dif = (bb["valor"] or 0) - (ba["valor"] or 0)
+    out = {**base, "diferencia": dif, "intervalo": {"bajo": bajo, "alto": alto}}
+    if bajo > 0:
+        return {**out, "veredicto": "mejora",
+                "explicacion": (f"{nombre_b} supera a {nombre_a} agrupando por sesión: el intervalo "
+                                f"({bajo:.3f}, {alto:.3f}) no incluye el 0.")}
+    if alto < 0:
+        return {**out, "veredicto": "empeora",
+                "explicacion": (f"{nombre_b} queda por debajo de {nombre_a} agrupando por sesión: el "
+                                f"intervalo ({bajo:.3f}, {alto:.3f}) no incluye el 0.")}
+    return {**out, "veredicto": "sin_diferencia_concluyente",
+            "explicacion": (f"El intervalo agrupado del 95 % ({bajo:.3f}, {alto:.3f}) incluye el 0: con "
+                            "estas sesiones no se puede afirmar que haya diferencia.")}
 
 
 def comparar(nombre_a, exitos_a, n_a, nombre_b, exitos_b, n_b, repeticiones=2000, semilla=0):

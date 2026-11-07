@@ -170,6 +170,18 @@ resultado.
 
 **Σ pesos = 122 · Σ(peso × cumplimiento) = 93 → avance al inicio de esta fase = 76,2 %.**
 
+> **Corrección aritmética, 07/11/2026.** La suma de arriba está mal: **la tabla de esta misma sección da 94,
+> no 93**, y por tanto 77,0 %, no 76,2 %. Los cinco criterios que no estaban a 1 restan 8 + 8 + 6 + 3 + 3 =
+> 28, y 122 − 28 = 94. Fue un error de suma al redactar la auditoría.
+>
+> **No se cambia ningún peso ni ningún cumplimiento**: la tabla queda exactamente como se fijó antes de
+> medir, y la línea original se deja escrita arriba. Lo único que se corrige es la operación.
+>
+> Conviene decir en qué dirección va el error: corregirlo **sube la línea de partida**, así que la mejora
+> que se puede atribuir a las etapas siguientes es 0,8 puntos **menor** de lo que decían los informes. La
+> suma se calcula ahora en `experimentos/avance.py`, para que la aritmética sea verificable y cualquier
+> cambio de peso quede en el historial de git en vez de dentro de una tabla de texto.
+
 Es menor que el 82 % del informe anterior y no porque el proyecto haya empeorado: los criterios de §18
 son más exigentes que los que usé entonces, porque exigen integración y medición del modelo, no solo
 implementación. La cifra del informe anterior sigue siendo correcta *bajo sus propios pesos*, que están

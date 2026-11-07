@@ -375,6 +375,44 @@ def main():
     chk("el resumen del conjunto cuenta todos los escenarios, fijos y generados",
         experimentos.resumen_conjunto()["total"] == len(escenarios.FIJOS) + len(escenarios.generados()))
 
+    # ── Intervalos agrupados por sesión ────────────────────────────────────────────────────────────────────
+    # Las 12 rondas de una sesión del atacante no son 12 observaciones independientes: comparten historial.
+    # Un Wilson sobre todas las rondas sale demasiado estrecho. Esto comprueba el bootstrap de clústeres y,
+    # sobre todo, que NO invente un intervalo cuando no puede calcularlo.
+    todo_igual = [(0, 12)] * 20
+    ag = metricas.bootstrap_agrupado(todo_igual)
+    chk("el agrupado cuenta bien las sesiones y las rondas",
+        ag["grupos"] == 20 and ag["n"] == 240 and ag["valor"] == 0.0)
+    chk("sin variación entre sesiones NO se publica un intervalo de amplitud cero",
+        ag["bajo"] is None and ag["alto"] is None and ag["degenerado"] is True)
+    chk("y se explica por qué, en vez de dejar un hueco", bool(ag["nota"]))
+
+    # Agrupación real: los éxitos se concentran en unas pocas sesiones. Es el caso en que Wilson engaña.
+    agrupado_de_verdad = [(12, 12)] * 5 + [(0, 12)] * 15
+    ag2 = metricas.bootstrap_agrupado(agrupado_de_verdad)
+    w2 = metricas.wilson(60, 240)
+    chk("con éxitos concentrados en sesiones, el agrupado sí da intervalo",
+        ag2["bajo"] is not None and ag2["alto"] > ag2["bajo"])
+    chk("y sale MÁS ANCHO que el Wilson que supone independencia",
+        (ag2["alto"] - ag2["bajo"]) > w2["amplitud"])
+    chk("el efecto de diseño lo cuantifica, y es mayor que 1", ag2["efecto_diseno"] > 1)
+    chk("el agrupado es reproducible con la misma semilla",
+        metricas.bootstrap_agrupado(agrupado_de_verdad, 500, 7)
+        == metricas.bootstrap_agrupado(agrupado_de_verdad, 500, 7))
+    chk("con una sola sesión no hay variación que remuestrear y no se inventa intervalo",
+        metricas.bootstrap_agrupado([(3, 12)])["bajo"] is None)
+    chk("una sesión sin rondas no cuenta como sesión",
+        metricas.bootstrap_agrupado([(0, 0), (1, 12)])["grupos"] == 1)
+
+    cmp_ag = metricas.comparar_agrupado("a", [(0, 12)] * 20, "b", agrupado_de_verdad)
+    chk("comparar agrupado detecta la diferencia cuando el intervalo no incluye el 0",
+        cmp_ag["veredicto"] == "mejora" and cmp_ag["intervalo"]["bajo"] > 0)
+    chk("y con pocas sesiones se niega a interpretar, aunque haya muchas rondas",
+        metricas.comparar_agrupado("a", [(0, 12)] * 3, "b", [(12, 12)] * 3)["veredicto"]
+        == "muestra_insuficiente")
+    chk("el mínimo de sesiones está declarado, no escondido en un número mágico",
+        metricas.GRUPOS_MINIMOS == 10)
+
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)
 

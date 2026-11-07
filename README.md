@@ -432,6 +432,10 @@ PROGRESO.md         bitácora de desarrollo
 | [`docs/INTEGRACION_WAZUH.md`](docs/INTEGRACION_WAZUH.md) | Los tres modos y el cliente de solo lectura |
 | [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md) | Revisión de seguridad y riesgos abiertos |
 | [`docs/INFORME_FINAL.md`](docs/INFORME_FINAL.md) | **Informe de la evolución técnica**: qué se hizo, qué se midió y qué queda |
+| [`docs/INFORME_INTEGRACION.md`](docs/INFORME_INTEGRACION.md) | Informe de la etapa de integración, en 19 puntos |
+| [`docs/CAMPANAS_GRANDES.md`](docs/CAMPANAS_GRANDES.md) | **1 536 inferencias del defensor** y por qué un 65,6 % no medía nada |
+| [`docs/CAMPANA_ATACANTE.md`](docs/CAMPANA_ATACANTE.md) | **480 rondas del atacante**: la IA cae, las capas aguantan |
+| [`docs/INCIDENTE_LANZAMIENTO.md`](docs/INCIDENTE_LANZAMIENTO.md) | Un fallo de infraestructura durante una medición, y qué destapó |
 
 ## Panel de operaciones y análisis
 
@@ -467,6 +471,31 @@ python experimentos/validar_metodologia.py llama3.2:3b
 Para una medición seria (n ≥ 200 por condición), las campañas se ejecutan **por lotes reanudables** con
 `/api/panel/lotes`: el plan es determinista, cada ronda se añade a su archivo con su índice y reanudar con
 otro plan u otra condición se rechaza en vez de mezclar resultados.
+
+### La medición seria, ya ejecutada
+
+```bash
+python experimentos/campanas_grandes.py && python experimentos/resumir_campanas.py
+```
+
+```bash
+python experimentos/campana_atacante.py
+```
+
+**2 496 inferencias reales.** Resultados en
+[`docs/CAMPANAS_GRANDES.md`](docs/CAMPANAS_GRANDES.md) (defensor: 1 536 inferencias, 6 condiciones) y
+[`docs/CAMPANA_ATACANTE.md`](docs/CAMPANA_ATACANTE.md) (atacante: 480 rondas, 40 sesiones). Los dos
+hallazgos que conviene conocer antes de leer cualquier porcentaje:
+
+- **La exactitud oficial le da a `llama3.2:3b` la misma cifra (65,6 %) que a un defensor que ignora la
+  entrada y contesta siempre lo mismo.** Nunca emitió `PERMITIR` en 1 024 rondas. Desde entonces la **línea
+  base trivial** se publica al lado de cualquier exactitud.
+- **Cero fugas en 462 rondas, pero a `qwen2.5:7b` lo engañaron 64 veces, en 19 de 20 partidas**, y las 64 las
+  frenó una capa determinista. El defensor que de verdad discrimina es también el que se puede convencer;
+  las capas son lo que impide la fuga.
+
+El avance del proyecto se calcula con `python experimentos/avance.py`, con los pesos de
+[`docs/AUDITORIA_INTEGRACION.md`](docs/AUDITORIA_INTEGRACION.md) §5 sin modificar.
 
 ## Modo LAN (dos PCs)
 

@@ -17,4 +17,10 @@ data/*.log
 
 # Índice RAG: se reconstruye desde el corpus, no se versiona
 data/rag_indice.json
-data/campanas/
+# Campañas por lotes: el directorio es estado de ejecución y no se versiona, PERO las campañas grandes
+# publicadas sí, porque son la evidencia primaria de las cifras de docs/CAMPANAS_GRANDES.md y
+# docs/CAMPANA_ATACANTE.md. Sin ellas nadie puede rehacer la cuenta: los resúmenes en data/*.json son
+# derivados. Son 1,4 MB de texto y datos ficticios de laboratorio.
+data/campanas/*
+!data/campanas/grande-*.jsonl
+!data/campanas/atacante-*.jsonl

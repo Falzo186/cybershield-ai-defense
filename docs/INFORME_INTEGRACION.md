@@ -180,6 +180,12 @@ Resultado completo en `data/validacion_metodologia.json`.
 atacante, ninguna de estas cifras es concluyente, y el propio programa lo imprime. Se publican porque son
 inferencias reales y porque enseñan algo que una métrica única habría escondido.
 
+> **Superado por una medición mayor, 07/11/2026.** La tarea 1 de la §17 se ejecutó: 1 536 inferencias reales
+> del defensor en 6 condiciones, con 244 observaciones imputables cada una. Está en
+> **`docs/CAMPANAS_GRANDES.md`**, con un hallazgo que esta muestra pequeña no podía ver: la exactitud oficial
+> le da a `llama3.2:3b` la misma cifra que a un defensor que contesta siempre lo mismo.
+> Las cifras de esta sección **se dejan como se midieron**; no se corrigen ni se reinterpretan.
+
 ### 11.1 · Las tres medidas, por separado
 
 | Medida | Resultado | Denominador |
@@ -350,6 +356,19 @@ avance = Σ(peso_i × cumplimiento_i) / Σ(peso_i)        cumplimiento ∈ {0, 0
 | Documentación actualizada | 4 | 1 | 1 | — |
 
 **Σ pesos = 122 · Σ(peso × cumplimiento) = 114 → avance = 93,4 %** (antes 76,2 %).
+
+> **Corrección aritmética, 07/11/2026.** Esta suma arrastra el error de la auditoría y suma uno de menos:
+> la columna «Ahora» de la tabla de arriba da **115, no 114**, es decir **94,3 %, no 93,4 %** (y la línea de
+> partida es 77,0 %, no 76,2 %; ver la corrección en `AUDITORIA_INTEGRACION.md` §5).
+>
+> **Ningún peso ni ningún cumplimiento cambia.** La tabla queda como estaba y la línea original se deja
+> escrita arriba. La mejora atribuible a esta etapa **no cambia**: eran 21 puntos ponderados (114 − 93) y
+> siguen siendo 21 (115 − 94). Lo que se mueve es la base y el extremo, cada uno un punto, 0,8 puntos
+> porcentuales. Así que la corrección no favorece a esta etapa: solo pone bien la cuenta. La suma vive ahora
+> en `experimentos/avance.py`.
+>
+> Estado tras las campañas grandes: **122 / 122 → 100,0 %**, con los mismos pesos. Qué significa y qué **no**
+> significa ese 100 %, en `docs/CAMPANA_ATACANTE.md` § «El 100 % y lo que sigue abierto».
 
 Los 8 puntos que faltan son, casi enteros, los dos criterios de evaluación a medias: no se cierran
 escribiendo más código, sino dejando correr campañas grandes.

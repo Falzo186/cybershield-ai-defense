@@ -355,3 +355,55 @@ problema de funcionalidad ausente sino de **acoplamiento insuficiente** entre m�
 - Pendiente / siguiente paso: ejecutar campañas grandes (n ≥ 200 por condición) con `evaluacion/lotes.py`;
   probar la integración de Wazuh contra una instalación real; medir el coste real del harness en una
   partida larga.
+
+---
+
+# Campañas grandes (07/11/2026)
+
+Cierre de la tarea 1 de la §17 del informe de integración: la medición seria que faltaba para que los dos
+criterios de evaluación pudieran pasar de 0,5 a 1.
+
+### Defensor: 1 536 inferencias reales en 6 condiciones (`docs/CAMPANAS_GRANDES.md`)
+- Qué se hizo: `experimentos/campanas_grandes.py` (6 condiciones, plan idéntico, 256 rondas planificadas y
+  244 verificables cada una) y `experimentos/resumir_campanas.py`.
+- Hallazgo: la exactitud oficial le da **65,6 %** a `llama3.2:3b` y **exactamente lo mismo** a un defensor
+  constante que ignora la entrada. El modelo no emitió `PERMITIR` ni `SOLICITAR_AUTORIZACION` ni una vez en
+  1 024 rondas. Solo `qwen2.5:7b` supera la línea base trivial: 75,4 % IC95 [69,6 · 80,4].
+- Decisiones: la línea base trivial se publica ahora **al lado** de cualquier exactitud, porque una métrica
+  a la que una constante le empata tiene que publicar la constante. El aviso de comparaciones múltiples
+  (cinco contra la misma referencia, ~23 % de falso positivo familiar) está escrito en el código desde antes
+  de ver un solo número.
+- Lo que no se puede concluir: la técnica de prompting. Las cuatro se midieron sobre un modelo degenerado,
+  donde no podían dar diferencia. RAG cayó a BM25 porque no hay `nomic-embed-text` y no se descargó.
+
+### Atacante: 480 rondas en 40 sesiones (`docs/CAMPANA_ATACANTE.md`)
+- Qué se hizo: `experimentos/campana_atacante.py`, dos condiciones que solo cambian el modelo defensor.
+- Hallazgo: **cero fugas en 462 rondas imputables**, pero a `qwen2.5:7b` lo engañaron **64 veces (28,2 %,
+  IC agrupado [22,4 · 33,9]) en 19 de 20 sesiones**. Las 64 las frenó una capa determinista: validación 43,
+  autorización 21, permisos 1. El defensor que de verdad discrimina es también el que se puede convencer; lo
+  que impide la fuga son las capas de detrás. Es el diseño de seis capas medido, no afirmado.
+- Decisiones: dos medidas separadas, **objetivo conseguido** (salió el dato, sobre la ejecución) y **engaño
+  del modelo** (la IA concedió el acceso). Un texto convincente no es un compromiso si el motor no ejecutó
+  nada. Y 240 rondas no son 240 observaciones independientes: se publica el intervalo **agrupado por
+  sesión** (`metricas.bootstrap_agrupado`), que es el que hay que citar.
+- Lo que no se puede concluir: que el sistema sea seguro. 0/462 con 20 sesiones deja el intervalo por sesión
+  en [0,0 · 16,1 %].
+
+### Dos defectos propios corregidos en esta etapa
+- **Durabilidad.** Las rondas se escribían al cerrar la sesión; un proceso matado se llevó inferencia ya
+  calculada (`docs/INCIDENTE_LANZAMIENTO.md`). Ahora se guardan una a una y lo que no cierra sesión queda
+  huérfano, se repite y no se cuenta dos veces.
+- **Intervalo falso.** El bootstrap agrupado devolvía `[0,0 · 0,0]` cuando todas las sesiones daban lo mismo.
+  Eso no es «no hay incertidumbre», es que el método no puede estimarla. Ahora devuelve `None` y lo explica.
+
+### Corrección aritmética del avance
+La auditoría afirmó `Σ = 93` donde **su propia tabla da 94**, y el informe de integración arrastró el error
+(`114` donde la tabla da `115`). Corregido en abierto en los dos documentos, **sin tocar ningún peso ni
+ningún cumplimiento**. La mejora atribuible a la etapa de integración no cambia: eran 21 puntos ponderados y
+siguen siendo 21. El cálculo vive ahora en `experimentos/avance.py`, verificable y en el historial de git.
+
+### Estado al cerrar la etapa
+- Avance con los pesos originales: **122 / 122 → 100,0 %** (antes 115/122 → 94,3 %; auditoría 94/122 → 77,0 %).
+- Ese 100 % mide los **18 criterios del encargo**, no el sistema: dos de los resultados publicados son malos,
+  Wazuh sigue sin instalación real, RAG sin embeddings, TLS sin desplegar y la ausencia de fugas no está
+  demostrada. La lista completa, en `docs/CAMPANA_ATACANTE.md` § «El 100 % y lo que sigue abierto».
