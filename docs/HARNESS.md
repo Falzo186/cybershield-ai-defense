@@ -123,3 +123,18 @@ real ejecutada, este documento no publica ninguna cifra de comparación.
 - Un hilo de herramienta que se pase del timeout no se cancela (arriba).
 - Todavía no está conectado a las rutas del servidor: se usa desde el motor de evaluación. Conectarlo a la
   batalla de la partida cambiaría el coste por ronda y debe medirse antes.
+
+---
+
+# Misión 23 h: el Harness gobierna partidas de combate reales
+
+Antes (arriba) el harness se medía desde el motor de evaluación. Ahora **gobierna cada partida de combate** (`src/lab/combate/motor.py`):
+
+- Cada `Partida` crea un `harness.ControlPartida` con `PresupuestoPartida(max_rondas=max_turnos, max_llamadas_modelo, max_tokens_salida, timeout_global_s,
+  max_errores_consecutivos=3)`. Antes de cada turno se consulta `puede_jugar_ronda()`; después se registra el consumo con `registrar_ronda()`.
+- Corte → `INCONCLUSA` con evento `harness.corte` y causa (`presupuesto_agotado`, `modelo_sin_respuesta`, `interrumpida`). **Nunca** se disfraza de victoria.
+- `ataque_repetido()` marca los mensajes repetidos del Rojo; no corta (un modelo girando en vacío es un resultado, no un fallo de seguridad).
+- Una acción denegada no se reintenta: el Azul decide una vez por solicitud (reintentos acotados a ≤ 2 solo para respuestas **malformadas**, nunca para eludir una decisión).
+- El presupuesto consumido se ve en la UI («Presupuesto (Harness)») y queda en `partida.resultado.consumo`.
+
+Pruebas: presupuesto de llamadas agotado, 3 errores seguidos, interrupción y consumo registrado (`src/lab/test_combate.py`). Medido con 8B reales: ver `docs/evaluacion/`.

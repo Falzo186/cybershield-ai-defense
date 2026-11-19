@@ -237,3 +237,30 @@ respuesta hace que los eventos lleguen a tirones o no lleguen.
 
 **Nada de esto está probado aquí**: no hay certificados ni proxy en esta máquina. Es la configuración
 recomendada, no una configuración verificada, y se declara como tal.
+
+---
+
+# Misión 23 h (2026-11-18): seguridad del combate IA vs IA
+
+Se añade; lo anterior no se modifica.
+
+## Lo que se garantiza y cómo se comprueba
+| Garantía | Mecanismo | Prueba |
+|---|---|---|
+| El espectador es de solo lectura **real** | Middleware: sesión de espectador y anónimo no pueden hacer POST; `POST /api/combate/partidas` exige el equipo `general` además | `server/test_combate.py` (403 sin sesión, como Rojo, como espectador) · E2E (403 desde el navegador anónimo, sin botones) |
+| Nadie fija el resultado | Solo el motor escribe `partida.resultado`; `partidas`+`eventos` tienen índice único; después, 409 | `test_combate` (doble resultado, 409 tras el resultado, rechazo de la BD) |
+| La configuración del escenario no cambia durante la partida | Hash SHA-256 recomprobado en cada turno; `intentar_modificar_escenario` → 409 y auditoría | `test_combate` |
+| El Azul no altera resultados históricos | Los modelos solo devuelven diccionarios; no reciben la BD. El contexto es una **copia profunda** (un modelo que lo muta no cambia nada) | `test_combate` («Azul que muta su contexto») |
+| Rojo no altera permisos del Azul | El Rojo no tiene ninguna ruta a las zonas ni al registro; su salida se valida contra el catálogo | `test_combate` |
+| La verdad de fondo no llega a los modelos | Contextos sin `legitima`/`relevante`/`zona`; en la API se oculta mientras la partida está en curso | `test_combate`, `server/test_combate.py` |
+| El Rojo solo escribe texto natural | Filtro de contenido técnico (código, comandos, herramientas ofensivas); el mensaje filtrado se sustituye y se cuenta | `test_combate` |
+| Auditoría inalterable | Cadena de hashes por partida; `verificar_cadena()` detecta cualquier cambio posterior | `test_combate` (alterar un evento rompe la cadena) |
+| Nada de secretos en logs | No se guardan tokens ni claves en eventos; el código de árbitro solo está en la consola del servidor | revisión manual + `grep` |
+| Un fallo del SIEM no tumba la partida | `wazuh.error` y continuar | diseño |
+
+## Limitaciones (sin disfrazarlas de resueltas)
+- **TLS y autenticación de transporte**: siguen **sin desplegarse** (ver «Configuración recomendada» arriba). `/combate/` hereda el mismo modelo: sesión por token en
+  cabecera, sin cifrado de transporte en localhost.
+- El código de árbitro y los tokens protegen la API, no sustituyen a un control de acceso de red. No exponer el puerto fuera de la LAN.
+- Wazuh es **simulado**; ninguna alerta debe presentarse como real.
+- La «verdad de fondo» en la base de datos de la partida es visible para quien tenga acceso al archivo `data/combate.db` (es el registro de auditoría).

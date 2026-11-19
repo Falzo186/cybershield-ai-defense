@@ -51,3 +51,24 @@ Azul revoque después. Para que Rojo puntúe más, deja un enlace sin contener o
 - Un ataque IA tarda mucho: es real (CPU). La fase dice a qué Ollama se espera; el tope es de 300 s por inferencia. Si el
   defensor de Azul falla, el ataque se **deniega** (fallo seguro) y no puntúa nadie.
 - Ensayo completo sin manos: `py -3 e2e\demo_partida.py` (~15 s, 42 comprobaciones, regenera las capturas).
+
+---
+
+# Guion de 10 minutos — combate IA vs IA (misión 23 h, 2026-11-18)
+
+**Prepara antes (5 min):** `ollama list` con `qwen3:8b` y `llama3.1:8b`; calienta cada uno con una llamada corta; `python server/app.py` y anota el código de árbitro;
+abre `http://localhost:8000/combate/` en dos ventanas (árbitro y espectador).
+
+| Min | Qué haces | Qué dices |
+|---|---|---|
+| 0–1 | Cabecera: chips «Ollama activo» y **WAZUH SIMULADO**; menú | «Laboratorio local con datos ficticios. La IA propone, el motor valida, las capas autorizan; **Wazuh es simulado**, y lo ves rotulado en todas partes.» |
+| 1–3 | Árbitro: escenario `verificacion_falsa-sencillo`, Rojo `qwen3:8b`, Azul `llama3.1:8b`, semilla 1 → Iniciar | «Dos modelos de 8B reales. Nadie es ganador por lo que diga: gana quien llegue a sus objetivos en el estado verificable.» Señala «El equipo Rojo redacta…» y la cronología |
+| 3–5 | Sigue 2–3 turnos: mensaje del Rojo, alertas del SIEM, decisión del Azul con su justificación | «El Azul decide con el registro del sistema; el texto del mensaje es un dato. Esta alerta no prueba por sí sola que sea malicioso.» |
+| 5–6 | Fin de la partida: banner de resultado, métricas, «Exportar JSON» | «El resultado sale del evento `partida.resultado` que escribe el motor, no del navegador. La cadena de hashes está íntegra.» |
+| 6–8 | Segunda partida **con modelos falsos** (`falso:objetivos` vs `falso:aprobar`): victoria Roja en 2 turnos; luego `falso:rechazar`: **empate degradado** | «Ambos pueden ganar de forma verificable. Y “rechazar siempre” no gana: exige ≥ 70 % de legítimas.» |
+| 8–9 | Espectador: sin botones, solo lectura (un POST da 403); pestaña Wazuh (simulado) con filtros y detalle JSON | «El espectador es de solo lectura real. Ruido de fondo incluido.» |
+| 9–10 | Historial y Campañas; cierra con las cifras reales de `docs/evaluacion/` | «Esto son las medidas honestas con 8B: lo que funcionó y lo que no.» |
+
+**Plan B si Ollama falla:** usa modelos falsos (`falso:*`) para los pasos 1–8 (muestran el motor, no la calidad de un modelo) y di explícitamente que no hay IA real en esa
+parte; muestra la partida real ya guardada en el **Historial** (se abre y se reproduce con el control de turno).
+**Plan C:** capturas de `docs/capturas_final/`.
