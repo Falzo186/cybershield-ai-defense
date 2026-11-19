@@ -14,6 +14,8 @@ import time
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
+if hasattr(sys.stdout, "reconfigure"):   # consolas de Windows en cp1252 rompían el informe con tildes/emoji
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 UNITARIAS = ["test_lab", "test_motor", "test_correos", "test_reglas", "test_misiones", "test_documentos", "test_eventos",
              "test_puntaje", "test_cliente", "test_correo_app", "test_incidentes", "test_ataque_ia", "test_informe",
              "test_apps", "test_diagnostico", "test_harness", "test_rag", "test_evaluacion", "test_adversarial", "test_wazuh", "test_correlacion",

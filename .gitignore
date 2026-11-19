@@ -24,3 +24,8 @@ data/rag_indice.json
 data/campanas/*
 !data/campanas/grande-*.jsonl
 !data/campanas/atacante-*.jsonl
+
+# Muestra de eventos usada por las pruebas de Wazuh (reconstruida en la mision 23h; el original nunca se versiono)
+!integraciones/wazuh/eventos_ejemplo.jsonl
+# Misión 23h: estado local de ejecución, bases y campañas en curso
+respaldo_pre_mision/
