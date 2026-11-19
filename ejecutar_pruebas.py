@@ -21,7 +21,7 @@ UNITARIAS = ["test_lab", "test_motor", "test_correos", "test_reglas", "test_misi
              "test_apps", "test_diagnostico", "test_harness", "test_rag", "test_evaluacion", "test_adversarial", "test_wazuh", "test_correlacion",
              "test_control_partida", "test_lotes", "test_escenarios_empresa", "test_combate", "test_wazuh_sim"]
 SERVIDOR = ["server/test_partida.py", "server/test_app.py", "server/test_batalla_partida.py", "server/test_resultados.py",
-            "server/test_apps.py", "server/test_presupuesto.py"]
+            "server/test_apps.py", "server/test_presupuesto.py", "server/test_combate.py"]
 INTEGRACION = ["e2e/test_reinicio.py", "integraciones/wazuh/test_reglas.py", "server/test_panel.py"]
 NAVEGADOR = ["e2e/demo_partida.py"]
 TOTAL = re.compile(r"(\d+)/(\d+)")
