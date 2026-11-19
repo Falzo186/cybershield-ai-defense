@@ -89,6 +89,11 @@ def _plan_fase(fase, reps_base, reps_llm, reps_var):
             for e in esc:
                 out.append(celda("cruzada", e, MODELO_A, MODELO_B, "base", k))
                 out.append(celda("cruzada", e, MODELO_B, MODELO_A, "base", k))
+    if "harness" in fases:   # P-15 (exploratorio): MISMO Harness activo, solo cambian los límites. 5 familias × 3 repeticiones = 15 partidas por celda
+        for k in range(1, 4):
+            for e in [x for x in esc if x.endswith("-intermedio")]:
+                for cfg in ("harness_estricto", "harness_holgado"):
+                    out.append(celda("harness", e, MODELO_A, MODELO_A, cfg, k))
     if "variaciones" in fases:   # una variable por vez, sobre el espejo/cruce que menos hunda: Azul con ejemplos / sin Wazuh
         for k in range(1, reps_var + 1):
             for e in esc:
@@ -175,6 +180,9 @@ def jugar_celda(c, d):
     azul = J.construir_azul(c["azul"], c["semilla"], HOST)
     if c["config"] == "ejemplos" and isinstance(azul, M.AzulOllama):
         azul = M.AzulOllama(M.partir_modelo(c["azul"])[0], host=HOST, semilla=c["semilla"], ejemplos=True, version=M.partir_modelo(c["azul"])[1])
+    t_ = esc["max_turnos"]
+    presup = {"harness_estricto": {"max_llamadas_modelo": 3 * t_, "max_tokens_salida": 350 * t_, "max_errores_consecutivos": 1, "timeout_global_s": 300},
+              "harness_holgado": {"max_llamadas_modelo": 20 * t_, "max_tokens_salida": 6000 * t_, "max_errores_consecutivos": 6, "timeout_global_s": 7200}}.get(c["config"])
     wz = SimProvider(ruta_ndjson=d / "wazuh_alerts.ndjson", ruta_db=":memory:", semilla=c["semilla"])
     alm = Almacen(d / f"partidas{SUFIJO}.db")
     previa = alm.partida(f"{c['fase']}-{c['id']}")
@@ -184,7 +192,7 @@ def jugar_celda(c, d):
         return r, 0.0
     # Si quedó una partida a medias de un corte anterior, el motor le asigna un id nuevo (sufijo -2, -3…): la huérfana no cuenta nada.
     p = Partida(esc, rojo, azul, semilla=c["semilla"], almacen=alm, wazuh=wz,
-                partida_id=f"{c['fase']}-{c['id']}", etiqueta_modelos={"celda": c["id"], "config": c["config"]},
+                partida_id=f"{c['fase']}-{c['id']}", presupuesto_override=presup, etiqueta_modelos={"celda": c["id"], "config": c["config"]},
                 azul_ve_wazuh=c["config"] not in ("sin_wazuh", "sin_aut_sin_wazuh"),
                 azul_ve_autorizaciones=c["config"] not in ("sin_autorizaciones", "sin_aut_sin_wazuh"))
     t0 = time.time()
