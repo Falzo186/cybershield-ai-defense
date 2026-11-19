@@ -155,7 +155,7 @@ class Doc(BaseDocTemplate):
         c.line(2 * cm, h - 1.55 * cm, w - 2 * cm, h - 1.55 * cm)
         c.setFont(F, 8)
         c.setFillColor(MARINA)
-        c.drawString(2 * cm, h - 1.3 * cm, "CyberShield AI Defense · " + self.titulo)
+        c.drawString(2 * cm, h - 1.3 * cm, "CyberShield AI Defense")
         c.setFillColor(ROJO)
         c.drawRightString(w - 2 * cm, h - 1.3 * cm, "Universidad Autónoma de Tamaulipas · Facultad de Ingeniería")
         c.setStrokeColor(colors.HexColor("#b8bfd0"))

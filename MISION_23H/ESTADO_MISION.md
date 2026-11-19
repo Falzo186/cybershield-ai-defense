@@ -1,19 +1,15 @@
 # ESTADO DE LA MISIÓN 23H
 
-- **T0:** 2026-11-18 21:40:50 (-06:00) · **T_CIERRE (T0+21h30):** 2026-11-19 19:10:50 · **T_FIN (T0+23h):** 2026-11-19 20:40:50
-- **Rama:** `mision-23h` (desde `main` @ 4dbdb35) · etiqueta `pre-mision-23h` · respaldo de `data/` en `respaldo_pre_mision/`
-- **Fase actual:** campañas con 8B en ejecución (F7 se analiza al terminar); trabajo en paralelo en F3/F5/F6 sin tocar la GPU.
+**MISIÓN FINALIZADA** — 2026-11-19 ~04:35 (T0 2026-11-18 21:40:50; la misión se completó antes de T_CIERRE).
 
-## Hecho (commits)
-- F0 diagnóstico + línea base corregida · F2 motor formal de victoria (`src/lab/combate/`, 15 escenarios) · F4 Wazuh simulado (`src/lab/wazuh_sim/`)
-- F3 combate con Harness (`ControlPartida`), parser estricto, CLI `python -m src.lab.combate.jugar`, degenerados, lanzador de campañas reanudable
-- F6 UI `/combate/` (Teatro de batalla) + API `/api/combate/*` + E2E 39/39 + capturas 1366/1920/1280
-
-## En ejecución en segundo plano
-- `experimentos/campana_combate.py --campana combate-v1` (dos procesos: `base` sin GPU, y `espejo,cruzada,base_llm,variaciones` con sufijo `llm`). Estado: `--estado`.
-
-## Pendiente
-- Prueba E2E con 8B reales + captura · sensibilidad/consistencia con GPU (al terminar las campañas) · análisis y gráficas (F7) · docs finales (F9) · informe PDF.
-
-## Latidos
-- 2026-11-18 21:40 arranque · 22:20 campañas vivas (base 598/1800 · espejo 29/90 al relanzar con la variante `sin_autorizaciones`)
+Resumen:
+1. Rama `mision-23h`, 21 commits desde `pre-mision-23h`, sin push.
+2. Motor formal de victoria/derrota (15 escenarios, zonas de política, verdad de fondo, resultado inmutable, cadena de hashes).
+3. Wazuh SIMULADO integrado (ruido, verdad de fondo oculta, RealProvider solo stub).
+4. Combate con qwen3:8b y llama3.1:8b reales, lanzable desde UI y CLI, gobernado por el Harness.
+5. UI `/combate/` verificada con capturas (1366×768, 1920×1080, 1280×720), E2E 41/41 y E2E real con 8B.
+6. Campañas: 2 370 partidas válidas, 0 inválidas; 0 victorias Rojas de 8B (0/240).
+7. Batería completa 38/38 suites, 1 850/1 850; cobertura de módulos nuevos 91 %.
+8. Documentación completa e `docs/INFORME_EJECUTIVO_FINAL.md` + PDF.
+9. Pendiente: Wazuh real, TLS, más modelos; B-1 (capturas_demo regeneradas por el E2E, sin commit).
+10. Veredicto: funcional; el combate es completo pero desbalanceado a favor del Azul con estos modelos.

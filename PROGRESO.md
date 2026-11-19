@@ -407,3 +407,13 @@ siguen siendo 21. El cálculo vive ahora en `experimentos/avance.py`, verificabl
 - Ese 100 % mide los **18 criterios del encargo**, no el sistema: dos de los resultados publicados son malos,
   Wazuh sigue sin instalación real, RAG sin embeddings, TLS sin desplegar y la ausencia de fugas no está
   demostrada. La lista completa, en `docs/CAMPANA_ATACANTE.md` § «El 100 % y lo que sigue abierto».
+
+---
+
+# Misión 23 h (2026-11-18 → 2026-11-19): combate IA vs IA con victoria y derrota formales
+
+- Qué se hizo: motor de combate (`src/lab/combate/`), Wazuh simulado (`src/lab/wazuh_sim/`), API `/api/combate/*`, UI `/combate/`, campañas reanudables, análisis estadístico, sensibilidad, E2E real con 8B, documentación e informe ejecutivo con PDF.
+- Decisiones: ver `docs/DECISIONES.md` (D-01…D-14). Resultados: `docs/evaluacion/INFORME_CAMPANAS.md`.
+- Resultados: 2 370 partidas válidas (510 con 8B reales); **0 victorias Rojas de 8B en 240**; Azul 63–95 % de victorias; batería 38/38 suites, 1 850/1 850.
+- Avance (fórmula histórica, pesos sin tocar): 100 % de los 18 criterios del encargo; criterios propios de la misión en `docs/INFORME_EJECUTIVO_FINAL.md` §11.
+- Pendiente / siguiente paso: Wazuh real, TLS, más modelos/prompts y repeticiones.
