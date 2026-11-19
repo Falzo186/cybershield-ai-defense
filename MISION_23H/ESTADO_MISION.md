@@ -13,3 +13,8 @@ Resumen:
 8. Documentación completa e `docs/INFORME_EJECUTIVO_FINAL.md` + PDF.
 9. Pendiente: Wazuh real, TLS, más modelos; B-1 (capturas_demo regeneradas por el E2E, sin commit).
 10. Veredicto: funcional; el combate es completo pero desbalanceado a favor del Azul con estos modelos.
+
+---
+## Misión extra
+- T0: 2026-11-19 06:54:26 (HAC). T_CIERRE = 13:39. T_FIN = 14:54.
+- Rama `mision-extra` desde `mision-23h`; etiqueta `pre-mision-extra`.
