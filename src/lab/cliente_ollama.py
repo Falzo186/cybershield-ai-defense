@@ -171,7 +171,8 @@ def generar_json(host, modelo, system, user, requeridos, origen, **kw):
 # NOTA sobre el timeout (120 s por defecto): la PRIMERA llamada a un modelo puede tardar mucho porque Ollama
 # lo carga en memoria/VRAM (y más aún por LAN); las llamadas siguientes son rápidas. Antes de iniciar una
 # batalla conviene usar «Probar modelo» (GET /api/ollama/probar) para forzar esa carga inicial.
-def generar(host, modelo, system, user, formato=None, timeout=120, temperature=0.7, num_predict=300):
+def generar(host, modelo, system, user, formato=None, timeout=120, temperature=0.7, num_predict=300, opciones=None,
+            keep_alive=None):
     """-> {ok, contenido, tiempo_ms, tokens, tokens_entrada, carga_ms, error}
 
     tiempo_ms: reloj de pared medido aquí (petición completa). tokens = tokens de SALIDA (eval_count),
@@ -197,6 +198,11 @@ def generar(host, modelo, system, user, formato=None, timeout=120, temperature=0
     }
     if formato == "json":
         cuerpo["format"] = "json"
+    # Misión 23h: opciones extra (num_ctx, seed…) y keep_alive opcionales; sin ellas el cuerpo es idéntico al de siempre.
+    if opciones:
+        cuerpo["options"].update(opciones)
+    if keep_alive is not None:
+        cuerpo["keep_alive"] = keep_alive
     try:
         with _abrir(host.rstrip("/") + "/api/chat", timeout, data=json.dumps(cuerpo).encode("utf-8")) as r:
             if r.status != 200:
