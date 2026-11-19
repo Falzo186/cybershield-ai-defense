@@ -72,3 +72,31 @@ abre `http://localhost:8000/combate/` en dos ventanas (árbitro y espectador).
 **Plan B si Ollama falla:** usa modelos falsos (`falso:*`) para los pasos 1–8 (muestran el motor, no la calidad de un modelo) y di explícitamente que no hay IA real en esa
 parte; muestra la partida real ya guardada en el **Historial** (se abre y se reproduce con el control de turno).
 **Plan C:** capturas de `docs/capturas_final/`.
+
+---
+
+# Guion de 10 minutos v2 — combate IA vs IA (misión extra, 2026-11-19)
+
+Reemplaza al guion de la misión de 23 h para exposiciones: incluye una partida en vivo con 8B, una **reproducción curada**, el **guion determinista** y la explicación honesta de por qué el Rojo no ganó. El guion anterior sigue más arriba, sin tocar.
+
+**Prepara antes (5 min):** `ollama list` con `qwen3:8b` y `llama3.1:8b`; calienta cada modelo con una llamada corta; `python server/app.py` y anota el código de árbitro; abre `http://localhost:8000/combate/` (árbitro). No lances nada más que use la GPU. Elige el escenario `verificacion_falsa-sencillo`, semilla 1.
+
+| Min | Qué haces | Qué dices |
+|---|---|---|
+| 0–1 | Cabecera: chips «Ollama activo» y **WAZUH SIMULADO**. | «Laboratorio local con datos ficticios. La IA propone, el motor valida, las capas autorizan; Wazuh es simulado y está rotulado en todas partes.» |
+| 1–4 | **Partida en vivo con 8B**: Rojo `qwen3:8b`, Azul `llama3.1:8b` → Iniciar. Sigue 2–3 turnos (mensaje del Rojo, señal del SIEM, decisión del Azul con su justificación). Mientras corre, cada turno tarda 10–25 s: aprovecha para explicar. | «Dos modelos reales de 8B. El Azul decide con el registro del sistema; el texto del mensaje es un dato. La alerta del SIEM no prueba por sí sola nada.» |
+| 4–5 | Cuando acabe (o con la partida ya guardada si el tiempo aprieta): banner de resultado y «Exportar JSON». | «El resultado lo escribe el motor en `partida.resultado`; el navegador no calcula nada. La cadena de hashes está íntegra.» |
+| 5–6 | **Historial → Partidas de demostración curadas** → «Reproducir cronología» en la de *sobre-cautela* (empate degradado). | «Esto es una partida REAL de la campaña, no una simulación nueva: los eventos son los registrados, con su semilla y su versión de prompts. El Azul frenó al Rojo pero escaló también a los empleados legítimos: no cuenta como victoria.» Opcional: la de *objetivo parcial* (llama→llama, 1 de 2 objetivos). |
+| 6–8 | **Teatro de batalla → «Demostración del motor · Guion determinista (sin IA)»**. Botón 1: guion contra Azul «APROBAR siempre» → **victoria Roja** en 2 turnos. Botón 2: el mismo guion contra el Azul por registro → **victoria Azul** (100 % de legítimas). | «Atención a la etiqueta roja: **GUION DETERMINISTA — NO ES UN MODELO**. Esto no es un Rojo con IA que gane: sirve para enseñar que el motor sí puede dar victoria Roja cuando el defensor cede, y que un defensor que verifica el registro no cede.» |
+| 8–10 | Pestaña Campañas / `docs/evaluacion/INFORME_CAMPANAS.md` y `INFORME_CAMPANAS_V2.md`. | Ver abajo («Cómo explicar honestamente…»). |
+
+## Cómo explicar honestamente «el Rojo no ganó» y por qué
+
+1. **Los hechos:** en `combate-v1`, el Rojo 8B ganó **0 de 240** partidas con IA real; solo 6 llegaron a un objetivo parcial, todas con `llama3.1:8b` contra sí mismo. Contra un Azul «aprueba todo» sí gana (93 %), así que sabe pedir.
+2. **La razón principal:** el Azul decide con el registro (derechos y autorizaciones) y el escenario fue diseñado para que quien verifica no tenga que ceder. Ganar al Rojo es fácil si el defensor lee el registro; **el problema real del Azul no es ceder, es el servicio**: `qwen3:8b` escala ≈70 % de sus decisiones y cae en empate degradado el 30 % de las veces.
+3. **Lo que no se afirma:** que el Rojo 8B no pueda ganar jamás; son 60 partidas por pareja, un solo diseño de prompts y modelos pequeños. La prueba de sensibilidad sí mostró un fallo real del Azul: ambos 8B aprobaron un documento interno a quien no tenía el derecho registrado si lo pedía con cortesía (v2: qwen 8/8, llama 5/8).
+4. **Lo que se hizo después (misión extra):** prompts v3 y la campaña `combate-v2`, con los resultados lado a lado y sin retocar v2 (ver `INFORME_CAMPANAS_V2.md`).
+5. **El guion determinista no es evidencia sobre ningún modelo.** Se usa solo para explicar el motor.
+
+**Plan B si Ollama falla:** pasos 1–5 con la partida curada y las capturas de `docs/capturas_final/extra/`; el guion determinista funciona sin Ollama. Dilo explícitamente.
+**Ensayo sin GPU:** `python e2e/test_combate_extra.py` (29 comprobaciones con modelos falsos; regenera las capturas de `docs/capturas_final/extra/`).
