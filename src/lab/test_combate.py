@@ -339,6 +339,30 @@ def main():
     chk("la aprobación indebida y el cambio de estado generan alertas relevantes",
         {a["rule"]["id"] for a in w.alertas_relevantes(pw.id)} & {"100021", "100022", "100023", "100024", "100025"})
 
+    # ── Prompts v3 (misión extra): v2 intacto, v3 aislado, sin verdad de fondo ──────────────────────────────
+    import hashlib
+    from .combate import prompts_v3 as P3
+    pe = X.Partida(E.cargar("verificacion_falsa-intermedio"), M.RojoMensajeFijo("R-EXC-PWD", "aprobar_excepcion"), M.AzulRegistro(), semilla=0)
+    pe.turno = 3
+    ca = pe._ctx_azul("E02", {"recurso": "R-L-HOR", "accion": "aprobar_excepcion", "referencia": "TCK-2101", "valida": True}, "hola")
+    cr = pe._ctx_rojo()
+    huella_v2 = hashlib.sha256((M.SYSTEM_ROJO + M.SYSTEM_AZUL + M.EJEMPLOS_AZUL + M.prompt_rojo(cr) + M.prompt_azul(ca)).encode()).hexdigest()
+    chk("los prompts v2 NO cambiaron respecto de la campaña combate-v1 (huella idéntica a la de pre-mision-extra)",
+        huella_v2 == "83b03bbcbdbdb47e66d65cf2edc54b481073862696a8ebbd259810308f6f49e5")
+    chk("«modelo@v3» se separa en modelo y versión; sin sufijo es v2", M.partir_modelo("qwen3:8b@v3") == ("qwen3:8b", "v3") and M.partir_modelo("llama3.1:8b") == ("llama3.1:8b", "v2"))
+    chk("construir_azul/rojo con «@v3» crean modelos con version v3 y el nombre limpio de modelo",
+        J.construir_azul("qwen3:8b@v3", 1, "http://x").version == "v3" and J.construir_azul("qwen3:8b@v3", 1, "http://x").modelo == "qwen3:8b"
+        and J.construir_rojo("llama3.1:8b@v3", E.cargar("verificacion_falsa-sencillo"), 1, "http://x").modelo == "llama3.1:8b")
+    chk("el prompt v3 del Azul no contiene la verdad de fondo ni el campo legitima", "legitima" not in P3.prompt_azul_v3(ca).lower() and "legitima" not in P3.SYSTEM_AZUL_V3.lower())
+    chk("el prompt v3 del Azul trata las alertas como contexto, no como prueba única", "CONTEXTO" in P3.prompt_azul_v3(ca) and "no decide por sí solo" in P3.prompt_azul_v3(ca))
+    cr2 = dict(cr, historial=[{"turno": 1, "mensaje": "mensaje uno", "decision": "RECHAZAR", "justificacion": "no", "recurso": "R-ADM-CONF", "origen": "rojo"}])
+    pr3 = P3.prompt_rojo_v3(cr2)
+    chk("el prompt v3 del Rojo resume los recursos ya intentados y los aún no intentados de ESTA partida", "R-ADM-CONF (1× → RECHAZAR)" in pr3 and "aún no intentados" in pr3)
+    chk("el Rojo v3 sigue limitado a texto natural: la regla de prohibiciones está presente", "PROHIBIDO: código" in P3.SYSTEM_ROJO_V3)
+    chk("una partida con Azul/Rojo v3 falsos conserva la versión por defecto; con modelos Ollama v3 se etiqueta «v3»",
+        X._version_prompts(M.RojoObjetivos([]), M.AzulFijo("RECHAZAR")) == "v2" and X._version_prompts(J.construir_rojo("qwen3:8b@v3", E.cargar("verificacion_falsa-sencillo"), 1, "http://x"),
+                                                                                                         J.construir_azul("qwen3:8b@v3", 1, "http://x")) == "v3")
+
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)
 
