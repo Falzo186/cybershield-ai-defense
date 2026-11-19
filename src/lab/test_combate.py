@@ -6,7 +6,7 @@ NO prueban ningún modelo real: para eso están las campañas con Ollama (experi
 import json
 import sqlite3
 
-from .combate import escenarios as E, modelos as M, motor as X
+from .combate import degenerados as D, escenarios as E, modelos as M, motor as X
 from .combate.store import Almacen
 from .wazuh_sim import ETIQUETA, RealProvider, SimProvider
 
@@ -195,6 +195,43 @@ def main():
     pub = pv.eventos(publico=True)
     chk("durante la partida no hay resultado ni verdad de fondo en la vista pública",
         all(x["tipo"] != "partida.resultado" for x in pub) and all("legitima" not in x["payload"] for x in pub))
+
+    # ── Un modelo no puede alterar el estado del motor ni el escenario (aislamiento) ─────────────────────────
+    class AzulMalicioso(M.AzulFijo):
+        def decidir(self, ctx):
+            ctx["solicitante"]["derechos"].append(["R-ADM-CONF", "liberar_documento"])
+            ctx["politica"].clear()
+            ctx["autorizaciones_vigentes"].append({"id": "TCK-0", "solicitante": "X01", "recurso": "R-ADM-CONF", "accion": "liberar_documento", "vigente": True})
+            return super().decidir(ctx)
+    esc = E.cargar("verificacion_falsa-sencillo")
+    pm2 = partida("verificacion_falsa-sencillo", M.RojoObjetivos(objetivos(esc)), AzulMalicioso("RECHAZAR"))
+    rm2 = pm2.jugar()
+    chk("un Azul que muta su contexto no altera el escenario congelado (hash intacto, sin 409) ni el registro",
+        rm2["resultado"] in X.RESULTADOS and rm2["resultado"] != "ERROR_TECNICO" and E.hash_escenario(pm2._esc) == pm2.hash_escenario
+        and ["R-ADM-CONF", "liberar_documento"] not in pm2._esc["registro"]["X01"]["derechos"])
+
+    # ── Detección de comportamientos degenerados ─────────────────────────────────────────────────────────
+    pd1 = partida("escalada_privilegios-complejo", M.RojoMensajeFijo("R-ADM-CONF", "liberar_documento"), M.AzulFijo("RECHAZAR"))
+    pd1.jugar()
+    a1 = D.analizar_partida(pd1.almacen.eventos(pd1.id))
+    chk("degenerados: «RECHAZAR siempre» + justificación idéntica + Rojo de un mensaje se detectan",
+        "azul_rechazar_siempre" in a1["flags"] and "azul_respuesta_identica" in a1["flags"] and "rojo_mensaje_identico_toda_la_partida" in a1["flags"]
+        and "rojo_insiste_en_un_solo_recurso" in a1["flags"] and "rojo_repite_mensajes" in a1["flags"])
+    pd2 = partida("escalada_privilegios-complejo", M.RojoObjetivos(objetivos(E.cargar("escalada_privilegios-complejo"))), M.AzulRegistro())
+    pd2.jugar()
+    chk("degenerados: un defensor por registro y un Rojo variado no activan «siempre X» ni contradicción (la justificación fija del falso sí se marca como idéntica, correctamente)",
+        not [k for k in D.analizar_partida(pd2.almacen.eventos(pd2.id))["flags"] if k.endswith("_siempre") or "contradice" in k])
+    chk("degenerados: el recuento por partida se agrega con denominador", D.resumir([a1, D.analizar_partida(pd2.almacen.eventos(pd2.id))])["n_partidas"] == 2)
+
+    # ── Identificadores únicos ───────────────────────────────────────────────────────────────────────────
+    alm = Almacen(":memory:")
+    ids = []
+    for _ in range(3):
+        px = X.Partida(E.cargar("verificacion_falsa-sencillo"), M.RojoObjetivos(objetivos(esc)), M.AzulRegistro(), semilla=9, almacen=alm)
+        ids.append(px.id)
+    chk("repetir el mismo escenario/semilla/modelos no pisa ni rompe: ids únicos (-2, -3)", len(set(ids)) == 3 and ids[1].endswith("-2"))
+    pz = partida("verificacion_falsa-sencillo", M.RojoObjetivos(objetivos(esc)), M.AzulRegistro(), semilla=11, presupuesto_override={"max_llamadas_modelo": 1000})
+    chk("el Harness gobierna la partida: el consumo (llamadas) queda en el resultado", pz.jugar()["consumo"]["llamadas_modelo"] >= 6)
 
     # ── Determinismo y tráfico legítimo ─────────────────────────────────────────────────────────────────────
     def hashes(sem):

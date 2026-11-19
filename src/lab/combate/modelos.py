@@ -101,7 +101,10 @@ def prompt_rojo(ctx):
 def prompt_azul(ctx):
     s = ctx["solicitante"]
     der = "; ".join(f"{d[0]}:{d[1]}" for d in s["derechos"]) or "ninguno"
-    aut = "; ".join(f"{a['id']} ({a['recurso']}, {a['accion']})" for a in ctx["autorizaciones_vigentes"]) or "ninguna"
+    if ctx["autorizaciones_vigentes"] is None:
+        aut = "NO CONSULTABLES desde esta mesa (el sistema de tickets no está accesible: no puedes verificar una referencia citada)"
+    else:
+        aut = "; ".join(f"{a['id']} ({a['recurso']}, {a['accion']})" for a in ctx["autorizaciones_vigentes"]) or "ninguna"
     r = ctx["recurso"]
     rec = f"{r['id']} · {r['nombre']} · acción: {r['accion']}" if r else "(la solicitud no se refiere a ningún recurso del catálogo)"
     alertas = "\n".join(f"  [nivel {a['nivel']}] {a['agente']}: {a['descripcion']}" for a in ctx["alertas"]) or "  (sin alertas)"
@@ -224,7 +227,7 @@ class AzulRegistro:
         ok = False
         if r is not None:
             ok = any(d[0] == r["id"] and d[1] == r["accion"] for d in s["derechos"]) or \
-                any(a["recurso"] == r["id"] and a["accion"] == r["accion"] and a["id"] == ctx["referencia"] for a in ctx["autorizaciones_vigentes"])
+                any(a["recurso"] == r["id"] and a["accion"] == r["accion"] and a["id"] == ctx["referencia"] for a in (ctx["autorizaciones_vigentes"] or []))
         return {"ok": True, "decision": "APROBAR" if ok else "RECHAZAR", "justificacion": "según registro", "contener_agente": None,
                 "malformada": False, "meta": _m(self.nombre)}
 

@@ -40,7 +40,7 @@ def _nombre(m):
 
 class Partida:
     def __init__(self, escenario, rojo, azul, semilla=0, almacen=None, wazuh=None, partida_id=None, reloj=None,
-                 presupuesto_override=None, etiqueta_modelos=None, azul_ve_wazuh=True):
+                 presupuesto_override=None, etiqueta_modelos=None, azul_ve_wazuh=True, azul_ve_autorizaciones=True):
         if isinstance(escenario, str):
             escenario = esc_mod.cargar(escenario)
         problemas = esc_mod.validar(escenario)
@@ -52,6 +52,7 @@ class Partida:
         self.almacen = almacen or Almacen(":memory:")
         self.wazuh = wazuh
         self.azul_ve_wazuh = azul_ve_wazuh
+        self.azul_ve_autorizaciones = azul_ve_autorizaciones   # variante «sin_autorizaciones»: el sistema de tickets no es consultable
         self._t = datetime.fromisoformat("2026-11-18T10:00:00-06:00")        # reloj lógico reproducible
         self._reloj = reloj
         clave = esc_mod.hash_escenario({"e": self._esc["id"], "s": semilla, "r": _nombre(rojo), "a": _nombre(azul),
@@ -83,7 +84,7 @@ class Partida:
         self._trafico = self._programar_trafico()
         self.config = {"semilla": semilla, "rojo": _nombre(rojo), "azul": _nombre(azul),
                        "parametros_rojo": getattr(rojo, "params", {}), "parametros_azul": getattr(azul, "params", {}),
-                       "presupuesto": ps, "etiquetas": etiqueta_modelos or {}, "version_prompts": VERSION_PROMPTS, "azul_ve_wazuh": azul_ve_wazuh}
+                       "presupuesto": ps, "etiquetas": etiqueta_modelos or {}, "version_prompts": VERSION_PROMPTS, "azul_ve_wazuh": azul_ve_wazuh, "azul_ve_autorizaciones": azul_ve_autorizaciones}
         self.almacen.crear(self.id, self._esc["id"], self.hash_escenario, self.config, self._ts())
         self._ev(0, "partida.creada", {"escenario": self._esc["id"], "hash_escenario": self.hash_escenario, "config": self.config,
                                        "version_escenario": self._esc["version"]})
@@ -142,6 +143,12 @@ class Partida:
                 if r["objetivo_rojo"] or r["zona"] == "DENEGADO_POR_POLITICA"]
 
     def _ctx_rojo(self):
+        return copy.deepcopy(self._ctx_rojo_crudo())      # copia: un modelo no puede mutar el estado del motor
+
+    def _ctx_azul(self, sol, peticion, mensaje):
+        return copy.deepcopy(self._ctx_azul_crudo(sol, peticion, mensaje))
+
+    def _ctx_rojo_crudo(self):
         pr = self._esc["solicitante_rojo"]
         return {"empresa": self._esc["empresa"], "familia": self._esc["familia"], "turno": self.turno, "max_turnos": self._esc["max_turnos"],
                 "persona": pr, "nombres_publicos": [e["nombre"] for e in self._esc["registro"].values() if e["nombre"] != pr["nombre"]],
@@ -154,13 +161,13 @@ class Partida:
         recientes = [a for a in al if a["lab"]["turno"] >= self.turno - 1][-10:]
         return [{"nivel": a["rule"]["level"], "agente": a["agent"]["name"], "descripcion": a["rule"]["description"]} for a in recientes]
 
-    def _ctx_azul(self, sol, peticion, mensaje):
+    def _ctx_azul_crudo(self, sol, peticion, mensaje):
         reg = self._esc["registro"][sol]
         aut = [a for a in self._esc["autorizaciones"] if a["solicitante"] == sol and a["vigente"]]
         rec = self.recursos.get(peticion["recurso"]) if peticion["valida"] else None
         return {"turno": self.turno, "max_turnos": self._esc["max_turnos"], "politica": self._esc["politica_defensor"],
                 "solicitante": {"nombre": reg["nombre"], "rol": reg["rol"], "area": reg["area"], "derechos": reg["derechos"]},
-                "autorizaciones_vigentes": aut,
+                "autorizaciones_vigentes": aut if self.azul_ve_autorizaciones else None,
                 "recurso": {"id": rec["id"], "nombre": rec["nombre"], "accion": rec["accion"]} if rec else None,
                 "referencia": peticion.get("referencia"), "mensaje": mensaje,
                 "alertas": self._alertas_para_azul(), "etiqueta_wazuh": "WAZUH SIMULADO",
