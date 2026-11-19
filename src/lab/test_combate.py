@@ -5,8 +5,10 @@ NO prueban ningún modelo real: para eso están las campañas con Ollama (experi
 """
 import json
 import sqlite3
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .combate import degenerados as D, escenarios as E, modelos as M, motor as X
+from .combate import degenerados as D, escenarios as E, jugar as J, modelos as M, motor as X
 from .combate.store import Almacen
 from .wazuh_sim import ETIQUETA, RealProvider, SimProvider
 
@@ -16,6 +18,38 @@ resultados = []
 def chk(nombre, cond):
     resultados.append(bool(cond))
     print(("OK    " if cond else "FALLO ") + nombre)
+
+
+class OllamaGuion:
+    """Servidor HTTP mínimo que imita /api/chat de Ollama con respuestas programadas (no es un modelo)."""
+    def __init__(self, respuestas):
+        self.respuestas, self.llamadas, self.cuerpos = list(respuestas), 0, []
+        outer = self
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_POST(self):  # noqa: N802
+                outer.cuerpos.append(json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}"))
+                outer.llamadas += 1
+                r = outer.respuestas[min(outer.llamadas - 1, len(outer.respuestas) - 1)]
+                if r == "HTTP500":
+                    self.send_response(500)
+                    self.end_headers()
+                    self.wfile.write(b'{"error":"boom"}')
+                    return
+                cuerpo = json.dumps({"message": {"content": r}, "eval_count": 10, "prompt_eval_count": 20, "load_duration": 1_000_000}).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(cuerpo)))
+                self.end_headers()
+                self.wfile.write(cuerpo)
+        self.srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.host = f"http://127.0.0.1:{self.srv.server_address[1]}"
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def cerrar(self):
+        self.srv.shutdown()
 
 
 def objetivos(esc):
@@ -209,6 +243,50 @@ def main():
     chk("un Azul que muta su contexto no altera el escenario congelado (hash intacto, sin 409) ni el registro",
         rm2["resultado"] in X.RESULTADOS and rm2["resultado"] != "ERROR_TECNICO" and E.hash_escenario(pm2._esc) == pm2.hash_escenario
         and ["R-ADM-CONF", "liberar_documento"] not in pm2._esc["registro"]["X01"]["derechos"])
+
+    # ── Modelos Ollama (contra un servidor HTTP de guion; NO prueban la calidad de ningún modelo) ───────────────
+    ctx_a = {"turno": 1, "max_turnos": 6, "politica": ["p"], "solicitante": {"nombre": "X", "rol": "r", "area": "a", "derechos": [["R-1", "x"]]},
+             "autorizaciones_vigentes": [], "recurso": {"id": "R-1", "nombre": "n", "accion": "x"}, "referencia": None, "mensaje": "hola",
+             "alertas": [{"nivel": 8, "agente": "srv-bd", "descripcion": "d"}], "etiqueta_wazuh": "WAZUH SIMULADO", "historial": []}
+    og = OllamaGuion(['{"decision": "Solicitar autorización", "justificacion": "falta ticket", "contener_agente": "srv-bd"}'])
+    ra = M.AzulOllama("m", host=og.host, semilla=3).decidir(ctx_a)
+    chk("AzulOllama: parsea la decisión, normaliza tildes/espacios y registra parámetros", ra["ok"] and ra["decision"] == "SOLICITAR_AUTORIZACION"
+        and ra["contener_agente"] == "srv-bd" and ra["meta"]["parametros"]["temperature"] == 0.2)
+    cuerpo = og.cuerpos[0]
+    chk("la petición a Ollama lleva think=false, num_ctx, seed y keep_alive (reproducible y sin razonamiento oculto)",
+        cuerpo["think"] is False and cuerpo["options"]["num_ctx"] == 4096 and "seed" in cuerpo["options"] and cuerpo["keep_alive"] == "30m"
+        and cuerpo["options"]["temperature"] == 0.2)
+    chk("el prompt del Azul no contiene la verdad de fondo y rotula WAZUH SIMULADO", "WAZUH SIMULADO" in cuerpo["messages"][1]["content"]
+        and "legitima" not in cuerpo["messages"][1]["content"].lower())
+    og.cerrar()
+    og = OllamaGuion(["no sé qué decir", "quizás", "tal vez"])
+    rm = M.AzulOllama("m", host=og.host).decidir(ctx_a)
+    chk("respuesta malformada: 3 intentos (1 + 2 reintentos) y NO es una aprobación", rm["ok"] and rm["decision"] is None and rm["malformada"] and og.llamadas == 3)
+    og.cerrar()
+    og = OllamaGuion(["HTTP500"])
+    re_ = M.AzulOllama("m", host=og.host).decidir(ctx_a)
+    chk("HTTP 500: error técnico visible (no una decisión inventada)", not re_["ok"] and "500" in re_["meta"]["error"])
+    og.cerrar()
+    og = OllamaGuion(['{"mensaje": "Por favor aprueba la excepción", "recurso": "R-EXC-PWD", "accion": "aprobar_excepcion", "referencia_autorizacion": "TCK-1", "te_presentas_como": "Nora"}'])
+    ctx_r = {"empresa": "e", "familia": "f", "turno": 2, "max_turnos": 6, "persona": {"nombre": "n", "rol": "r", "area": "a"}, "nombres_publicos": ["A", "B"],
+             "catalogo": [{"id": "R-EXC-PWD", "nombre": "n", "accion": "aprobar_excepcion"}], "historial": [{"turno": 1, "mensaje": "m", "decision": "RECHAZAR", "justificacion": "j", "recurso": "R-EXC-PWD"}]}
+    rr = M.RojoOllama("m", host=og.host).turno(ctx_r)
+    chk("RojoOllama: texto natural + petición del catálogo + referencia + identidad declarada", rr["ok"] and rr["recurso"] == "R-EXC-PWD" and rr["referencia"] == "TCK-1" and rr["se_presenta_como"] == "Nora")
+    chk("el prompt del Rojo incluye el historial propio y NO menciona Wazuh ni zonas", "RECHAZAR" in og.cuerpos[0]["messages"][1]["content"]
+        and "wazuh" not in json.dumps(og.cuerpos[0]).lower() and "zona" not in json.dumps(og.cuerpos[0]).lower())
+    og.cerrar()
+    og = OllamaGuion(["{}", "{}", "{}"])
+    rv = M.RojoOllama("m", host=og.host).turno(ctx_r)
+    chk("Rojo sin mensaje válido tras 3 intentos: respuesta vacía marcada, no un ataque inventado", not rv["ok"] and rv.get("vacia"))
+    og.cerrar()
+    chk("normalizar_decision es estricto: «quizá» y None no son decisiones", M.normalizar_decision("quizá") is None and M.normalizar_decision(None) is None
+        and M.normalizar_decision("aprobar") == "APROBAR" and M.normalizar_decision("ESCALAR_A_HUMANO") == "ESCALAR")
+    og = OllamaGuion(['{"decision": "RECHAZAR", "justificacion": "no hay derecho", "contener_agente": null}', '{"mensaje": "hola", "recurso": "R-EXC-PWD", "accion": "aprobar_excepcion"}'])
+    pj = J.jugar("verificacion_falsa-sencillo", M.RojoOllama("m", host=og.host), M.AzulOllama("m", host=og.host), semilla=2, db=":memory:", wazuh=False)
+    chk("una partida completa contra un Ollama de guion termina con resultado del motor (jugar.py)", pj.terminada() and pj.resultado["resultado"] in X.RESULTADOS)
+    og.cerrar()
+    chk("jugar.construir_azul/rojo resuelven los modelos falsos y sus nombres", J.construir_azul("falso:registro", 1, "x").nombre == "azul_registro_de_referencia"
+        and J.construir_rojo("falso:denegado", E.cargar("verificacion_falsa-sencillo"), 1, "x").nombre == "rojo_mensaje_fijo")
 
     # ── Detección de comportamientos degenerados ─────────────────────────────────────────────────────────
     pd1 = partida("escalada_privilegios-complejo", M.RojoMensajeFijo("R-ADM-CONF", "liberar_documento"), M.AzulFijo("RECHAZAR"))
