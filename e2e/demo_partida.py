@@ -137,7 +137,13 @@ def main(ver=False):
     inicio = time.time()
     try:
         with sync_playwright() as p:
-            nav = p.chromium.launch(headless=not ver)
+            nav = None
+            for kw in ({}, {"channel": "msedge"}, {"channel": "chrome"}):   # Chromium de Playwright, o el Edge/Chrome instalado (sin descargar nada)
+                try:
+                    nav = p.chromium.launch(headless=not ver, **kw)
+                    break
+                except Exception:  # noqa: BLE001
+                    continue
 
             def vista(rol):
                 ctx = nav.new_context(viewport=VIEWPORT, accept_downloads=True, locale="es-MX")

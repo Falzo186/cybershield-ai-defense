@@ -39,3 +39,4 @@ data/campanas/combate-*/wazuh_alerts.ndjson
 data/combate.db
 data/wazuh_sim.db
 data/wazuh_sim/
+.coverage
