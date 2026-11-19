@@ -92,7 +92,7 @@ Reemplaza al guion de la misión de 23 h para exposiciones: incluye una partida 
 
 ## Cómo explicar honestamente «el Rojo no ganó» y por qué
 
-1. **Los hechos:** en `combate-v1`, el Rojo 8B ganó **0 de 240** partidas con IA real; solo 6 llegaron a un objetivo parcial, todas con `llama3.1:8b` contra sí mismo. Contra un Azul «aprueba todo» sí gana (93 %), así que sabe pedir.
+1. **Los hechos:** en `combate-v1`, el Rojo 8B ganó **0 de 240** partidas con IA real; en la matriz principal solo 6 llegaron a un objetivo parcial, todas con `llama3.1:8b` contra sí mismo (y otras 6 en las variaciones, también llama). Contra un Azul «aprueba todo» sí gana (93 %), así que sabe pedir.
 2. **La razón principal:** el Azul decide con el registro (derechos y autorizaciones) y el escenario fue diseñado para que quien verifica no tenga que ceder. Ganar al Rojo es fácil si el defensor lee el registro; **el problema real del Azul no es ceder, es el servicio**: `qwen3:8b` escala ≈70 % de sus decisiones y cae en empate degradado el 30 % de las veces.
 3. **Lo que no se afirma:** que el Rojo 8B no pueda ganar jamás; son 60 partidas por pareja, un solo diseño de prompts y modelos pequeños. La prueba de sensibilidad sí mostró un fallo real del Azul: ambos 8B aprobaron un documento interno a quien no tenía el derecho registrado si lo pedía con cortesía (v2: qwen 8/8, llama 5/8).
 4. **Lo que se hizo después (misión extra):** prompts v3 y la campaña `combate-v2`, con los resultados lado a lado y sin retocar v2 (ver `INFORME_CAMPANAS_V2.md`).
