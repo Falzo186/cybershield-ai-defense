@@ -88,7 +88,7 @@ def _plan_fase(fase, reps_base, reps_llm, reps_var):
     if "variaciones" in fases:   # una variable por vez, sobre el espejo/cruce que menos hunda: Azul con ejemplos / sin Wazuh
         for k in range(1, reps_var + 1):
             for e in esc:
-                for cfg in ("ejemplos", "sin_wazuh"):
+                for cfg in ("ejemplos", "sin_wazuh", "sin_autorizaciones", "sin_aut_sin_wazuh"):
                     for r, a in ((MODELO_A, MODELO_A), (MODELO_B, MODELO_B)):
                         out.append(celda("variaciones", e, r, a, cfg, k))
     return out
@@ -129,8 +129,11 @@ def pid_vivo(pid):
         return False
 
 
+SUFIJO = ""   # --sufijo: permite dos procesos sobre la misma campaña (fases distintas): candado y base de partidas propios
+
+
 def candado(d):
-    f = d / "lock.pid"
+    f = d / f"lock{SUFIJO}.pid"
     if f.exists():
         try:
             info = json.loads(f.read_text(encoding="utf-8"))
@@ -169,9 +172,17 @@ def jugar_celda(c, d):
     if c["config"] == "ejemplos" and isinstance(azul, M.AzulOllama):
         azul = M.AzulOllama(c["azul"], host=HOST, semilla=c["semilla"], ejemplos=True)
     wz = SimProvider(ruta_ndjson=d / "wazuh_alerts.ndjson", ruta_db=":memory:", semilla=c["semilla"])
-    p = Partida(esc, rojo, azul, semilla=c["semilla"], almacen=Almacen(d / "partidas.db"), wazuh=wz,
+    alm = Almacen(d / f"partidas{SUFIJO}.db")
+    previa = alm.partida(f"{c['fase']}-{c['id']}")
+    if previa and previa["resultado"]:   # la partida terminó pero la observación no llegó a escribirse (corte entre medias): se recupera, no se repite
+        r = dict(previa["resultado"])
+        r["recuperada"] = True
+        return r, 0.0
+    # Si quedó una partida a medias de un corte anterior, el motor le asigna un id nuevo (sufijo -2, -3…): la huérfana no cuenta nada.
+    p = Partida(esc, rojo, azul, semilla=c["semilla"], almacen=alm, wazuh=wz,
                 partida_id=f"{c['fase']}-{c['id']}", etiqueta_modelos={"celda": c["id"], "config": c["config"]},
-                azul_ve_wazuh=c["config"] != "sin_wazuh")
+                azul_ve_wazuh=c["config"] not in ("sin_wazuh", "sin_aut_sin_wazuh"),
+                azul_ve_autorizaciones=c["config"] not in ("sin_autorizaciones", "sin_aut_sin_wazuh"))
     t0 = time.time()
     try:
         r = p.jugar()
@@ -251,7 +262,7 @@ def estado(nombre, fases, reps_base, reps_llm, reps_var):
     d = carpeta(nombre)
     obs = estado_por_id(leer_obs(d))
     pl = plan(fases, reps_base, reps_llm, reps_var)
-    f = d / "lock.pid"
+    f = d / f"lock{SUFIJO}.pid"
     info = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
     hechas = sum(1 for c in pl if c["id"] in obs)
     inval = sum(1 for c in pl if c["id"] in obs and not obs[c["id"]]["valida"])
@@ -262,11 +273,11 @@ def estado(nombre, fases, reps_base, reps_llm, reps_var):
 
 def lanzar(argv_extra, nombre):
     d = carpeta(nombre)
-    log = open(d / "log.txt", "a", encoding="utf-8")
+    log = open(d / f"log{SUFIJO}.txt", "a", encoding="utf-8")
     flags = 0x00000008 | 0x00000200 if os.name == "nt" else 0   # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
     p = subprocess.Popen([sys.executable, str(Path(__file__).resolve())] + argv_extra, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                          creationflags=flags, close_fds=True, cwd=str(RAIZ), env={**os.environ, "PYTHONIOENCODING": "utf-8"})
-    print(f"campaña lanzada en segundo plano: PID {p.pid}; log en {d / 'log.txt'}")
+    print(f"campaña lanzada en segundo plano: PID {p.pid}; log en {d / f'log{SUFIJO}.txt'}")
     return 0
 
 
@@ -283,7 +294,10 @@ def main():
     ap.add_argument("--prueba-corta", action="store_true")
     ap.add_argument("--lanzar", action="store_true", help="relanza este mismo comando desacoplado en segundo plano")
     ap.add_argument("--estado", action="store_true")
+    ap.add_argument("--sufijo", default="", help="segundo proceso sobre la misma campaña (fases distintas)")
     a = ap.parse_args()
+    global SUFIJO
+    SUFIJO = f"-{a.sufijo}" if a.sufijo else ""
     fases = [x for x in a.fases.split(",") if x]
     if a.estado:
         return estado(a.campana, fases, a.reps_base, a.reps_llm, a.reps_var)

@@ -32,8 +32,8 @@ respaldo_pre_mision/
 # Campañas de combate (misión 23h): la evidencia primaria (observaciones y alertas) sí se versiona; el estado de ejecución no
 !data/campanas/combate-*/
 !data/campanas/combate-*/observaciones.jsonl
-data/campanas/combate-*/lock.pid
-data/campanas/combate-*/log.txt
+data/campanas/combate-*/lock*.pid
+data/campanas/combate-*/log*.txt
 data/campanas/combate-*/*.db
 data/campanas/combate-*/wazuh_alerts.ndjson
 data/combate.db
