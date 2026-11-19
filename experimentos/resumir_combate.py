@@ -242,7 +242,7 @@ def graficas(informe, salida):
     ax.set_xlim(0, 100)
     ax.set_xlabel("% de partidas válidas")
     ax.set_title("Resultados de los combates por celda (inconclusas excluidas)", fontsize=10)
-    ax.legend(ncol=4, fontsize=7, loc="lower center", bbox_to_anchor=(0.5, -0.22 - 0.01 * len(celdas)))
+    ax.legend(ncol=4, fontsize=7, loc="upper center", bbox_to_anchor=(0.5, -0.06))
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     fig.tight_layout()
