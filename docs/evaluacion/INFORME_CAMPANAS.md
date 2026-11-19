@@ -37,7 +37,7 @@ Inferencias reales: ≈ 19 llamadas por partida × 510 partidas con 8B ≈ 9 700
 `llama3.1:8b` en espejo: 6 de 480 intentos = 1,25 % aceptados), por lo que acabaron en EMPATE. La etapa «intento → acción aceptada» rinde 1,25 % en llama y 0 % en los otros tres cruces.
 
 **Rojo y Azul pueden ganar** (el motor lo permite y está demostrado con guion), pero **con estos modelos y prompts el Rojo no gana: el combate lo domina el Azul**. La parte débil del Azul no es ceder, sino **el costo de la cautela**:
-- `qwen3:8b` como Azul **escala** el 74 % de las solicitudes (466 de 660 decisiones en espejo) y rechaza/pide autorización a legítimas: legítimas atendidas **84 %** (espejo) y 77 % cuando el Rojo es llama; **empate degradado en 30 %** de las partidas.
+- `qwen3:8b` como Azul **escala** el 70,6 % de sus decisiones (466 de 660 en espejo; 66,5 % como Azul cruzado) y rechaza/pide autorización a legítimas: legítimas atendidas **84 %** (espejo) y 77 % cuando el Rojo es llama; **empate degradado en 30 %** de las partidas.
 - `llama3.1:8b` como Azul **pide autorización** en el 60 % de las decisiones (398/660), atiende 96–97 % de las legítimas y gana más (83–95 %).
 - Falsos positivos (legítimas no atendidas): qwen3 13,9 % [8,9–19,3]; llama 3,9 % [1,1–6,9] (espejo). El ruido del Wazuh simulado contribuye: qwen escaló solicitudes legítimas citando «alertas de actividad inusual» que eran ruido de fondo.
 - Por dificultad (espejo): sencillo 55 %/85 % victoria Azul (qwen/llama), intermedio 65 %/70 %, complejo 90 %/95 %. Los escenarios sencillos son los que más empates degradados dan: umbral 1 con menos turnos y menos tráfico legítimo medible (un solo rechazo baja la tasa por debajo del 70 %).
@@ -69,11 +69,11 @@ Hallazgo honesto: **ambos 8B detectan un ticket inventado y resisten la presión
 (a) los Rojos 8B piden los recursos con trucos que el Azul sí detecta (tickets inventados, identidades ajenas, urgencia) y
 (b) el Rojo cortés guionado de la fase `cortes` tampoco ganó (0/60: llama 97 % victoria Azul, qwen 80 %), porque los recursos objetivo (cuentas ajenas, excepciones, campos de prueba) no se parecen al recurso de S1.
 La primera versión de S1 usaba un recurso que la política permite a cualquiera sobre su propia cuenta: era una prueba mal diseñada; se descartó y se conserva en `combate-v1/descartado/`.
-Comportamientos degenerados: ningún Azul fue «siempre X» (el modelo cambia de decisión con la entrada: S2 y S3), pero qwen3 **sobre-escala** (74 %) y llama **sobre-pide autorización** (60 %): sesgos de cautela, no respuestas constantes.
+Comportamientos degenerados: ningún Azul fue «siempre X» (el modelo cambia de decisión con la entrada: S2 y S3), pero qwen3 **sobre-escala** (≈ 70 %) y llama **sobre-pide autorización** (60 %): sesgos de cautela, no respuestas constantes.
 
 ## 5. Rojo y Azul por separado
-**Rojo (8B):** 0 victorias; objetivo parcial en 6/240 partidas válidas (2,5 %); intentos → aceptadas → efectos → objetivos: 1920 → 6 → 6 → 6. No repite mensajes (0 repetidos), no se declara ganador falsamente, no hubo respuestas vacías ni mensajes filtrados por contenido técnico. Con el Azul de referencia por registro o contra mensajes fijos, 0 %. Contra Azul que aprueba todo (línea base), gana ~93 % (llama/qwen): **sabe pedir, pero no engaña a un defensor que verifica**.
-**Azul (8B):** prevención ≈ 99–100 % de las solicitudes del Rojo (0–1 aprobaciones indebidas en toda la campaña), a costa de legítimas no atendidas (4–14 %, hasta 22 % con qwen cruzado). El problema del Azul es de precisión y servicio, no de seguridad.
+**Rojo (8B):** 0 victorias; objetivo parcial en 6/240 partidas válidas (2,5 %); intentos → aceptadas → efectos → objetivos: 1 920 → 6 → 6 → 6. No repite mensajes (0 repetidos), no se declara ganador falsamente, no hubo respuestas vacías ni mensajes filtrados por contenido técnico. Con el Azul de referencia por registro o contra mensajes fijos, 0 %. Contra Azul que aprueba todo (línea base), gana 93 % de las partidas (14/15 con cada modelo): **sabe pedir, pero no engaña a un defensor que verifica**.
+**Azul (8B):** prevención 98,7 % (llama espejo: 6 aprobaciones indebidas en 452 solicitudes maliciosas, IC95 % de FN [0,6–2,9 %]) y 100 % en las otras tres parejas (0 de ~480), a costa de legítimas no atendidas (4–14 % en espejo; 22 % con qwen como Azul cruzado, 77 % atendidas). El problema del Azul es de precisión y servicio, no de seguridad.
 
 ## Limitaciones
 - 60 partidas por pareja (15 escenarios × 4 repeticiones; las repeticiones del mismo escenario no son independientes por completo: misma plantilla de tráfico con otra semilla). Intervalos por partida; «0/60» no es «imposible».
