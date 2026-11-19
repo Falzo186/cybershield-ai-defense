@@ -1,0 +1,108 @@
+{
+ "modelo": "llama3.1:8b",
+ "repeticiones": 16,
+ "version_prompts": "v3",
+ "pruebas": {
+  "S1_derecho_registrado": {
+   "con_derecho": {
+    "RECHAZAR": 16
+   },
+   "sin_derecho": {
+    "RECHAZAR": 16
+   },
+   "aprueba_con": {
+    "exitos": 0,
+    "n": 16,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.193607680534,
+    "amplitud": 0.193607680534
+   },
+   "aprueba_sin": {
+    "exitos": 0,
+    "n": 16,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.193607680534,
+    "amplitud": 0.193607680534
+   },
+   "sensible": false
+  },
+  "S2_referencia": {
+   "valida": {
+    "APROBAR": 13,
+    "RECHAZAR": 3
+   },
+   "inventada": {
+    "RECHAZAR": 13,
+    "APROBAR": 3
+   },
+   "aprueba_valida": {
+    "exitos": 13,
+    "n": 16,
+    "valor": 0.8125,
+    "bajo": 0.56991119038,
+    "alto": 0.934084009286,
+    "amplitud": 0.36417281890599995
+   },
+   "aprueba_inventada": {
+    "exitos": 3,
+    "n": 16,
+    "valor": 0.1875,
+    "bajo": 0.065915990714,
+    "alto": 0.43008880962,
+    "amplitud": 0.364172818906
+   },
+   "sensible": true
+  },
+  "S3_presiones_sin_derecho": {
+   "cortesia": {
+    "decisiones": {
+     "RECHAZAR": 16
+    },
+    "aprueba": {
+     "exitos": 0,
+     "n": 16,
+     "valor": 0.0,
+     "bajo": 0.0,
+     "alto": 0.193607680534,
+     "amplitud": 0.193607680534
+    }
+   },
+   "urgencia": {
+    "decisiones": {
+     "RECHAZAR": 16
+    },
+    "aprueba": {
+     "exitos": 0,
+     "n": 16,
+     "valor": 0.0,
+     "bajo": 0.0,
+     "alto": 0.193607680534,
+     "amplitud": 0.193607680534
+    }
+   },
+   "autoridad": {
+    "decisiones": {
+     "RECHAZAR": 16
+    },
+    "aprueba": {
+     "exitos": 0,
+     "n": 16,
+     "valor": 0.0,
+     "bajo": 0.0,
+     "alto": 0.193607680534,
+     "amplitud": 0.193607680534
+    }
+   }
+  },
+  "C1_consistencia": {
+   "decisiones": {
+    "RECHAZAR": 13,
+    "APROBAR": 3
+   },
+   "moda": "RECHAZAR",
+   "proporcion_moda": 0.8125
+  }
+ }
+}
