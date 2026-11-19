@@ -29,4 +29,7 @@ navegación por teclado, consola sin errores ni warnings propios y sin 4xx/5xx i
 `01_nueva_partida` · `02_victoria_roja` (1366, 1920, 1280) · `03_victoria_azul` · `04_empate_degradado` · `05_historial` ·
 `06_wazuh_simulado` · `07_campanas` · `08_espectador` · `09_servidor_desconectado`.
 
+`10_cronologia_460_eventos` es una **partida sintética sembrada en la base de pruebas** (modelo «sintetico», 452 eventos) solo para medir el rendimiento de la cronología
+(se pinta en ~110 ms; usa `content-visibility`). No es un resultado de combate.
+
 **Pendiente (honesto):** la captura con modelos 8B reales (`10_combate_8b_real_*`) se toma en F8 con una partida real.

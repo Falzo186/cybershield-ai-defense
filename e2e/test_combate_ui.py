@@ -71,6 +71,31 @@ def iniciar(page, escenario, rojo, azul, semilla=1, ritmo=None):
                            arg=anterior, timeout=15000)
 
 
+def sembrar_partida_larga(ruta):
+    """Una partida terminada con ~460 eventos sintéticos (solo para medir el rendimiento de la cronología; no es un resultado real)."""
+    sys.path.insert(0, str(RAIZ))
+    from src.lab.combate import escenarios as E
+    from src.lab.combate.store import Almacen
+    alm = Almacen(ruta)
+    esc = E.cargar("escalada_privilegios-complejo")
+    alm.crear("larga-prueba", esc["id"], E.hash_escenario(esc), {"semilla": 0, "rojo": "sintetico", "azul": "sintetico", "version_prompts": "v2"}, "2026-11-18T09:00:00-06:00")
+    alm.añadir("larga-prueba", 0, "2026-11-18T09:00:00-06:00", "partida.creada", {"escenario": esc["id"]})
+    for t in range(1, 11):
+        alm.añadir("larga-prueba", t, "2026-11-18T09:00:01-06:00", "turno.inicio", {"turno": t, "max_turnos": 10})
+        for k in range(11):
+            alm.añadir("larga-prueba", t, "2026-11-18T09:00:02-06:00", "rojo.mensaje", {"solicitante": "X01", "mensaje": f"Mensaje sintético {t}.{k}", "peticion": {"recurso": "R-ADM-CONF", "valida": True},
+                                                                                         "repetido": False, "modelo": "sintetico"})
+            alm.añadir("larga-prueba", t, "2026-11-18T09:00:03-06:00", "siem.senal", {"clave": "solicitud.urgencia"})
+            alm.añadir("larga-prueba", t, "2026-11-18T09:00:04-06:00", "azul.decision", {"origen": "rojo", "decision": "RECHAZAR", "justificacion": "sintético", "legitima": False, "modelo": "sintetico"})
+            alm.añadir("larga-prueba", t, "2026-11-18T09:00:05-06:00", "rojo.prevenido", {"decision": "RECHAZAR"})
+    res = {"resultado": "VICTORIA_AZUL", "motivo": "sintético", "causa": None, "partida_id": "larga-prueba", "escenario": esc["id"], "hash_escenario": E.hash_escenario(esc),
+           "turnos_jugados": 10, "max_turnos": 10, "objetivos_alcanzados": [], "umbral_victoria_roja": 3, "tasa_legitimas": 1.0, "integridad_ok": True,
+           "metricas": {"rojo": {"intentos": 110, "aceptadas": 0, "efectos": 0, "objetivos": 0, "bloqueadas_por_capas": 0}, "azul": {"clasificacion": {"VP": 110, "FP": 0, "FN": 0, "VN": 4}}},
+           "consumo": {"llamadas_modelo": 0, "max_llamadas_modelo": 100, "tokens_salida": 0, "max_tokens_salida": 30000, "errores_consecutivos": 0, "max_errores_consecutivos": 3}}
+    alm.añadir("larga-prueba", 10, "2026-11-18T09:01:00-06:00", "partida.resultado", res)
+    alm.cerrar("larga-prueba", "finalizada", res, "2026-11-18T09:01:00-06:00")
+
+
 def lanzar_navegador(pw, ver):
     """Chromium de Playwright si está descargado; si no, el Edge/Chrome ya instalado (sin descargar nada)."""
     for kw in ({}, {"channel": "msedge"}, {"channel": "chrome"}):
@@ -87,6 +112,7 @@ def main(ver=False, capturas=True):
     tmp = tempfile.mkdtemp()
     env = {**os.environ, "PUERTO": str(port), "CS_CODIGO_ARBITRO": CODIGO, "CS_COMBATE_DB": os.path.join(tmp, "c.db"),
            "CS_WAZUH_SIM_DB": os.path.join(tmp, "w.db"), "PYTHONIOENCODING": "utf-8"}
+    sembrar_partida_larga(env["CS_COMBATE_DB"])
     srv = subprocess.Popen([sys.executable, str(RAIZ / "server" / "app.py")], cwd=str(RAIZ), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(60):
@@ -194,7 +220,7 @@ def main(ver=False, capturas=True):
             # ── Historial ─────────────────────────────────────────────────────────────────────────────────
             page.click("button[data-vista=historial]")
             page.wait_for_selector("#h-tabla table.datos")
-            chk("el historial lista las 5 partidas con sus resultados", page.locator("#h-tabla tbody tr").count() == 5)
+            chk("el historial lista las 5 partidas jugadas y la sembrada con sus resultados", page.locator("#h-tabla tbody tr").count() == 6)
             page.select_option("#h-resultado", "INCONCLUSA")
             page.wait_for_function("document.querySelectorAll('#h-tabla tbody tr').length === 1")
             chk("el filtro por resultado funciona", page.locator("#h-tabla tbody tr").count() == 1)
@@ -248,6 +274,21 @@ def main(ver=False, capturas=True):
                 if capturas:
                     page.screenshot(path=str(SALIDA / f"02_victoria_roja_{nombre}.png"))
             page.set_viewport_size(VISTAS["1366x768"])
+
+            # ── Rendimiento con 200+ eventos ───────────────────────────────────────────────────────────────
+            t0 = time.time()
+            page.goto(base + "/combate/#teatro/larga-prueba")
+            page.reload()
+            page.wait_for_function("document.querySelectorAll('#cronos .msg').length > 300", timeout=20000)
+            ms = (time.time() - t0) * 1000
+            n_msgs = page.locator("#cronos .msg").count()
+            chk(f"200+ eventos: la cronología se pinta en < 4 s ({n_msgs} mensajes, {ms:.0f} ms) y el contador dice 452", ms < 4000 and "452 eventos" in page.inner_text("#cron-n"))
+            t1 = time.time()
+            page.evaluate("document.querySelector('#cronos').scrollTop = 0")
+            page.evaluate("document.querySelector('#cronos').scrollTop = document.querySelector('#cronos').scrollHeight")
+            chk("200+ eventos: el desplazamiento no bloquea el hilo (< 500 ms para ir al inicio y al final)", (time.time() - t1) * 1000 < 500)
+            if capturas:
+                page.screenshot(path=str(SALIDA / "10_cronologia_460_eventos_1366x768.png"))
 
             # ── Teclado y foco ─────────────────────────────────────────────────────────────────────────────
             page.keyboard.press("Tab")
