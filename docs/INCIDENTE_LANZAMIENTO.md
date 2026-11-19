@@ -59,3 +59,21 @@ fallos y, si no pudo escribir, **la sesión no se cierra** y se dice por qué.
   reventado la tanda completa a la primera sesión.
 
 El relanzamiento completó las 40 sesiones en 102,6 min con **0 rondas huérfanas**.
+
+---
+## Adenda 2026-11-19 · Intento de demostrar la causa (misión extra, fase A.3)
+
+Se probaron tres enfoques controlados en Windows 11 con un hijo de Python de 10 s (scripts efímeros, no versionados). Códigos de salida y estado medidos, no supuestos.
+
+| # | Enfoque | Resultado medido |
+|---|---|---|
+| 1 | Envoltorio original (`cmd /c "python hijo & echo fin"`) y `taskkill /F /T` sobre el envoltorio | Código del envoltorio **1**; el hijo **murió** (no escribió su marca) |
+| 2 | Lanzador desacoplado (`DETACHED_PROCESS\|CREATE_NEW_PROCESS_GROUP`) y `taskkill /F /T` sobre el padre | Código del padre **1**; el hijo **murió también** |
+| 2b | Control: los mismos dos lanzamientos con `taskkill /F` **sin** `/T` (solo el padre) | Hijo **sobrevivió y terminó** en ambos casos |
+| 3 | Borrar el directorio de trabajo del hijo mientras corre | Windows lo **deniega** (`PermissionError`); el hijo termina con código 0 |
+
+Qué se descarta: el cambio o borrado del directorio de trabajo no mata al hijo (enfoque 3), así que la hipótesis del cwd del incidente original **queda descartada como causa directa**.
+
+Qué se aprende: un corte del árbol (`/T`) mata también al proceso desacoplado, porque Windows conserva la relación padre-hijo. Mi mitigación anterior («lanzador desacoplado») protege solo cuando se mata al padre sin el árbol; **no protege contra un corte de árbol**. Esto corrige la afirmación previa de que la mitigación era suficiente. La protección real que sí funciona es la reanudación (ids deterministas, candado PID, huérfanas).
+
+Qué NO se demostró: el código **4** no se reprodujo (se obtuvo 1). Sigue sin conocerse qué proceso externo terminó el envoltorio original ni por qué devolvió 4. Causa raíz: **no demostrada**.
