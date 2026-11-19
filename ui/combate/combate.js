@@ -63,7 +63,7 @@
     $$(".nav-item").forEach((b) => b.setAttribute("aria-current", b.dataset.vista === v ? "page" : "false"));
     $("#titulo-seccion").textContent = TITULOS[v];
     try { history.replaceState(null, "", "#" + v + (S.pid ? "/" + S.pid : "")); } catch (_) { /* sin history */ }
-    if (v === "historial") cargarHistorial(); else if (v === "wazuh") cargarWazuh(); else if (v === "campanas") cargarCampanas();
+    if (v === "historial") { cargarHistorial(); cargarCuradas(); } else if (v === "wazuh") cargarWazuh(); else if (v === "campanas") cargarCampanas();
   }
   $$(".nav-item").forEach((b) => b.addEventListener("click", () => ir(b.dataset.vista)));
 
@@ -149,9 +149,9 @@
 
   // ── Partida: carga incremental y render ─────────────────────────────────────────────────────────
   const bloques = new Map();
-  function abrirPartida(pid) {
-    clearTimeout(S.timer);
-    Object.assign(S, { pid, det: null, eventos: [], ultimo: 0, limite: null });
+  function abrirPartida(pid, opts) {
+    clearTimeout(S.timer); detenerReproduccion();
+    Object.assign(S, { pid, det: null, eventos: [], ultimo: 0, limite: null, autoRep: !!(opts && opts.reproducir) });
     $("#cronos").textContent = ""; bloques.clear(); $("#teatro-vacio").hidden = true; $("#teatro").hidden = false; $("#banner").hidden = true;
     $("#nueva").open = false; ir("teatro"); sondear();
   }
@@ -166,8 +166,29 @@
       siguiente = det.en_curso || !det.resultado ? 1000 : 0;
     } catch (e) { if (e.status === 404) { toast("La partida ya no existe", "error"); S.pid = null; return; } siguiente = 3000; $("#pensando").hidden = false; $("#pensando").textContent = "Reconectando con el servidor…"; }
     if (siguiente) S.timer = setTimeout(sondear, siguiente);
-    else { pintarTodo(); const r = S.eventos.length; $("#reproductor").hidden = r === 0; }
+    else { pintarTodo(); const r = S.eventos.length; $("#reproductor").hidden = r === 0; if (S.autoRep && r) { S.autoRep = false; reproducir(); } }
   }
+
+  // Reproducción: avanza turno a turno SOLO mostrando lo que ya está registrado (no calcula nada en el navegador)
+  let repTimer = null;
+  function fijarLimite(v) {
+    S.limite = v >= S.det.max_turnos ? null : v;
+    $("#rep-turno").value = String(v);
+    $$("#cronos .turno-bloque").forEach((b) => { b.hidden = S.limite != null && parseInt(b.dataset.turno, 10) > S.limite; });
+    pintarTodo();
+  }
+  function detenerReproduccion() { clearTimeout(repTimer); repTimer = null; const b = $("#btn-reproducir"); if (b) b.lastChild.textContent = "Reproducir cronología"; }
+  function reproducir() {
+    if (!S.det || !S.det.resultado) return;
+    if (repTimer) { detenerReproduccion(); return; }
+    const max = S.det.max_turnos; let t = 0; $("#btn-reproducir").lastChild.textContent = "Pausar reproducción";
+    fijarLimite(0);
+    const ritmo = () => (window.__ritmoRep != null ? window.__ritmoRep : 1100);
+    const paso = () => { t++; fijarLimite(t); const c = $("#cronos"); c.scrollTop = c.scrollHeight;
+      if (t >= max) { detenerReproduccion(); return; } repTimer = setTimeout(paso, ritmo()); };
+    repTimer = setTimeout(paso, ritmo());
+  }
+  $("#btn-reproducir").addEventListener("click", reproducir);
 
   // Estado derivado SOLO de los eventos que el motor persistió
   function derivar() {
@@ -197,6 +218,15 @@
     const d = S.det; if (!d) return;
     const D = derivar();
     const fin = !!d.resultado && (S.limite == null || S.limite >= d.max_turnos);
+    // Etiquetas permanentes: Rojo guionado (no es un modelo) y partida curada (reproducción de una partida real)
+    $("#etiqueta-guion").hidden = !/^rojo_/.test(String(d.rojo || ""));
+    const bc = $("#banner-curada");
+    if (d.curada) {
+      bc.hidden = false; bc.textContent = "";
+      const cfg = d.config || {};
+      bc.append(el("b", "", "REPRODUCCIÓN de una partida real registrada"), document.createTextNode(` (campaña combate-v1, ${d.partida_original}). ${d.motivo_curada} Modelos: Rojo ${d.rojo} · Azul ${d.azul} · semilla ${d.semilla} · prompts ${cfg.version_prompts || "—"}. `));
+      const a = el("a", "", "Ver eventos (JSON)"); a.href = `${BASE}/partidas/${d.id}/eventos`; a.target = "_blank"; a.rel = "noopener"; bc.append(a);
+    } else bc.hidden = true;
     // Cabecera
     $("#cp-titulo").textContent = tituloEsc(d.escenario);
     $("#cp-sub").textContent = `Partida ${d.id} · semilla ${d.semilla} · hash del escenario ${d.hash_escenario.slice(0, 12)}… · cadena de auditoría ${d.cadena ? "íntegra" : "ROTA"} · prompts ${(d.config || {}).version_prompts || "—"}`;
@@ -321,6 +351,7 @@
   }
   $("#ver-siem").addEventListener("change", () => $$("#cronos [data-siem]").forEach((n) => { n.hidden = !$("#ver-siem").checked; }));
   $("#rep-turno").addEventListener("input", (ev) => {
+    detenerReproduccion();
     const v = parseInt(ev.target.value, 10); S.limite = v >= S.det.max_turnos ? null : v;
     $$("#cronos .turno-bloque").forEach((b) => { b.hidden = S.limite != null && parseInt(b.dataset.turno, 10) > S.limite; }); pintarTodo();
   });
@@ -361,9 +392,35 @@
       tb.append(body); t.append(tb);
     } catch (e) { t.textContent = ""; const v = el("div", "vacio"); v.append(el("strong", "", "No se pudo cargar el historial"), document.createTextNode(e.message)); t.append(v); }
   }
+  async function cargarCuradas() {
+    const c = $("#h-curadas-lista"); c.textContent = "";
+    try {
+      const r = await api("GET", BASE + "/curadas");
+      r.curadas.forEach((x) => {
+        const k = x.campana || {}; const t = el("div", "curada"); t.dataset.id = x.id;
+        const cab = el("div", "datos"); cab.append(chipResultado(x.resultado), chipx(`semilla ${k.semilla}`), chipx(`prompts ${k.version_prompts}`), chipx(`${x.eventos} eventos`));
+        const ac = el("div", "acciones");
+        const rep = el("button", "boton boton-primario"); rep.append(el("span", "", "Reproducir cronología")); rep.addEventListener("click", () => abrirPartida(x.id, { reproducir: true }));
+        const ab = el("button", "boton"); ab.append(el("span", "", "Abrir")); ab.addEventListener("click", () => abrirPartida(x.id));
+        const ev = el("a", "boton"); ev.href = `${BASE}/partidas/${x.id}/eventos`; ev.target = "_blank"; ev.rel = "noopener"; ev.textContent = "Eventos (JSON)";
+        ac.append(rep, ab, ev);
+        t.append(el("h4", "", tituloEsc(k.escenario)), cab, el("p", "", x.motivo), el("p", "", `Rojo ${k.rojo} · Azul ${k.azul}`), ac); c.append(t);
+      });
+    } catch (e) { c.textContent = "No se pudieron cargar las partidas curadas: " + e.message; }
+  }
+  // Demostración del motor con guion determinista (sin IA): Rojo guionado contra Azul trivial o por registro
+  async function demoGuion(azul) {
+    if (S.rol !== "general") { toast("Solo el árbitro puede iniciar la demostración", "error"); return; }
+    try {
+      const r = await api("POST", BASE + "/partidas", { escenario: $("#f-escenario").value, rojo: "falso:objetivos", azul, semilla: parseInt($("#f-semilla").value || "1", 10),
+        ritmo_s: typeof window.__ritmo === "number" ? window.__ritmo : undefined });
+      toast("Demostración con guion determinista iniciada", "ok"); abrirPartida(r.id);
+    } catch (e) { toast(e.message, "error"); }
+  }
+  $$("#demo-guion button[data-azul]").forEach((b) => b.addEventListener("click", () => demoGuion(b.dataset.azul)));
   function chipResultado(r) { const m = { VICTORIA_ROJA: "chip-rojo", VICTORIA_AZUL: "chip-azul", EMPATE: "chip-aviso", EMPATE_DEGRADADO: "chip-aviso", INCONCLUSA: "chip-neutro", ERROR_TECNICO: "chip-error" };
     return el("span", "chip sin-punto " + (m[r] || "chip-neutro"), (ETIQ_RES[r] || [r])[0]); }
-  $("#h-refrescar").addEventListener("click", cargarHistorial); $("#h-resultado").addEventListener("change", cargarHistorial);
+  $("#h-refrescar").addEventListener("click", () => { cargarHistorial(); cargarCuradas(); }); $("#h-resultado").addEventListener("change", cargarHistorial);
   $("#h-escenario").addEventListener("input", () => { clearTimeout(S.hb); S.hb = setTimeout(cargarHistorial, 300); });
 
   // ── Wazuh simulado ──────────────────────────────────────────────────────────────────────────────

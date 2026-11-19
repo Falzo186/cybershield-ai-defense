@@ -8,6 +8,7 @@ Reglas (misión 23 h):
   - Durante una partida en curso se oculta la verdad de fondo (`legitima`).
   - Todo lo de Wazuh va marcado como SIMULADO.
 """
+import json
 import os
 import threading
 import time
@@ -41,6 +42,37 @@ def _err(msg, status=400):
 
 def _almacen():
     return Almacen(os.environ.get("CS_COMBATE_DB") or RUTA_POR_DEFECTO)
+
+
+DIR_CURADAS = RAIZ / "data" / "demo_curadas"
+_CACHE_CURADAS = {}
+
+
+def _doc_curada(pid):
+    """Partida curada (reproducción de una partida REAL registrada en combate-v1). -> dict|None. Solo lectura."""
+    if not str(pid).startswith("curada-") or "/" in pid or "\\" in pid or ".." in pid:
+        return None
+    f = DIR_CURADAS / f"{pid}.json"
+    if not f.is_file():
+        return None
+    if pid not in _CACHE_CURADAS:
+        _CACHE_CURADAS[pid] = json.loads(f.read_text(encoding="utf-8"))
+    return _CACHE_CURADAS[pid]
+
+
+def _almacen_curada(doc):
+    """SQLite en memoria con los eventos tal cual se registraron (mismos hashes: la cadena se vuelve a verificar)."""
+    a = Almacen(":memory:")
+    p = doc["partida"]
+    a.db.execute("INSERT INTO partidas VALUES(?,?,?,?,?,?,?,?)",
+                 (p["id"], p["escenario_id"], p["hash_escenario"], p["estado"], json.dumps(p["config"], ensure_ascii=False),
+                  json.dumps(p["resultado"], ensure_ascii=False) if p["resultado"] else None, p["creada"], p["fin"]))
+    for e in doc["eventos"]:
+        a.db.execute("INSERT INTO eventos VALUES(?,?,?,?,?,?,?,?)", (p["id"], e["seq"], e["turno"], e["ts"], e["tipo"],
+                                                                       json.dumps(e["payload"], ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                                                                       e["hash_prev"], e["hash"]))
+    a.db.commit()
+    return a
 
 
 def _wazuh():
@@ -96,6 +128,18 @@ def registrar(app, host_ollama):
         if spec not in cliente_ollama.listar_modelos(host_ollama):
             return False, f"el modelo «{spec}» no está instalado en Ollama"
         return True, None
+
+    def _alm(pid):
+        d = _doc_curada(pid)
+        return _almacen_curada(d) if d else _almacen()
+
+    def _real(pid):
+        d = _doc_curada(pid)
+        return d["partida_id_original"] if d else pid
+
+    def _alertas(pid):
+        d = _doc_curada(pid)
+        return d["alertas_wazuh_simuladas"] if d else _wazuh().consultar_alertas(pid)
 
     @app.get("/api/combate/estado")
     async def combate_estado():
@@ -175,6 +219,16 @@ def registrar(app, host_ollama):
         _ACTUAL["cancelar"] = True
         return _ok({"id": pid, "interrumpiendo": True})
 
+    @app.get("/api/combate/curadas")
+    async def combate_curadas():
+        out = []
+        for f in sorted(DIR_CURADAS.glob("curada-*.json")) if DIR_CURADAS.is_dir() else []:
+            d = _doc_curada(f.stem)
+            if d:
+                out.append({"id": f.stem, "motivo": d["motivo_seleccion"], "origen": d["origen"], "partida_original": d["partida_id_original"],
+                            "campana": d["campana"], "resultado": (d["partida"]["resultado"] or {}).get("resultado"), "eventos": len(d["eventos"])})
+        return _ok({"curadas": out, "nota": "Reproducciones de partidas reales registradas en combate-v1; los eventos no se editan."})
+
     @app.get("/api/combate/partidas")
     async def combate_listar(resultado: str | None = None, escenario: str | None = None, limite: int = 100):
         ps = [_resumen(p) for p in _almacen().listar(max(1, min(limite, 500)))]
@@ -186,7 +240,8 @@ def registrar(app, host_ollama):
 
     @app.get("/api/combate/partidas/{pid}")
     async def combate_detalle(pid: str):
-        alm = _almacen()
+        alm = _alm(pid)
+        pid_pub, pid = pid, _real(pid)
         p = alm.partida(pid)
         if not p:
             return _err("partida desconocida", 404)
@@ -201,11 +256,14 @@ def registrar(app, host_ollama):
                "en_curso": vivo, "cadena": alm.verificar_cadena(pid)[0]}
         if res:
             det["resultado_detalle"] = res
+        if pid_pub != pid:
+            det.update({"id": pid_pub, "curada": True, "partida_original": pid, "motivo_curada": _doc_curada(pid_pub)["motivo_seleccion"]})
         return _ok(det)
 
     @app.get("/api/combate/partidas/{pid}/eventos")
     async def combate_eventos(pid: str, desde: int = 0):
-        alm = _almacen()
+        alm = _alm(pid)
+        pid_pub, pid = pid, _real(pid)
         p = alm.partida(pid)
         if not p:
             return _err("partida desconocida", 404)
@@ -218,20 +276,26 @@ def registrar(app, host_ollama):
     @app.get("/api/combate/partidas/{pid}/wazuh")
     async def combate_wazuh(pid: str, nivel_min: int = 0, grupo: str | None = None, agente: str | None = None, limite: int = 200):
         w = _wazuh()
-        al = w.consultar_alertas(pid, nivel_min=max(0, nivel_min), grupos=[grupo] if grupo else None, agente=agente, limite=max(1, min(limite, 500)))
+        dc = _doc_curada(pid)
+        if dc:
+            al = [a for a in dc["alertas_wazuh_simuladas"] if a["rule"]["level"] >= max(0, nivel_min)
+                  and (not grupo or grupo in a["rule"]["groups"]) and (not agente or a["agent"]["name"] == agente)][-max(1, min(limite, 500)):]
+        else:
+            al = w.consultar_alertas(pid, nivel_min=max(0, nivel_min), grupos=[grupo] if grupo else None, agente=agente, limite=max(1, min(limite, 500)))
         return _ok({"etiqueta": ETIQUETA, "modo": w.modo, "simulado": True, "agentes": w.listar_agentes(), "alertas": al,
                     "total": len(al)})
 
     @app.get("/api/combate/partidas/{pid}/exportar")
     async def combate_exportar(pid: str):
-        alm = _almacen()
+        alm = _alm(pid)
+        pid_pub, pid = pid, _real(pid)
         p = alm.partida(pid)
         if not p:
             return _err("partida desconocida", 404)
         if p["resultado"] is None:
             return _err("la partida aún no tiene resultado: no se puede exportar", 409)
         return _ok({"partida": p, "eventos": alm.eventos(pid), "cadena_integra": alm.verificar_cadena(pid)[0],
-                    "alertas_wazuh_simuladas": _wazuh().consultar_alertas(pid), "etiqueta_wazuh": ETIQUETA})
+                    "alertas_wazuh_simuladas": _alertas(pid_pub), "etiqueta_wazuh": ETIQUETA})
 
     @app.get("/api/combate/campanas")
     async def combate_campanas():

@@ -179,3 +179,23 @@ dialog h3 { margin: 0 0 var(--p-e2); font-size: var(--p-t-lg); } dialog p { colo
   .wazuh-doble { grid-template-columns: 1fr; } .cronos { max-height: 60vh; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* ── Misión extra: guion determinista, curadas, reproducción ─────────────────────────────────── */
+.etiqueta-guion { position: sticky; top: 0; z-index: 5; background: #5c0f14; color: #fff; border: 2px solid #ff6b6b; border-radius: var(--p-r-lg);
+  padding: var(--p-e3) var(--p-e5); font-weight: 800; letter-spacing: .06em; font-size: var(--p-t-lg); margin-bottom: var(--p-e3); }
+.etiqueta-guion small { display: block; font-weight: 500; letter-spacing: 0; font-size: var(--p-t-sm); color: #ffd5d5; margin-top: 2px; }
+.banner-curada { border: 1px solid var(--p-borde); border-left: 4px solid var(--p-acento); background: var(--p-superficie-2); border-radius: var(--p-r-lg);
+  padding: var(--p-e3) var(--p-e5); margin-bottom: var(--p-e3); font-size: var(--p-t-sm); color: var(--p-texto-2); }
+.banner-curada b { color: var(--p-texto); }
+.banner-curada a { color: var(--p-acento); }
+.curadas { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--p-e4); }
+.curada { border: 1px solid var(--p-borde); border-radius: var(--p-r-md); padding: var(--p-e4); background: var(--p-superficie-2); display: flex; flex-direction: column; gap: var(--p-e3); }
+.curada h4 { margin: 0; font-size: var(--p-t-md); }
+.curada p { margin: 0; color: var(--p-texto-2); font-size: var(--p-t-sm); }
+.curada .datos { display: flex; flex-wrap: wrap; gap: var(--p-e2); }
+.curada .acciones { display: flex; flex-wrap: wrap; gap: var(--p-e2); margin-top: auto; }
+.reproductor .boton { margin-left: var(--p-e3); }
+#demo-guion .acciones-form { margin-top: var(--p-e3); }
+#demo-guion .nota-tarjeta + .acciones-form + .nota-tarjeta { margin-top: var(--p-e3); }
+#h-curadas .nota-tarjeta { margin: 0 0 var(--p-e4); }
+.curada .acciones .boton { white-space: nowrap; }

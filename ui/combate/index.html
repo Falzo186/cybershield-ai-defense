@@ -78,10 +78,24 @@
           </div>
         </details>
 
+        <details class="tarjeta" id="demo-guion">
+          <summary class="tarjeta-cab"><h3>Demostración del motor · Guion determinista (sin IA)</h3><span class="chip chip-aviso sin-punto">NO ES UN MODELO</span></summary>
+          <div class="tarjeta-cuerpo">
+            <p class="nota-tarjeta">Sirve para explicar cómo el motor decide, <b>no</b> para aparentar que el Rojo 8B gana (no ganó ninguna partida de las campañas). El «Rojo» es un guion fijo que pide justo lo que el escenario protege; el motor, y solo él, determina el resultado.</p>
+            <div class="acciones-form">
+              <button type="button" class="boton boton-primario" id="btn-guion-aprobar" data-azul="falso:aprobar"><svg viewBox="0 0 24 24"><use href="#i-jugar"></use></svg>1 · Guion contra Azul «APROBAR siempre»</button>
+              <button type="button" class="boton" id="btn-guion-registro" data-azul="falso:registro"><svg viewBox="0 0 24 24"><use href="#i-jugar"></use></svg>2 · Mismo guion contra Azul por registro</button>
+            </div>
+            <p class="nota-tarjeta" id="nota-guion">Usa el escenario elegido arriba. Solo el árbitro puede iniciarlas.</p>
+          </div>
+        </details>
+
         <div id="teatro-vacio" class="tarjeta"><div class="vacio"><strong>Aún no hay ninguna partida abierta</strong>
           Inicia un combate con el formulario de arriba, o abre una del Historial.</div></div>
 
         <div id="teatro" hidden>
+          <div class="etiqueta-guion" id="etiqueta-guion" role="note" hidden>GUION DETERMINISTA — NO ES UN MODELO<small>El Rojo de esta partida es un guion fijo sin IA; sirve para explicar el motor, no para medir a ningún modelo.</small></div>
+          <div class="banner-curada" id="banner-curada" role="note" hidden></div>
           <div class="tarjeta cabecera-partida">
             <div class="cp-fila">
               <div class="cp-titulo">
@@ -121,6 +135,7 @@
                 <label for="rep-turno">Reproducción: turno</label>
                 <input type="range" id="rep-turno" min="0" max="1" value="1">
                 <output id="rep-valor">—</output>
+                <button type="button" class="boton" id="btn-reproducir"><svg viewBox="0 0 24 24"><use href="#i-jugar"></use></svg><span>Reproducir cronología</span></button>
               </div>
             </section>
 
@@ -157,7 +172,12 @@
       <section class="vista" id="vista-historial" hidden>
         <div class="cabecera-vista"><h2>Historial de combates</h2>
           <p>Cada fila sale de la base de datos de partidas. El resultado mostrado es el del evento <code>partida.resultado</code> persistido por el motor.</p></div>
-        <div class="tarjeta">
+        <div class="tarjeta" id="h-curadas">
+          <div class="tarjeta-cab"><h3>Partidas de demostración curadas</h3><span class="chip chip-neutro sin-punto">reproducciones de partidas REALES</span></div>
+          <div class="tarjeta-cuerpo"><p class="nota-tarjeta">Tres partidas reales de la campaña <code>combate-v1</code>, elegidas para ilustrar tres desenlaces. Los eventos se muestran tal como se registraron (misma cadena de hashes); no se editan ni se inventan.</p>
+            <div class="curadas" id="h-curadas-lista"></div></div>
+        </div>
+        <div class="tarjeta" style="margin-top:var(--p-e4)">
           <div class="barra-filtros">
             <label class="campo"><span>Resultado</span><select id="h-resultado"><option value="">Todos</option><option>VICTORIA_ROJA</option><option>VICTORIA_AZUL</option><option>EMPATE</option><option>EMPATE_DEGRADADO</option><option>INCONCLUSA</option><option>ERROR_TECNICO</option></select></label>
             <label class="campo"><span>Escenario o familia</span><input type="search" id="h-escenario" placeholder="p. ej. verificacion_falsa"></label>
