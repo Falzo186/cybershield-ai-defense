@@ -29,3 +29,13 @@ data/campanas/*
 !integraciones/wazuh/eventos_ejemplo.jsonl
 # Misión 23h: estado local de ejecución, bases y campañas en curso
 respaldo_pre_mision/
+# Campañas de combate (misión 23h): la evidencia primaria (observaciones y alertas) sí se versiona; el estado de ejecución no
+!data/campanas/combate-*/
+!data/campanas/combate-*/observaciones.jsonl
+data/campanas/combate-*/lock.pid
+data/campanas/combate-*/log.txt
+data/campanas/combate-*/*.db
+data/campanas/combate-*/wazuh_alerts.ndjson
+data/combate.db
+data/wazuh_sim.db
+data/wazuh_sim/

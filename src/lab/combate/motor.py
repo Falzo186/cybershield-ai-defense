@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 
 from .. import harness
 from . import escenarios as esc_mod
-from .modelos import PROHIBIDO
+from .modelos import PROHIBIDO, VERSION_PROMPTS
 from .store import Almacen
 
 RESULTADOS = ("VICTORIA_ROJA", "VICTORIA_AZUL", "EMPATE", "EMPATE_DEGRADADO", "INCONCLUSA", "ERROR_TECNICO")
@@ -40,7 +40,7 @@ def _nombre(m):
 
 class Partida:
     def __init__(self, escenario, rojo, azul, semilla=0, almacen=None, wazuh=None, partida_id=None, reloj=None,
-                 presupuesto_override=None, etiqueta_modelos=None):
+                 presupuesto_override=None, etiqueta_modelos=None, azul_ve_wazuh=True):
         if isinstance(escenario, str):
             escenario = esc_mod.cargar(escenario)
         problemas = esc_mod.validar(escenario)
@@ -51,6 +51,7 @@ class Partida:
         self.rojo, self.azul, self.semilla = rojo, azul, semilla
         self.almacen = almacen or Almacen(":memory:")
         self.wazuh = wazuh
+        self.azul_ve_wazuh = azul_ve_wazuh
         self._t = datetime.fromisoformat("2026-11-18T10:00:00-06:00")        # reloj lógico reproducible
         self._reloj = reloj
         clave = esc_mod.hash_escenario({"e": self._esc["id"], "s": semilla, "r": _nombre(rojo), "a": _nombre(azul),
@@ -78,7 +79,7 @@ class Partida:
         self._trafico = self._programar_trafico()
         self.config = {"semilla": semilla, "rojo": _nombre(rojo), "azul": _nombre(azul),
                        "parametros_rojo": getattr(rojo, "params", {}), "parametros_azul": getattr(azul, "params", {}),
-                       "presupuesto": ps, "etiquetas": etiqueta_modelos or {}}
+                       "presupuesto": ps, "etiquetas": etiqueta_modelos or {}, "version_prompts": VERSION_PROMPTS, "azul_ve_wazuh": azul_ve_wazuh}
         self.almacen.crear(self.id, self._esc["id"], self.hash_escenario, self.config, self._ts())
         self._ev(0, "partida.creada", {"escenario": self._esc["id"], "hash_escenario": self.hash_escenario, "config": self.config,
                                        "version_escenario": self._esc["version"]})
@@ -144,7 +145,7 @@ class Partida:
                 "catalogo": self._catalogo_rojo(), "historial": [h for h in self.historial if h["origen"] == "rojo"][-4:]}
 
     def _alertas_para_azul(self):
-        if self.wazuh is None:
+        if self.wazuh is None or not self.azul_ve_wazuh:
             return []
         al = self.wazuh.consultar_alertas(self.id, nivel_min=1, limite=0)
         recientes = [a for a in al if a["lab"]["turno"] >= self.turno - 1][-10:]
@@ -256,6 +257,10 @@ class Partida:
         causa = {"agotado": "presupuesto_agotado", "error": "modelo_sin_respuesta", "cancelado": "interrumpida"}.get(est, est)
         return self._cerrar("INCONCLUSA", f"el Harness cortó la partida: {motivo}", causa=causa)
 
+    @staticmethod
+    def _meta_ev(m):
+        return {k: m.get(k) for k in ("llamadas", "tokens", "tokens_entrada", "tiempo_ms", "intentos")}
+
     def _sumar_consumo(self, lado, meta):
         c = self._consumo_pend
         c[f"{lado}_llamadas"] = c.get(f"{lado}_llamadas", 0) + (meta.get("llamadas") or 0)
@@ -288,7 +293,8 @@ class Partida:
         if repetido:
             self.cont["rojo_repetidos"] += 1
         self._ev(self.turno, "rojo.mensaje", {"solicitante": rid, "mensaje": mensaje, "peticion": pet, "repetido": repetido,
-                                              "se_presenta_como": resp.get("se_presenta_como"), "modelo": resp["meta"].get("modelo")})
+                                              "se_presenta_como": resp.get("se_presenta_como"), "modelo": resp["meta"].get("modelo"),
+                                              "meta": self._meta_ev(resp["meta"])})
         for clave, data in self._senales(rid, pet, mensaje, "rojo", resp.get("se_presenta_como")):
             self._ev(self.turno, "siem.senal", {"clave": clave, **data},
                      {"clave": clave, "agente": self.recursos[pet["recurso"]]["agente"] if valida else "srv-correo", "relevante": True,
@@ -325,9 +331,9 @@ class Partida:
         self.cont["decisiones"][dkey] = self.cont["decisiones"].get(dkey, 0) + 1
         self._ev(self.turno, "azul.decision", {"origen": origen, "solicitante": sol, "decision": dkey, "justificacion": resp.get("justificacion", ""),
                                                "malformada": malformada, "legitima": legitima, "modelo": resp["meta"].get("modelo"),
-                                               "crudo": resp.get("crudo")})
+                                               "crudo": resp.get("crudo"), "meta": self._meta_ev(resp["meta"])})
         if origen == "rojo":     # el Rojo ve la respuesta visible del defensor; el tráfico legítimo de los demás no
-            self.historial.append({"origen": "rojo", "turno": self.turno, "mensaje": mensaje, "decision": dkey,
+            self.historial.append({"origen": "rojo", "turno": self.turno, "mensaje": mensaje, "decision": dkey, "recurso": pet["recurso"],
                                    "justificacion": resp.get("justificacion", "")})
         self.historial.append({"origen": "azul", "turno": self.turno, "decision": dkey})
         if resp.get("contener_agente"):
