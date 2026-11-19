@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CyberShield · Combate IA vs IA</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../panel/panel.css">
+<link rel="stylesheet" href="combate.css">
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <g id="i-escudo"><path d="M12 2 4 5.5v6c0 5 3.4 9.3 8 10.5 4.6-1.2 8-5.5 8-10.5v-6L12 2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></g>
+  <g id="i-teatro"><path d="M4 5h16v10H4zM8 19h8M12 15v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-historial"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5.5l3.5 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+  <g id="i-wazuh"><path d="M3 12h4l2.5-6 4 13L16 12h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-campana"><path d="M5 20V10M12 20V4M19 20v-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></g>
+  <g id="i-jugar"><path d="M7 4.5 19 12 7 19.5V4.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></g>
+  <g id="i-detener"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/></g>
+  <g id="i-refrescar"><path d="M20 11a8 8 0 1 0-1.5 6M20 5v6h-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g id="i-descargar"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+</defs></svg>
+
+<a class="saltar" href="#principal">Saltar al contenido</a>
+
+<div class="armazon">
+  <aside class="lateral">
+    <div class="marca">
+      <svg class="marca-logo" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-escudo"></use></svg>
+      <div><div class="marca-texto">CyberShield</div><div class="marca-sub">Combate IA vs IA</div></div>
+    </div>
+    <nav class="nav" aria-label="Secciones del combate">
+      <div class="nav-grupo">Combate</div>
+      <button class="nav-item" data-vista="teatro" aria-current="page"><svg viewBox="0 0 24 24"><use href="#i-teatro"></use></svg><span>Teatro de batalla</span></button>
+      <button class="nav-item" data-vista="historial"><svg viewBox="0 0 24 24"><use href="#i-historial"></use></svg><span>Historial</span></button>
+      <button class="nav-item" data-vista="wazuh"><svg viewBox="0 0 24 24"><use href="#i-wazuh"></use></svg><span>Wazuh (simulado)</span></button>
+      <button class="nav-item" data-vista="campanas"><svg viewBox="0 0 24 24"><use href="#i-campana"></use></svg><span>Campañas</span></button>
+    </nav>
+    <div class="pie-lateral">
+      Laboratorio local · datos ficticios<br>
+      <a href="/panel/">Panel de operaciones</a> · <a href="/">Partida Rojo/Azul</a>
+    </div>
+  </aside>
+
+  <div class="principal">
+    <header class="superior">
+      <h1 class="titulo-seccion" id="titulo-seccion">Teatro de batalla</h1>
+      <div class="estados" id="estados" aria-live="polite"><span class="chip chip-neutro">Comprobando estado</span></div>
+    </header>
+
+    <main class="contenido" id="principal" tabindex="-1">
+
+      <!-- ═══ Teatro de batalla ═══════════════════════════════════════════════════════════════ -->
+      <section class="vista" id="vista-teatro">
+        <details class="tarjeta nueva" id="nueva" open>
+          <summary class="tarjeta-cab"><h3>Nueva partida de combate</h3><span class="chip chip-neutro sin-punto" id="chip-rol">sin sesión</span></summary>
+          <div class="tarjeta-cuerpo">
+            <form id="form-nueva" class="form-nueva" autocomplete="off">
+              <label class="campo"><span>Escenario</span><select id="f-escenario" required></select></label>
+              <label class="campo"><span>Modelo Rojo (ataque)</span><select id="f-rojo" required></select></label>
+              <label class="campo"><span>Modelo Azul (defensa)</span><select id="f-azul" required></select></label>
+              <label class="campo corto"><span>Semilla</span><input type="number" id="f-semilla" value="1" min="0" max="99999"></label>
+              <label class="campo check"><input type="checkbox" id="f-ejemplos"><span>Azul con ejemplos</span></label>
+              <label class="campo check"><input type="checkbox" id="f-wazuh" checked><span>Azul ve alertas SIMULADAS</span></label>
+              <div class="acciones-form">
+                <button type="submit" class="boton boton-primario" id="btn-iniciar"><svg viewBox="0 0 24 24"><use href="#i-jugar"></use></svg>Iniciar combate</button>
+              </div>
+            </form>
+            <p class="nota-tarjeta" id="nota-nueva"></p>
+            <form id="form-entrar" class="form-entrar" hidden>
+              <label class="campo"><span>Tu nombre</span><input type="text" id="e-nombre" maxlength="24" value="Árbitro"></label>
+              <label class="campo"><span>Código de árbitro (consola del servidor)</span><input type="text" id="e-codigo" inputmode="numeric" maxlength="12"></label>
+              <button type="submit" class="boton">Entrar como árbitro</button>
+              <span class="error-form" id="e-error" role="alert"></span>
+            </form>
+          </div>
+        </details>
+
+        <div id="teatro-vacio" class="tarjeta"><div class="vacio"><strong>Aún no hay ninguna partida abierta</strong>
+          Inicia un combate con el formulario de arriba, o abre una del Historial.</div></div>
+
+        <div id="teatro" hidden>
+          <div class="tarjeta cabecera-partida">
+            <div class="cp-fila">
+              <div class="cp-titulo">
+                <h2 id="cp-titulo">—</h2>
+                <div class="cp-sub" id="cp-sub"></div>
+              </div>
+              <div class="cp-estado">
+                <span class="chip" id="cp-chip">—</span>
+                <button class="boton boton-peligro" id="btn-interrumpir" hidden><svg viewBox="0 0 24 24"><use href="#i-detener"></use></svg>Interrumpir</button>
+              </div>
+            </div>
+            <div class="turnos" id="turnos" role="progressbar" aria-label="Avance de turnos"></div>
+            <div class="cp-meta" id="cp-meta"></div>
+          </div>
+
+          <div class="banner" id="banner" hidden role="status"></div>
+
+          <div class="teatro-rejilla">
+            <aside class="equipo equipo-rojo tarjeta" aria-label="Equipo Rojo">
+              <div class="tarjeta-cab"><h3>Equipo Rojo</h3><span class="chip chip-neutro sin-punto" id="rojo-modelo">—</span></div>
+              <div class="tarjeta-cuerpo">
+                <div class="sub-titulo">Objetivos <span id="rojo-umbral"></span></div>
+                <ul class="objetivos" id="rojo-objetivos"></ul>
+                <div class="sub-titulo">Del intento al objetivo</div>
+                <ol class="embudo" id="rojo-embudo"></ol>
+                <div class="nota-tarjeta">Cada etapa se cuenta solo con confirmación del motor. Un mensaje «lo logré» vale 0.</div>
+              </div>
+            </aside>
+
+            <section class="tarjeta linea" aria-label="Línea de tiempo del combate">
+              <div class="tarjeta-cab"><h3>Cronología</h3>
+                <div class="acciones"><span class="chip chip-neutro sin-punto" id="cron-n">0 eventos</span>
+                  <label class="chk-mini"><input type="checkbox" id="ver-siem" checked><span>Señales del SIEM</span></label></div></div>
+              <div class="cronos" id="cronos" tabindex="0" aria-live="polite"></div>
+              <div class="pensando" id="pensando" hidden></div>
+              <div class="reproductor" id="reproductor" hidden>
+                <label for="rep-turno">Reproducción: turno</label>
+                <input type="range" id="rep-turno" min="0" max="1" value="1">
+                <output id="rep-valor">—</output>
+              </div>
+            </section>
+
+            <aside class="lado-derecho">
+              <div class="equipo equipo-azul tarjeta" aria-label="Equipo Azul">
+                <div class="tarjeta-cab"><h3>Equipo Azul</h3><span class="chip chip-neutro sin-punto" id="azul-modelo">—</span></div>
+                <div class="tarjeta-cuerpo">
+                  <div class="sub-titulo">Solicitudes legítimas atendidas</div>
+                  <div class="medidor" id="azul-medidor"></div>
+                  <div class="sub-titulo">Decisiones</div>
+                  <div id="azul-decisiones" class="decs"></div>
+                  <div class="sub-titulo">Defensa en profundidad</div>
+                  <div class="valor-linea" id="azul-dp">—</div>
+                </div>
+              </div>
+              <div class="tarjeta">
+                <div class="tarjeta-cab"><h3>Recursos del escenario</h3></div>
+                <div class="tarjeta-cuerpo sin-relleno"><ul class="recursos" id="recursos"></ul></div>
+              </div>
+              <div class="tarjeta">
+                <div class="tarjeta-cab"><h3>Wazuh</h3><span class="chip chip-simulado sin-punto">WAZUH SIMULADO</span></div>
+                <div class="tarjeta-cuerpo sin-relleno"><ul class="alertas-mini" id="alertas-mini"></ul></div>
+              </div>
+              <div class="tarjeta">
+                <div class="tarjeta-cab"><h3>Presupuesto (Harness)</h3></div>
+                <div class="tarjeta-cuerpo" id="presupuesto"></div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ Historial ═══════════════════════════════════════════════════════════════════════ -->
+      <section class="vista" id="vista-historial" hidden>
+        <div class="cabecera-vista"><h2>Historial de combates</h2>
+          <p>Cada fila sale de la base de datos de partidas. El resultado mostrado es el del evento <code>partida.resultado</code> persistido por el motor.</p></div>
+        <div class="tarjeta">
+          <div class="barra-filtros">
+            <label class="campo"><span>Resultado</span><select id="h-resultado"><option value="">Todos</option><option>VICTORIA_ROJA</option><option>VICTORIA_AZUL</option><option>EMPATE</option><option>EMPATE_DEGRADADO</option><option>INCONCLUSA</option><option>ERROR_TECNICO</option></select></label>
+            <label class="campo"><span>Escenario o familia</span><input type="search" id="h-escenario" placeholder="p. ej. verificacion_falsa"></label>
+            <button class="boton" id="h-refrescar"><svg viewBox="0 0 24 24"><use href="#i-refrescar"></use></svg>Actualizar</button>
+          </div>
+          <div id="h-tabla" class="tarjeta-cuerpo sin-relleno"></div>
+        </div>
+      </section>
+
+      <!-- ═══ Wazuh simulado ═════════════════════════════════════════════════════════════════ -->
+      <section class="vista" id="vista-wazuh" hidden>
+        <div class="cabecera-vista"><h2>Wazuh (simulado) <span class="chip chip-simulado sin-punto">SIMULADO</span></h2>
+          <p>Alertas con esquema compatible con Wazuh generadas por el motor de combate. No es una instalación de Wazuh. Incluyen ruido benigno de fondo.</p></div>
+        <div class="rejilla rejilla-3" id="w-estado"></div>
+        <div class="tarjeta" style="margin-top:var(--p-e4)">
+          <div class="barra-filtros">
+            <label class="campo"><span>Partida</span><select id="w-partida"></select></label>
+            <label class="campo"><span>Nivel mínimo</span><input type="number" id="w-nivel" min="0" max="15" value="0"></label>
+            <label class="campo"><span>Agente</span><select id="w-agente"><option value="">Todos</option></select></label>
+            <label class="campo"><span>Grupo</span><select id="w-grupo"><option value="">Todos</option></select></label>
+            <button class="boton" id="w-refrescar"><svg viewBox="0 0 24 24"><use href="#i-refrescar"></use></svg>Actualizar</button>
+          </div>
+          <div class="wazuh-doble">
+            <div id="w-tabla" class="tarjeta-cuerpo sin-relleno"></div>
+            <div class="detalle-alerta"><div class="sub-titulo" style="padding:var(--p-e4) var(--p-e4) 0">Detalle de la alerta</div>
+              <pre class="codigo" id="w-detalle" tabindex="0">Selecciona una alerta de la lista.</pre></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ Campañas ═══════════════════════════════════════════════════════════════════════ -->
+      <section class="vista" id="vista-campanas" hidden>
+        <div class="cabecera-vista"><h2>Campañas de evaluación</h2>
+          <p>Resultados de las campañas por lotes (<code>experimentos/campana_combate.py</code>). El análisis completo con intervalos de confianza está en <code>docs/evaluacion/INFORME_CAMPANAS.md</code>.</p></div>
+        <div id="c-lista" class="pila"></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<dialog id="dlg" aria-labelledby="dlg-titulo">
+  <form method="dialog">
+    <h3 id="dlg-titulo"></h3><p id="dlg-texto"></p>
+    <div class="dlg-acciones"><button value="no" class="boton">Cancelar</button><button value="si" class="boton boton-peligro" id="dlg-ok">Confirmar</button></div>
+  </form>
+</dialog>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+
+<script src="combate.js"></script>
+</body>
+</html>

@@ -22,6 +22,7 @@ def construir_rojo(spec, esc, semilla, host):
         objs = [r for r in esc["recursos"] if r["objetivo_rojo"]]
         return {"objetivos": lambda: M.RojoObjetivos(objs),
                 "fijo": lambda: M.RojoMensajeFijo(objs[0]["id"], objs[0]["accion"]),
+                "denegado": lambda: M.RojoMensajeFijo("R-ADM-CONF", "liberar_documento"),
                 "aleatorio": lambda: M.RojoAleatorio(semilla)}[tipo]()
     return M.RojoOllama(spec, host=host, semilla=semilla)
 

@@ -56,7 +56,11 @@ class Partida:
         self._reloj = reloj
         clave = esc_mod.hash_escenario({"e": self._esc["id"], "s": semilla, "r": _nombre(rojo), "a": _nombre(azul),
                                         "x": str(etiqueta_modelos)})[:8]
-        self.id = partida_id or f"c{semilla:04d}-{clave}"
+        base_id = partida_id or f"c{semilla:04d}-{clave}"
+        self.id, n = base_id, 1
+        while self.almacen.partida(self.id) is not None:     # mismo escenario/semilla/modelos otra vez: id nuevo, nunca pisar ni fallar
+            n += 1
+            self.id = f"{base_id}-{n}"
         self.rng = random.Random(f"{semilla}|{self._esc['id']}")
         self.recursos = {r["id"]: r for r in self._esc["recursos"]}
         self.estado_rec = {r["id"]: self._estado_inicial(r) for r in self._esc["recursos"]}
@@ -88,8 +92,7 @@ class Partida:
     def _ts(self):
         if self._reloj:
             return self._reloj()
-        self._t += timedelta(seconds=7)
-        return _iso(self._t)
+        return _iso(datetime.now().astimezone())     # hora real; el hash de cada evento NO incluye la marca de tiempo (reproducible)
 
     @staticmethod
     def _estado_inicial_de(r):

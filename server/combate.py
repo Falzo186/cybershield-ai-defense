@@ -23,7 +23,7 @@ from src.lab.wazuh_sim import ETIQUETA, SimProvider
 
 RAIZ = Path(__file__).resolve().parents[1]
 PAUSA_FALSOS_S = 0.6        # ritmo de turnos con modelos falsos, para que la interfaz pueda mostrar el avance
-MODELOS_FALSOS_ROJO = {"falso:objetivos": "Rojo de guion (va a por los objetivos)", "falso:fijo": "Rojo de mensaje fijo",
+MODELOS_FALSOS_ROJO = {"falso:objetivos": "Rojo de guion (va a por los objetivos)", "falso:fijo": "Rojo de mensaje fijo", "falso:denegado": "Rojo que insiste en un recurso denegado",
                        "falso:aleatorio": "Rojo aleatorio"}
 MODELOS_FALSOS_AZUL = {"falso:registro": "Azul de referencia (decide por registro)", "falso:rechazar": "Azul «rechazar siempre»",
                        "falso:aprobar": "Azul «aprobar siempre»", "falso:aleatorio": "Azul aleatorio", "falso:credulo": "Azul crédulo"}
@@ -152,6 +152,11 @@ def registrar(app, host_ollama):
             except X.ErrorMotor as exc:
                 return _err(exc.mensaje, exc.status)
             pausa = PAUSA_FALSOS_S if rojo.startswith("falso:") and azul.startswith("falso:") else 0
+            if pausa and cuerpo.get("ritmo_s") is not None:      # solo para modelos falsos: la interfaz/pruebas pueden frenar o acelerar el ritmo
+                try:
+                    pausa = max(0.0, min(5.0, float(cuerpo["ritmo_s"])))
+                except (TypeError, ValueError):
+                    return _err("ritmo_s debe ser un número")
             _ACTUAL.update(partida=p, error=None, cancelar=False)
             h = threading.Thread(target=_correr, args=(p, pausa), daemon=True)
             _ACTUAL["hilo"] = h
