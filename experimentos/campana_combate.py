@@ -75,6 +75,10 @@ def _plan_fase(fase, reps_base, reps_llm, reps_var):
                 out += [celda("base_llm", e, m, a, "base", k) for e in esc for k in range(1, 2)]
             for r in ("falso:fijo", "falso:aleatorio"):
                 out += [celda("base_llm", e, r, m, "base", k) for e in esc for k in range(1, 2)]
+    if "cortes" in fases:   # Rojo guionado y cortés (sin trucos) contra cada 8B en el rol Azul: ¿exige el defensor el derecho registrado?
+        for m in (MODELO_A, MODELO_B):
+            for k in (1, 2):
+                out += [celda("cortes", e, "falso:cortes", m, "base", k) for e in esc]
     if "espejo" in fases:
         for k in range(1, reps_llm + 1):
             for e in esc:

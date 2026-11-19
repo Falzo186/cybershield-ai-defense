@@ -173,17 +173,17 @@
   function derivar() {
     const D = { turno: 0, rojo: { intentos: 0, aceptadas: 0, efectos: 0, objetivos: 0 }, logrados: {}, bloqueadas: 0, engano: 0, dec: {}, legN: 0, legS: 0, vp: 0, fp: 0, fn: 0, vn: 0,
       comprometidos: {}, bloqueados: {}, ultimoTipo: null, resultado: null, errores: 0, consumo: null, hayLegitima: false };
-    const lim = S.limite;
+    const lim = S.limite; let origen = null;   // origen de la última decisión del Azul: la verdad de fondo no se publica en vivo
     S.eventos.forEach((e) => {
       if (lim != null && e.turno > lim) return;
       const p = e.payload; D.ultimoTipo = e.tipo;
       if (e.tipo === "turno.inicio") D.turno = e.turno;
       else if (e.tipo === "rojo.mensaje") D.rojo.intentos++;
-      else if (e.tipo === "motor.accion_aceptada" && !p.legitima) D.rojo.aceptadas++;
-      else if (e.tipo === "motor.efecto" && !p.legitima) D.rojo.efectos++;
+      else if (e.tipo === "motor.accion_aceptada" && origen === "rojo") D.rojo.aceptadas++;
+      else if (e.tipo === "motor.efecto" && origen === "rojo") D.rojo.efectos++;
       else if (e.tipo === "objetivo.alcanzado") { D.rojo.objetivos++; D.logrados[p.objetivo] = e.turno; D.comprometidos[p.recurso] = true; }
       else if (e.tipo === "motor.accion_bloqueada") { D.bloqueadas++; D.bloqueados[p.recurso] = (D.bloqueados[p.recurso] || 0) + 1; }
-      else if (e.tipo === "azul.decision") { D.dec[p.decision] = (D.dec[p.decision] || 0) + 1; if (p.origen === "trafico") D.hayLegitima = true; }
+      else if (e.tipo === "azul.decision") { origen = p.origen; D.dec[p.decision] = (D.dec[p.decision] || 0) + 1; if (p.origen === "trafico") D.hayLegitima = true; }
       else if (e.tipo === "legitima.atendida") { D.legS++; D.legN++; }
       else if (e.tipo === "legitima.rechazada") D.legN++;
       else if (e.tipo === "modelo.error") D.errores++;
