@@ -174,7 +174,7 @@ def jugar_celda(c, d):
     rojo = J.construir_rojo(c["rojo"], esc, c["semilla"], HOST)
     azul = J.construir_azul(c["azul"], c["semilla"], HOST)
     if c["config"] == "ejemplos" and isinstance(azul, M.AzulOllama):
-        azul = M.AzulOllama(c["azul"], host=HOST, semilla=c["semilla"], ejemplos=True)
+        azul = M.AzulOllama(M.partir_modelo(c["azul"])[0], host=HOST, semilla=c["semilla"], ejemplos=True, version=M.partir_modelo(c["azul"])[1])
     wz = SimProvider(ruta_ndjson=d / "wazuh_alerts.ndjson", ruta_db=":memory:", semilla=c["semilla"])
     alm = Almacen(d / f"partidas{SUFIJO}.db")
     previa = alm.partida(f"{c['fase']}-{c['id']}")
@@ -197,6 +197,14 @@ def jugar_celda(c, d):
     return r, time.time() - t0
 
 
+def _ver(c):
+    vr = M.partir_modelo(c["rojo"])[1] if not c["rojo"].startswith("falso") else None
+    va = M.partir_modelo(c["azul"])[1] if not c["azul"].startswith("falso") else None
+    if vr is None and va is None:
+        return M.VERSION_PROMPTS
+    return vr or va if (vr == va or vr is None or va is None) else f"rojo:{vr}/azul:{va}"
+
+
 def observacion(c, r, dur, intento):
     m = r.get("metricas") or {}
     az = (m.get("azul") or {}).get("clasificacion") or {}
@@ -211,7 +219,7 @@ def observacion(c, r, dur, intento):
             "malformadas": (m.get("azul") or {}).get("malformadas"), "errores_tecnicos": m.get("errores_tecnicos"),
             "wazuh": (m.get("azul") or {}).get("wazuh"), "llamadas": cons.get("llamadas_modelo"), "tokens_entrada": cons.get("tokens_entrada"),
             "tokens_salida": cons.get("tokens_salida"), "duracion_s": round(dur, 1), "partida_id": r.get("partida_id"),
-            "version_prompts": M.VERSION_PROMPTS, "ts": datetime.now().isoformat(timespec="seconds")}
+            "version_prompts": _ver(c), "ts": datetime.now().isoformat(timespec="seconds")}
 
 
 def ejecutar(nombre, fases, reps_base, reps_llm, reps_var, limite=None, max_horas=None, reintentar=False, prueba=False):
@@ -295,12 +303,15 @@ def main():
     ap.add_argument("--limite", type=int, default=None, help="máximo de partidas nuevas en esta ejecución")
     ap.add_argument("--max-horas", type=float, default=None)
     ap.add_argument("--reintentar-invalidas", action="store_true")
+    ap.add_argument("--version", default="v2", help="versión de prompts de los modelos 8B (v2 | v3); v3 añade «@v3» al nombre del modelo")
     ap.add_argument("--prueba-corta", action="store_true")
     ap.add_argument("--lanzar", action="store_true", help="relanza este mismo comando desacoplado en segundo plano")
     ap.add_argument("--estado", action="store_true")
     ap.add_argument("--sufijo", default="", help="segundo proceso sobre la misma campaña (fases distintas)")
     a = ap.parse_args()
-    global SUFIJO
+    global SUFIJO, MODELO_A, MODELO_B
+    if a.version != "v2":
+        MODELO_A, MODELO_B = f"qwen3:8b@{a.version}", f"llama3.1:8b@{a.version}"
     SUFIJO = f"-{a.sufijo}" if a.sufijo else ""
     fases = [x for x in a.fases.split(",") if x]
     if a.estado:

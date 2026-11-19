@@ -13,6 +13,7 @@ import re
 import unicodedata
 
 from .. import cliente_ollama as co
+from . import prompts_v3 as P3
 
 DECISIONES = ("APROBAR", "RECHAZAR", "SOLICITAR_AUTORIZACION", "ESCALAR")
 HOST_DEFECTO = "http://127.0.0.1:11434"
@@ -121,6 +122,18 @@ def prompt_azul(ctx):
             f"Tus decisiones anteriores:\n{hist}\n\nDecide (JSON).")
 
 
+def partir_modelo(spec):
+    """«qwen3:8b@v3» -> («qwen3:8b», «v3»). Sin sufijo -> («qwen3:8b», «v2»)."""
+    if "@" in spec:
+        m, v = spec.rsplit("@", 1)
+        return m, v
+    return spec, "v2"
+
+
+def version_de(jugador):
+    return getattr(jugador, "version", None) or "v2"
+
+
 def _meta0(modelo, params):
     return {"llamadas": 0, "tokens": 0, "tokens_entrada": 0, "tiempo_ms": 0, "intentos": 0, "error": None,
             "modelo": modelo, "parametros": params}
@@ -135,15 +148,18 @@ def _acumular(meta, r):
 
 
 class RojoOllama:
-    def __init__(self, modelo, host=HOST_DEFECTO, temperature=0.7, num_predict=260, num_ctx=4096, timeout=180, semilla=0, keep_alive="30m"):
-        self.modelo, self.host, self.timeout = modelo, host, timeout
-        self.params = {"temperature": temperature, "num_predict": num_predict, "num_ctx": num_ctx, "semilla": semilla, "keep_alive": keep_alive}
+    def __init__(self, modelo, host=HOST_DEFECTO, temperature=0.7, num_predict=260, num_ctx=4096, timeout=180, semilla=0, keep_alive="30m",
+                 version="v2"):
+        self.modelo, self.host, self.timeout, self.version = modelo, host, timeout, version
+        self.params = {"temperature": temperature, "num_predict": num_predict, "num_ctx": num_ctx, "semilla": semilla, "keep_alive": keep_alive,
+                       "version_prompts": version}
 
     def turno(self, ctx):
         meta = _meta0(self.modelo, self.params)
-        user = prompt_rojo(ctx)
+        v3 = self.version == "v3"
+        user = P3.prompt_rojo_v3(ctx) if v3 else prompt_rojo(ctx)
         for intento in range(3):
-            r = co.generar(self.host, self.modelo, SYSTEM_ROJO, user if intento == 0 else co.MENSAJE_REINTENTO + "\n\n" + user,
+            r = co.generar(self.host, self.modelo, P3.SYSTEM_ROJO_V3 if v3 else SYSTEM_ROJO, user if intento == 0 else co.MENSAJE_REINTENTO + "\n\n" + user,
                            formato="json", timeout=self.timeout, temperature=self.params["temperature"], num_predict=self.params["num_predict"],
                            opciones={"num_ctx": self.params["num_ctx"], "seed": self.params["semilla"] + ctx["turno"] * 7 + intento},
                            keep_alive=self.params["keep_alive"])
@@ -163,15 +179,16 @@ class RojoOllama:
 
 class AzulOllama:
     def __init__(self, modelo, host=HOST_DEFECTO, temperature=0.2, num_predict=200, num_ctx=4096, timeout=180, semilla=0, keep_alive="30m",
-                 ejemplos=False):
-        self.modelo, self.host, self.timeout, self.ejemplos = modelo, host, timeout, ejemplos
+                 ejemplos=False, version="v2"):
+        self.modelo, self.host, self.timeout, self.ejemplos, self.version = modelo, host, timeout, ejemplos, version
         self.params = {"temperature": temperature, "num_predict": num_predict, "num_ctx": num_ctx, "semilla": semilla, "keep_alive": keep_alive,
-                       "ejemplos": ejemplos}
+                       "ejemplos": ejemplos, "version_prompts": version}
 
     def decidir(self, ctx):
         meta = _meta0(self.modelo, self.params)
-        system = SYSTEM_AZUL + (EJEMPLOS_AZUL if self.ejemplos else "")
-        user = prompt_azul(ctx)
+        v3 = self.version == "v3"
+        system = (P3.SYSTEM_AZUL_V3 if v3 else SYSTEM_AZUL) + (EJEMPLOS_AZUL if self.ejemplos else "")
+        user = P3.prompt_azul_v3(ctx) if v3 else prompt_azul(ctx)
         ultimo = None
         for intento in range(3):               # 1 intento + máx. 2 reintentos por respuesta malformada
             r = co.generar(self.host, self.modelo, system, user if intento == 0 else co.MENSAJE_REINTENTO + "\n\n" + user,

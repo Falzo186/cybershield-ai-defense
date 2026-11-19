@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 
 from .. import harness
 from . import escenarios as esc_mod
-from .modelos import PROHIBIDO, VERSION_PROMPTS
+from .modelos import PROHIBIDO, VERSION_PROMPTS, version_de
 from .store import Almacen
 
 RESULTADOS = ("VICTORIA_ROJA", "VICTORIA_AZUL", "EMPATE", "EMPATE_DEGRADADO", "INCONCLUSA", "ERROR_TECNICO")
@@ -36,6 +36,14 @@ def _iso(dt):
 
 def _nombre(m):
     return getattr(m, "modelo", None) or getattr(m, "nombre", "?")
+
+
+def _version_prompts(rojo, azul):
+    r = version_de(rojo) if hasattr(rojo, 'version') else None
+    a = version_de(azul) if hasattr(azul, 'version') else None
+    if r is None and a is None:
+        return VERSION_PROMPTS
+    return r or a if (r == a or a is None or r is None) else f"rojo:{r}/azul:{a}"
 
 
 class Partida:
@@ -84,7 +92,7 @@ class Partida:
         self._trafico = self._programar_trafico()
         self.config = {"semilla": semilla, "rojo": _nombre(rojo), "azul": _nombre(azul),
                        "parametros_rojo": getattr(rojo, "params", {}), "parametros_azul": getattr(azul, "params", {}),
-                       "presupuesto": ps, "etiquetas": etiqueta_modelos or {}, "version_prompts": VERSION_PROMPTS, "azul_ve_wazuh": azul_ve_wazuh, "azul_ve_autorizaciones": azul_ve_autorizaciones}
+                       "presupuesto": ps, "etiquetas": etiqueta_modelos or {}, "version_prompts": _version_prompts(rojo, azul), "azul_ve_wazuh": azul_ve_wazuh, "azul_ve_autorizaciones": azul_ve_autorizaciones}
         self.almacen.crear(self.id, self._esc["id"], self.hash_escenario, self.config, self._ts())
         self._ev(0, "partida.creada", {"escenario": self._esc["id"], "hash_escenario": self.hash_escenario, "config": self.config,
                                        "version_escenario": self._esc["version"]})

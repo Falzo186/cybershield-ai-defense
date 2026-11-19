@@ -24,7 +24,8 @@ def construir_rojo(spec, esc, semilla, host):
                 "fijo": lambda: M.RojoMensajeFijo(objs[0]["id"], objs[0]["accion"]),
                 "denegado": lambda: M.RojoMensajeFijo("R-ADM-CONF", "liberar_documento"),
                 "aleatorio": lambda: M.RojoAleatorio(semilla)}[tipo]()
-    return M.RojoOllama(spec, host=host, semilla=semilla)
+    m, v = M.partir_modelo(spec)
+    return M.RojoOllama(m, host=host, semilla=semilla, version=v)
 
 
 def construir_azul(spec, semilla, host):
@@ -33,7 +34,8 @@ def construir_azul(spec, semilla, host):
         return {"registro": M.AzulRegistro, "rechazar": lambda: M.AzulFijo("RECHAZAR"), "aprobar": lambda: M.AzulFijo("APROBAR"),
                 "solicitar": lambda: M.AzulFijo("SOLICITAR_AUTORIZACION"), "aleatorio": lambda: M.AzulAleatorio(semilla),
                 "credulo": M.AzulCaeEnTodo}[tipo]()
-    return M.AzulOllama(spec, host=host, semilla=semilla)
+    m, v = M.partir_modelo(spec)
+    return M.AzulOllama(m, host=host, semilla=semilla, version=v)
 
 
 def jugar(escenario, rojo, azul, semilla=1, host=M.HOST_DEFECTO, db=None, wazuh=True, etiquetas=None, callback=None):
