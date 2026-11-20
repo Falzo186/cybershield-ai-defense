@@ -1,0 +1,9 @@
+Tienes una misión autónoma de 23 horas sobre este proyecto (CyberShield AI Defense). Todo lo que necesitas está en la carpeta MISION_23H/ dentro del proyecto.
+
+1) Lee COMPLETA la carpeta MISION_23H/ en el orden indicado en 00_LEEME_PRIMERO.md (archivos 00 a 12). Después ejecuta su protocolo de arranque (registrar hora T0 con `date`, rama mision-23h, etiqueta de respaldo, ESTADO_MISION.md, una tarea por fase).
+2) Trabaja sin pedir guía humana, siguiendo 11_PLAN_DE_TIEMPO_23H.md fase por fase, apegándote SIEMPRE a 02_REGLAS_INQUEBRANTABLES.md (sin push, sin borrar históricos, resultados honestos, límites éticos del atacante).
+3) Objetivos: combate IA vs IA con modelos de 8B donde Rojo y Azul puedan ganar de forma verificable por el motor, Wazuh SIMULADO integrado, campañas de evaluación reales con métricas honestas, interfaz impecable verificada con capturas, pruebas en verde y documentación completa.
+4) Si pierdes contexto o se compacta la conversación, relee 00_LEEME_PRIMERO.md, ESTADO_MISION.md, PROGRESO.md y `git log` y continúa desde donde quedaste.
+5) Termina con docs/INFORME_EJECUTIVO_FINAL.md y su PDF, aunque la misión quede incompleta (con la lista honesta de lo pendiente).
+
+Empieza ahora. No respondas con un plan: ejecuta.
