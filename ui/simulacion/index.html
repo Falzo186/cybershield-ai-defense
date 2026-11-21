@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CyberShield · Simulación</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../panel/panel.css">
+<link rel="stylesheet" href="../combate/combate.css">
+<link rel="stylesheet" href="simulacion.css">
+</head>
+<body>
+<a class="saltar" href="#principal">Saltar al contenido</a>
+<header class="barra">
+  <div class="barra-marca"><b>CyberShield</b> · Simulación</div>
+  <span class="chip chip-simulado sin-punto" title="Las alertas son del SIEM simulado">WAZUH SIMULADO</span>
+  <nav class="barra-enlaces"><a href="/combate/">Combate IA vs IA</a> · <a href="/equipo/">Sala de equipo</a> · <a href="/panel/">Panel</a> · <a href="/">Partida Rojo/Azul</a></nav>
+</header>
+
+<main id="principal" tabindex="-1">
+  <!-- Catálogo -->
+  <section id="vista-catalogo" class="contenido">
+    <div class="cabecera-vista"><h2>Partidas grabadas del modo Caminos</h2>
+      <p>Son partidas <b>ejecutadas de verdad por el motor</b> y guardadas con su cadena de hashes. La reproducción no regenera nada: solo reproduce el registro, a <b>ritmo narrativo</b>. La insignia de cada tarjeta dice <b>quién jugó</b>: un guion prefijado <b>no</b> es «la IA venció».</p></div>
+    <div class="catalogo" id="catalogo"></div>
+  </section>
+
+  <!-- Reproductor -->
+  <section id="vista-reproductor" class="contenido" hidden>
+    <div class="rep-cab tarjeta">
+      <div class="rep-titulo"><button class="boton" id="btn-volver">← Catálogo</button><h2 id="r-titulo">—</h2></div>
+      <div class="rep-meta" id="r-meta"></div>
+      <div class="nota-ritmo" role="note" id="nota-ritmo">Reproducción a ritmo narrativo (≈ 10 min): no es la duración real de la ejecución.</div>
+      <div class="rep-controles">
+        <button class="boton boton-primario" id="btn-play" aria-label="Reproducir o pausar">▶ Reproducir</button>
+        <button class="boton" id="btn-hito">Siguiente hito ⏭</button>
+        <label class="campo corto"><span>Velocidad</span><select id="sel-vel"><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option></select></label>
+        <div class="barra-prog" id="barra-prog"><input type="range" id="rng" min="0" max="1000" value="0" aria-label="Progreso de la reproducción"><div class="hitos" id="hitos" aria-hidden="true"></div></div>
+        <output id="reloj" class="reloj">00:00 / 10:00</output>
+      </div>
+    </div>
+    <div class="banner" id="banner-res" hidden role="status"></div>
+    <div class="rejilla-sim">
+      <section class="tarjeta"><div class="tarjeta-cab"><h3>Línea de tiempo narrada</h3><span class="chip chip-neutro sin-punto" id="hora-sim">09:00:00</span></div>
+        <div class="tarjeta-cuerpo sin-relleno"><ol class="cron-sim" id="cron" tabindex="0" aria-live="polite"></ol></div></section>
+      <section class="tarjeta centro"><div class="tarjeta-cab"><h3>Grafo de caminos</h3><span class="chip chip-neutro sin-punto">camino recorrido resaltado</span></div>
+        <div class="tarjeta-cuerpo"><div id="grafo" class="grafo"></div>
+          <div class="base-estado" id="base-estado"><span class="sub-titulo">Base de datos sintética</span><b id="base-chip" class="chip chip-ok sin-punto">ÍNTEGRA</b></div></div></section>
+
+    </div>
+      <div class="fila-paneles">
+        <section class="tarjeta"><div class="tarjeta-cab"><h3>Mensajes</h3></div><div class="tarjeta-cuerpo sin-relleno"><div id="mensajes" class="mensajes"></div></div></section>
+        <section class="tarjeta"><div class="tarjeta-cab"><h3>Inventario de credenciales del Rojo</h3></div><div class="tarjeta-cuerpo"><ul id="inventario" class="inventario"></ul></div></section>
+        <section class="tarjeta"><div class="tarjeta-cab"><h3>Wazuh</h3><span class="chip chip-simulado sin-punto">WAZUH SIMULADO</span></div><div class="tarjeta-cuerpo sin-relleno"><ul id="alertas" class="alertas-mini"></ul></div></section>
+        <section class="tarjeta"><div class="tarjeta-cab"><h3>Marcador</h3></div><div class="tarjeta-cuerpo" id="marcador"></div></section>
+      </div>
+    <div class="tarjeta ensena" id="ensena" hidden><div class="tarjeta-cab"><h3>Qué enseña esta partida</h3></div><div class="tarjeta-cuerpo" id="ensena-txt"></div></div>
+  </section>
+</main>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script src="simulacion.js"></script>
+</body>
+</html>

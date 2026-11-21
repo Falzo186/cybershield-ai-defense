@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field  # noqa: E402
 import mock_server as ms  # noqa: E402
 import panel as pn  # noqa: E402
 import combate as cb  # noqa: E402
+import simulacion as sim  # noqa: E402
 import partida as pt  # noqa: E402
 from src.lab import (apps, ataque_ia, atacante, cliente_ollama, correos, documentos, escenarios_empresa,  # noqa: E402
                      harness, informe, motor,
@@ -67,7 +68,7 @@ RUTA_SALIR = "/api/sesion/salir"   # cerrar la propia sesión: permitido a cualq
 # El panel de análisis (/api/panel/...) es una vista de solo lectura del laboratorio: no toca la partida, no
 # expone secretos y se consulta sin unirse a ningún equipo. Sus POST (lanzar o cancelar una campaña) sí
 # exigen sesión, como cualquier otra acción.
-PREFIJOS_PUBLICOS = ("/api/panel/", "/api/combate/")   # el combate: GET públicos de solo lectura; los POST los valida combate.py (árbitro)
+PREFIJOS_PUBLICOS = ("/api/panel/", "/api/combate/", "/api/simulacion/")   # el combate: GET públicos de solo lectura; los POST los valida combate.py (árbitro)
 # Rutas reservadas a UN equipo (además de exigir sesión). Detener, iniciar y cerrar la partida es cosa del árbitro;
 # Rojo envía correos de entrenamiento y Azul los lee en su buzón.
 SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul",
@@ -1977,6 +1978,7 @@ async def manual_real(body: ManualRealIn):
 # El panel va antes del mount de la UI: ese mount captura «/» y se traga lo que venga después.
 pn.registrar(app, HOST, repositorio.por_defecto)
 cb.registrar(app, HOST)
+sim.registrar(app)
 ms.montar_ui(app)
 
 if __name__ == "__main__":
