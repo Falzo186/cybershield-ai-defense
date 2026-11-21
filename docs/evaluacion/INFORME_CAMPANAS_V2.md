@@ -60,3 +60,13 @@ Campaña `combate-v2` (prompts v3) comparada **lado a lado** con `combate-v1` (p
 
 ## Veredicto
 El prompt v3 resuelve el problema de servicio de qwen3:8b (de 70 % a 100 % de victoria Azul) sin aprobar nada indebido, y **no** lo resuelve para llama3.1:8b, que pasa de pedir demasiado a rechazar casi todo. El Rojo no ganó ninguna partida con el diseño de texto libre.
+
+## Fase D (exploratoria) — efecto del Harness: límites estrictos vs holgados (P-15)
+Campaña `combate-v2-harness`: qwen3:8b@v3 contra sí mismo, 5 familias × escenario intermedio × 3 repeticiones = **15 partidas por celda**. El Harness estuvo **activo en las dos celdas** (ningún control desactivado); solo cambiaron los topes: *estricto* = 3 llamadas/turno, 350 tokens/turno, 1 error consecutivo, 300 s; *holgado* = 20 llamadas/turno, 6 000 tokens/turno, 6 errores consecutivos, 7 200 s.
+
+| Celda | n válidas | Resultado | Llamadas medias | Duración media |
+|---|---|---|---|---|
+| harness_estricto | 15 | VICTORIA_AZUL 15/15 | 19,0 | 39 s |
+| harness_holgado | 15 | VICTORIA_AZUL 15/15 | 19,0 | 38 s |
+
+**Resultado: sin diferencia observable.** El consumo real (≈19 llamadas por partida de 8 turnos, ≈2,4/turno) quedó **por debajo** incluso del tope estricto (24), así que el Harness estricto **nunca cortó** ninguna partida: no se mide su efecto sobre el resultado, sino que con 8B sanos esos topes no son vinculantes. Para observar un efecto habría que apretar más los topes o inducir fallos (modelo lento, errores). Exploratorio (n=15 por celda); no concluyente. No cambia las conclusiones de las secciones anteriores.

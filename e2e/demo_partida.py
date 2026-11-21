@@ -194,6 +194,8 @@ def main(ver=False):
             azul.click("#bp-defender")
             t = esperar(lambda: "verificado" in toast(azul) and toast(azul)) or toast(azul)
             chk("Azul fija su defensor IA y el servidor lo comprueba contra su Ollama", True, "verificado" in t)
+            esperar(lambda: all("falso-defensor" in pg.inner_text("#bp-defensor") and "verificado" in pg.inner_text("#bp-defensor")
+                                for pg in (general, rojo, azul, espectador)))   # la propagación al espectador es por sondeo: se espera, no se asume
             chk("todas las vistas ven el defensor de Azul verificado", [True] * 4,
                 ["falso-defensor" in pg.inner_text("#bp-defensor") and "verificado" in pg.inner_text("#bp-defensor")
                  for pg in (general, rojo, azul, espectador)])

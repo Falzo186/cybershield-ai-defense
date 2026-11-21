@@ -417,3 +417,12 @@ siguen siendo 21. El cálculo vive ahora en `experimentos/avance.py`, verificabl
 - Resultados: 2 370 partidas válidas (510 con 8B reales); **0 victorias Rojas de 8B en 240**; Azul 63–95 % de victorias; batería 38/38 suites, 1 850/1 850.
 - Avance (fórmula histórica, pesos sin tocar): 100 % de los 18 criterios del encargo; criterios propios de la misión en `docs/INFORME_EJECUTIVO_FINAL.md` §11.
 - Pendiente / siguiente paso: Wazuh real, TLS, más modelos/prompts y repeticiones.
+
+---
+
+# Misión extra (2026-11-19 → 2026-11-21): prompts v3, campaña `combate-v2`, demo curada
+- Qué se hizo: pendientes al día, adenda del exit code 4 (causa **no demostrada**), prompts v3 (Azul con procedimiento de registro; Rojo con historial de la partida), campaña `combate-v2` (300 partidas válidas), comparación v1 vs v3 con el mismo analizador, Harness estricto vs holgado (exploratorio, sin efecto observable), partidas curadas con reproducción y modo «Guion determinista (sin IA)».
+- Resultados: Rojo 0/300 con v3; Azul qwen3:8b v3 120/120 victorias (v2: 70 %), Azul llama3.1:8b v3 120/120 empates degradados (v2: 7 %). Informe: `docs/evaluacion/INFORME_CAMPANAS_V2.md`.
+- Batería: 37/39 suites · 1 885/1 887 (2 fallos explicados en `docs/PRUEBAS.md`; uno arreglado, uno de entorno abierto).
+- Avance (fórmula histórica, pesos sin tocar): sin cambios, 100 % de los 18 criterios del encargo; no mide el sistema.
+- Pendiente: P-16 (cruzada ampliada), P-17 (llama v3), P-18 (Rojo v3 aislado), B-2 (umbral de rendimiento).
