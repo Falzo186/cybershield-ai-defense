@@ -100,3 +100,22 @@ Reemplaza al guion de la misión de 23 h para exposiciones: incluye una partida 
 
 **Plan B si Ollama falla:** pasos 1–5 con la partida curada y las capturas de `docs/capturas_final/extra/`; el guion determinista funciona sin Ollama. Dilo explícitamente.
 **Ensayo sin GPU:** `python e2e/test_combate_extra.py` (29 comprobaciones con modelos falsos; regenera las capturas de `docs/capturas_final/extra/`).
+
+---
+
+# Guion de 10 minutos v3 — con modo Caminos (misión Caminos, 2026-11-21)
+
+**Prepara (5 min):** `ollama list` con `qwen3:8b` y `llama3.1:8b` (calienta cada uno); `python server/app.py` y anota el código de árbitro; entra como árbitro en `/combate/` o `/equipo/` (así `/simulacion/` puede lanzar partidas). Abre `http://localhost:8000/simulacion/` y `/combate/`.
+
+| Min | Qué haces | Qué dices |
+|---|---|---|
+| 0–1 | Cabecera con **WAZUH SIMULADO**. | «Laboratorio local, datos ficticios; la IA propone, el motor valida y declara el resultado.» |
+| 1–3 | **Combate libre real** (`/combate/`): Rojo `qwen3:8b` vs Azul `llama3.1:8b` (`LIBRE_IA`). | «Aquí el Rojo solo escribe texto contra un Azul que decide por el registro: en 240+300 partidas **no ganó ninguna**. Es un resultado válido, no un fallo de la demo.» |
+| 3–4 | `/simulacion/` → catálogo: señala la **insignia** de cada tarjeta. | «Tres tipos de procedencia: `LIBRE_IA`, `CAMINOS_IA` (un 8B elige opciones del grafo) y `CAMINOS_GUION` (decisiones prefijadas).» |
+| 4–6 | **Reproducir «Victoria Roja: el segundo factor llegó por un correo que nadie reportó»** (4×). Señala el grafo, el inventario, las alertas SIMULADAS y «Qué enseña». | «**Es un guion**: demuestra que el motor y el grafo permiten este final; **no** es «la IA venció». Mira qué decisión del Azul lo permitió: no cuestionar de dónde venía el segundo factor.» |
+| 6–7 | Reproducir **la reversión** («parece ganar el Rojo y al final gana el Azul»). | «Rotar la credencial a tiempo invalida la sesión: el Azul puede recuperar una partida que parecía perdida.» |
+| 7–9 | **Modo automático en vivo**: «Lanzar una partida ahora» → Automático, Rojo `qwen3:8b`, Azul `llama3.1:8b` → «Jugar y ver». | «Aquí dos 8B juegan solos con credenciales ficticias fijas; el motor valida cada credencial. Si el Azul aprueba una válida sin ver el contexto (hora, dispositivo, canal), el Rojo gana de verdad; si el Rojo toca una credencial señuelo, pierde.» |
+| 9–10 | Resultados de `docs/evaluacion/INFORME_CAMINOS.md`. | Tasa empírica de victoria Roja con 8B **en este modo** (con n e IC) y honestidad sobre lo que no se probó. |
+
+**Cómo explicar con honestidad `LIBRE_IA` vs `CAMINOS_*`:** el combate libre mide si un modelo logra engañar con **solo texto** a un defensor que verifica el registro (no lo logró). Caminos **cambia las reglas del juego**: da al Rojo opciones y un camino real a la victoria y mide qué hace cada 8B con ellas. Una victoria Roja de **guion** prueba que el diseño la permite; una de **8B** (`CAMINOS_IA`) es real pero **solo en este modo**; ninguna debe presentarse como «la IA hackeó a la IA» en general.
+**Plan B sin Ollama:** reproduce las 6 grabaciones (no necesitan GPU) y lanza partidas con los modelos simples (rotuladas GUION).
