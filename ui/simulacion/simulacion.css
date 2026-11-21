@@ -49,3 +49,6 @@ body { background: var(--p-fondo); color: var(--p-texto); font-family: var(--p-s
 @media (max-width: 1200px) { .rejilla-sim { grid-template-columns: 1fr; } }
 .alertas-mini li { display: flex; gap: var(--p-e2); align-items: flex-start; padding: 6px var(--p-e3); font-size: var(--p-t-sm); }
 .alertas-mini li .chip { flex: none; white-space: nowrap; }
+.lanzar { margin-bottom: var(--p-e4); } .lanzar > summary { list-style: none; cursor: pointer; }
+.form-lanzar { display: grid; grid-template-columns: minmax(220px, 1.4fr) minmax(180px, 1fr) minmax(180px, 1fr) 110px 100px auto; gap: var(--p-e3) var(--p-e4); align-items: end; }
+.inventario li .chip { flex: none; white-space: nowrap; }

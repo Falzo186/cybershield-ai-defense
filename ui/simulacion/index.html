@@ -23,6 +23,20 @@
   <section id="vista-catalogo" class="contenido">
     <div class="cabecera-vista"><h2>Partidas grabadas del modo Caminos</h2>
       <p>Son partidas <b>ejecutadas de verdad por el motor</b> y guardadas con su cadena de hashes. La reproducción no regenera nada: solo reproduce el registro, a <b>ritmo narrativo</b>. La insignia de cada tarjeta dice <b>quién jugó</b>: un guion prefijado <b>no</b> es «la IA venció».</p></div>
+    <details class="tarjeta lanzar" id="lanzar">
+      <summary class="tarjeta-cab"><h3>Lanzar una partida ahora (árbitro)</h3><span class="chip chip-neutro sin-punto" id="chip-lanzar">modo automático o grafo</span></summary>
+      <div class="tarjeta-cuerpo">
+        <form id="form-lanzar" class="form-lanzar" autocomplete="off">
+          <label class="campo"><span>Modo</span><select id="l-modo"><option value="auto">Automático de credenciales (IA vs IA)</option><option value="grafo">Grafo de caminos</option></select></label>
+          <label class="campo"><span>Rojo</span><select id="l-rojo"></select></label>
+          <label class="campo"><span>Azul</span><select id="l-azul"></select></label>
+          <label class="campo corto" id="l-dif-wrap" hidden><span>Dificultad</span><select id="l-dif"><option>sencillo</option><option>intermedio</option><option>complejo</option></select></label>
+          <label class="campo corto"><span>Semilla</span><input type="number" id="l-sem" value="1" min="0" max="99999"></label>
+          <button type="submit" class="boton boton-primario" id="l-ir">Jugar y ver</button>
+        </form>
+        <p class="nota-tarjeta" id="l-nota">Solo el árbitro (sesión «general») puede lanzar partidas. Con modelos 8B reales cada partida tarda unos segundos; los modelos simples (guion, registro, aprobar…) no usan IA y quedan rotulados como GUION.</p>
+      </div>
+    </details>
     <div class="catalogo" id="catalogo"></div>
   </section>
 

@@ -68,7 +68,7 @@ RUTA_SALIR = "/api/sesion/salir"   # cerrar la propia sesión: permitido a cualq
 # El panel de análisis (/api/panel/...) es una vista de solo lectura del laboratorio: no toca la partida, no
 # expone secretos y se consulta sin unirse a ningún equipo. Sus POST (lanzar o cancelar una campaña) sí
 # exigen sesión, como cualquier otra acción.
-PREFIJOS_PUBLICOS = ("/api/panel/", "/api/combate/", "/api/simulacion/")   # el combate: GET públicos de solo lectura; los POST los valida combate.py (árbitro)
+PREFIJOS_PUBLICOS = ("/api/panel/", "/api/combate/", "/api/simulacion/", "/api/caminos/")   # el combate: GET públicos de solo lectura; los POST los valida combate.py (árbitro)
 # Rutas reservadas a UN equipo (además de exigir sesión). Detener, iniciar y cerrar la partida es cosa del árbitro;
 # Rojo envía correos de entrenamiento y Azul los lee en su buzón.
 SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul",
@@ -1978,7 +1978,7 @@ async def manual_real(body: ManualRealIn):
 # El panel va antes del mount de la UI: ese mount captura «/» y se traga lo que venga después.
 pn.registrar(app, HOST, repositorio.por_defecto)
 cb.registrar(app, HOST)
-sim.registrar(app)
+sim.registrar(app, HOST)
 ms.montar_ui(app)
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ def main(ver=False, capturas=True):
     port = B.puerto_libre()
     base = f"http://127.0.0.1:{port}"
     tmp = tempfile.mkdtemp()
-    env = {**os.environ, "PUERTO": str(port), "CS_LAB_DB": os.path.join(tmp, "lab.db"), "CS_COMBATE_DB": os.path.join(tmp, "c.db"), "CS_WAZUH_SIM_DB": os.path.join(tmp, "w.db"), "PYTHONIOENCODING": "utf-8"}
+    env = {**os.environ, "PUERTO": str(port), "CS_LAB_DB": os.path.join(tmp, "lab.db"), "CS_COMBATE_DB": os.path.join(tmp, "c.db"), "CS_WAZUH_SIM_DB": os.path.join(tmp, "w.db"), "CS_CAMINOS_DB": os.path.join(tmp, "cam.db"), "CS_CODIGO_ARBITRO": "246810", "PYTHONIOENCODING": "utf-8"}
     srv = subprocess.Popen([sys.executable, str(RAIZ / "server" / "app.py")], cwd=str(RAIZ), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(60):
@@ -78,11 +78,14 @@ def main(ver=False, capturas=True):
                 p.screenshot(path=str(SALIDA / "02_reproduccion_en_curso_1366x768.png"))
             muestras = []
             t0 = time.time()
-            while time.time() - t0 < 40 and p.is_hidden("#banner-res"):
-                muestras.append(p.is_hidden("#ensena"))
+            while time.time() - t0 < 40:
+                b_oculto, e_oculto = p.evaluate("[document.querySelector('#banner-res').hidden, document.querySelector('#ensena').hidden]")   # lectura atómica
+                if not b_oculto:
+                    break
+                muestras.append(e_oculto)
                 time.sleep(0.2)
             p.wait_for_selector("#banner-res:not([hidden])", timeout=30000)
-            chk("el resultado y «qué enseña» aparecen solo al llegar al evento de resultado del registro", all(muestras) and p.is_visible("#ensena"))
+            chk("el resultado y «qué enseña» aparecen solo al llegar al evento de resultado del registro", all(muestras) and p.is_visible("#ensena"), f"muestras={muestras[-3:]} n={len(muestras)} ens={p.is_visible('#ensena')}")
             chk("victoria Roja en CAMINOS_GUION: el banner aclara que NO es una victoria de un modelo", "Victoria del Equipo Rojo" in p.inner_text("#banner-res") and "NO es una victoria de un modelo" in p.inner_text("#banner-res"))
             chk("los paneles se sincronizaron: mensajes, inventario (C-01 válida confirmada), alertas SIMULADAS y base COMPROMETIDA",
                 p.locator("#mensajes .m").count() >= 2 and "VÁLIDA" in p.inner_text("#inventario") and "SIMULADO" in p.inner_text("#alertas") and "COMPROMETIDA" in p.inner_text("#base-chip"))
@@ -103,6 +106,40 @@ def main(ver=False, capturas=True):
             chk("la reversión termina en victoria Azul, con la base CONTENIDA o ÍNTEGRA y su enseñanza", "Victoria del Equipo Azul" in p.inner_text("#banner-res") and ("ROTADA" in p.inner_text("#inventario")) and "COMPROMETIDA" not in p.inner_text("#base-chip") and len(p.inner_text("#ensena-txt")) > 20)
             if capturas:
                 p.screenshot(path=str(SALIDA / "04_reversion_victoria_azul_1366x768.png"))
+            p.click("#btn-volver")
+            # ── Lanzar una partida desde la interfaz (árbitro) ────────────────────────────────────────────
+            import urllib.request as _u
+            rq = _u.Request(base + "/api/sesion", data=json.dumps({"nombre": "Arbitro", "equipo": "general", "codigo": "246810"}).encode(), headers={"Content-Type": "application/json"}, method="POST")
+            tok = json.loads(_u.urlopen(rq, timeout=10).read().decode())["token"]
+            sin_token = None
+            try:
+                _u.urlopen(_u.Request(base + "/api/caminos/partidas", data=b"{}", headers={"Content-Type": "application/json"}, method="POST"), timeout=10)
+            except urllib.error.HTTPError as e:
+                sin_token = e.code
+            chk("sin sesión de árbitro, lanzar una partida da 403", sin_token == 403)
+            p.evaluate(f"localStorage.setItem('cs_sesion_general', {json.dumps(tok)})")
+            p.reload()
+            p.evaluate("document.querySelector('#lanzar').open = true; window.__ritmoSim = 0.02")
+            p.wait_for_selector("#l-ir:not([disabled])", timeout=10000)
+            p.select_option("#l-modo", "auto"); p.select_option("#l-rojo", "primera"); p.select_option("#l-azul", "aprobar")
+            p.click("#l-ir")
+            p.wait_for_selector("#vista-reproductor:not([hidden])", timeout=30000)
+            chk("el modo automático se lanza desde la interfaz y se abre su reproducción con la insignia GUION (líneas base, sin IA)", "GUION" in p.inner_text("#r-meta") and "ritmo narrativo" in p.inner_text("#nota-ritmo").lower())
+            p.select_option("#sel-vel", "4"); p.click("#btn-play")
+            p.wait_for_selector("#banner-res:not([hidden])", timeout=40000)
+            chk("automático: Azul «aprobar siempre» deja ganar al Rojo; el banner aclara que es un guion, y el inventario muestra la credencial VÁLIDA solo tras el motor",
+                "Victoria del Equipo Rojo" in p.inner_text("#banner-res") and "NO es una victoria de un modelo" in p.inner_text("#banner-res") and "VÁLIDA" in p.inner_text("#inventario") and "COMPROMETIDA" in p.inner_text("#base-chip"),
+                f"banner={p.inner_text('#banner-res')[:80]!r} inv={p.inner_text('#inventario')[:120]!r} base={p.inner_text('#base-chip')!r}")
+            chk("en el modo automático no se pinta el grafo fijo", "no usa el grafo fijo" in p.inner_text("#grafo"))
+            if capturas:
+                p.screenshot(path=str(SALIDA / "06_automatico_lanzado_1366x768.png"))
+            p.click("#btn-volver")
+            p.select_option("#l-modo", "grafo"); p.select_option("#l-rojo", "primera"); p.select_option("#l-azul", "registro")
+            p.click("#l-ir")
+            p.wait_for_selector("#vista-reproductor:not([hidden])", timeout=30000)
+            p.select_option("#sel-vel", "4"); p.click("#btn-play")
+            p.wait_for_selector("#banner-res:not([hidden])", timeout=40000)
+            chk("grafo lanzado desde la UI: Azul por registro gana y el grafo se resalta", "Victoria del Equipo Azul" in p.inner_text("#banner-res") and p.locator("#grafo .e.vis").count() >= 2)
             ctx.close()
             ctx2 = nav.new_context(viewport=B.VISTAS["1920x1080"], locale="es-MX")
             p2 = ctx2.new_page()

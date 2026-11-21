@@ -27,6 +27,8 @@
     "caminos.credencial_rotada": "El SIEM registró una credencial rotada", "caminos.base_entregada": "Alerta: entrega de la base de datos", "caminos.documento_instruccion": "Alerta: documento con texto que da instrucciones" };
   const ESTADO_TXT = { correo_clic: "Un empleado abrió el enlace del correo", sesion_activa: "Credencial comprometida: el Rojo tiene una sesión activa", base_entregada: "La base de datos sintética fue ENTREGADA",
     cred_rotada: "La credencial fue rotada: la sesión del Rojo quedó invalidada", contencion_activa: "Cuenta contenida por el Equipo Azul", honeytoken_usado: "Se usó una credencial señuelo", datos_senuelo_entregados: "Se entregaron datos de prueba (señuelo)" };
+  const CANAL = { portal_interno: "el portal interno", vpn: "la VPN", externo: "la web externa" };
+  const CREDS = [["C-01", "gerente de operaciones"], ["C-02", "técnico de soporte"], ["C-03", "analista de finanzas"], ["C-04", "exempleado"], ["C-05", "contratista temporal"], ["C-06", "practicante de RR. HH."], ["C-07", "administrador de respaldos"], ["C-08", "cuenta de servicio heredada"]];
   const S = { det: null, items: [], t: 0, vel: 1, jugando: false, timer: null, ult: 0, vistos: 0 };
 
   async function api(ruta) {
@@ -72,6 +74,17 @@
         it.push({ k: "alerta", actor: "sistema", titulo: ALERTA[p.clave] || p.clave, detalle: "WAZUH SIMULADO · " + p.clave, clave: p.clave, peso: 2, turno: e.turno });
       } else if (e.tipo === "caminos.estado") {
         Object.entries(p.cambios).forEach(([k, v]) => { if (v === true && ESTADO_TXT[k]) it.push({ k: "estado", actor: "sistema", titulo: ESTADO_TXT[k], detalle: "Estado confirmado por el motor", bandera: k, cambios: { [k]: v }, peso: 2, turno: e.turno }); else if (k === "sesion_activa" && v === false) it.push({ k: "estado", actor: "sistema", titulo: "La sesión del Rojo se cerró", detalle: "Estado confirmado por el motor", cambios: { sesion_activa: false }, peso: 1, turno: e.turno }); });
+      } else if (e.tipo === "rojo.intento") {
+        it.push({ k: "decision", actor: "rojo", titulo: `El Equipo Rojo probó la credencial ${p.cid} por ${CANAL[p.canal] || p.canal}`, detalle: "Intento de acceso a la base de datos sintética", mensaje: p.mensaje, peso: 3, hito: true, cid: p.cid, auto: true, turno: e.turno });
+      } else if (e.tipo === "motor.autenticacion") {
+        const t = { fallo: "Autenticación fallida (cuenta contabilizada)", cuenta_bloqueada: "La cuenta está bloqueada: intento rechazado", honeytoken: "Se usó una credencial señuelo: alerta crítica y cuenta bloqueada", correcta: "La credencial autenticó correctamente" }[p.resultado] || p.resultado;
+        it.push({ k: "estado", actor: "sistema", titulo: t, detalle: "Validado por el motor", cid: p.cid, aut: p.resultado, peso: 2, turno: e.turno });
+      } else if (e.tipo === "legitima.solicitud") {
+        it.push({ k: "estado", actor: "sistema", titulo: `Un empleado legítimo (${p.identidad}) solicita acceso`, detalle: "Tráfico legítimo intercalado", peso: 1, turno: e.turno });
+      } else if (e.tipo === "azul.decision") {
+        it.push({ k: "decision", actor: "azul", titulo: { aprobar: "El Equipo Azul aprobó el acceso", pedir_verificacion: "El Equipo Azul pidió verificación adicional", rechazar: "El Equipo Azul rechazó", contener: "El Equipo Azul contuvo la cuenta y rotó la credencial" }[p.decision] || p.decision, detalle: p.origen === "legit" ? "Sobre una solicitud legítima" : "Sobre un intento del Rojo", mensaje: p.justificacion, peso: 3, hito: p.origen !== "legit", auto: true, decision: p.decision, turno: e.turno });
+      } else if (e.tipo === "motor.base_entregada") {
+        it.push({ k: "estado", actor: "sistema", titulo: "La base de datos sintética fue ENTREGADA", detalle: "Estado confirmado por el motor", cambios: { base_entregada: true }, todos: { base_entregada: true }, peso: 2, turno: e.turno });
       } else if (e.tipo === "partida.resultado") {
         it.push({ k: "resultado", actor: "sistema", titulo: p.motivo, detalle: "Resultado declarado por el motor (partida.resultado)", resultado: p, peso: 4, hito: true, turno: e.turno });
       }
@@ -84,7 +97,7 @@
 
   // ── Grafo SVG ─────────────────────────────────────────────────────────────────────────────────
   function dibujarGrafo(g) {
-    const cont = $("#grafo"); cont.textContent = "";
+    const cont = $("#grafo"); cont.textContent = ""; if (!g) { cont.append(el("p", "nota-tarjeta", "El modo automático no usa el grafo fijo: el Rojo elige libremente credencial y canal y el motor valida.")); return; }
     const prof = {}, orden = []; const hojas = new Set(Object.keys(g.hojas));
     (function dfs(id, d) { if (hojas.has(id)) { if (!(id in prof) || prof[id] < d) prof[id] = d; if (!orden.includes(id)) orden.push(id); return; } if (!(id in prof) || prof[id] < d) prof[id] = d; if (!orden.includes(id)) orden.push(id); g.nodos[id].opciones.forEach((o) => dfs(o.siguiente, d + 1)); })(g.inicio, 0);
     const cols = Math.max(...Object.values(prof)) + 1, porCol = {};
@@ -101,6 +114,7 @@
     cont.append(svg);
   }
   function marcarGrafo() {
+    if (!S.det.grafo) return;
     const vis = new Set(), arist = new Set(); S.items.slice(0, S.vistos).forEach((x) => { if (x.k === "decision") { arist.add(x.nodo + ":" + x.opcion); vis.add(x.nodo); const o = S.det.grafo.nodos[x.nodo].opciones.find((q) => q.id === x.opcion); if (o) vis.add(o.siguiente); } });
     if (!vis.size) vis.add(S.det.grafo.inicio);
     document.querySelectorAll("#grafo .n, #grafo .h").forEach((n) => n.classList.toggle("vis", vis.has(n.dataset.id)));
@@ -118,12 +132,17 @@
     // estado derivado SOLO de lo ya reproducido
     const fl = {}; v.forEach((x) => { if (x.todos) Object.assign(fl, x.todos); });
     const inv = [["C-01", "gerente de operaciones"], ["C-07", "administrador de respaldos"]];
+    if (S.det.modo === "auto") {
+      const est = {}; v.forEach((x) => { if (x.cid && x.k === "decision") est[x.cid] = est[x.cid] || "presentada"; if (x.cid && x.aut) { const n = (est["_f" + x.cid] || 0); if (x.aut === "fallo") { est["_f" + x.cid] = n + 1; est[x.cid] = "FALLIDA (" + (n + 1) + ")"; } else if (x.aut === "cuenta_bloqueada") est[x.cid] = "BLOQUEADA"; else if (x.aut === "honeytoken") est[x.cid] = "SEÑUELO detectado"; else if (x.aut === "correcta") est[x.cid] = "VÁLIDA (confirmada por el motor)"; } });
+      const ul2 = $("#inventario"); ul2.textContent = "";
+      CREDS.forEach(([id, rol]) => { const e = est[id] || "sin probar"; const li = el("li"); li.append(el("span", "", id + " · " + rol), el("span", "chip sin-punto " + (/VÁLIDA/.test(e) ? "chip-error" : /SEÑUELO/.test(e) ? "chip-ok" : /FALLIDA|BLOQ/.test(e) ? "chip-aviso" : e === "presentada" ? "chip-info" : "chip-neutro"), e)); ul2.append(li); });
+    }
     const dec = v.filter((x) => x.k === "decision").map((x) => x.opcion);
     const usada01 = fl.cred_gerente_presentada || dec.includes("cred_gerente");
     const estC01 = !usada01 ? ["sin probar", "chip-neutro"] : fl.cred_rotada ? ["ROTADA", "chip-aviso"] : (fl.base_entregada || fl.sesion_activa || fl.alerta_vista || fl.verificacion_exigida) ? ["VÁLIDA (confirmada por el motor)", "chip-error"] : ["presentada", "chip-info"];
     const estC07 = fl.honeytoken_usado ? ["SEÑUELO detectado", "chip-ok"] : (fl.cred_respaldos_presentada || dec.includes("cred_respaldos")) ? ["presentada", "chip-info"] : ["sin probar", "chip-neutro"];
-    const ul = $("#inventario"); ul.textContent = ""; [[inv[0], estC01], [inv[1], estC07]].forEach(([c, e]) => { const li = el("li"); li.append(el("span", "", c[0] + " · " + c[1]), el("span", "chip sin-punto " + e[1], e[0])); ul.append(li); });
-    const base = $("#base-chip"); let b = ["ÍNTEGRA", "chip-ok"]; if (fl.base_entregada) b = ["COMPROMETIDA", "chip-error"]; else if (fl.cred_rotada || fl.contencion_activa || fl.honeytoken_usado) b = ["CONTENIDA", "chip-info"];
+    const ul = $("#inventario"); if (S.det.modo !== "auto") { ul.textContent = ""; } [[inv[0], estC01], [inv[1], estC07]].filter(() => S.det.modo !== "auto").forEach(([c, e]) => { const li = el("li"); li.append(el("span", "", c[0] + " · " + c[1]), el("span", "chip sin-punto " + e[1], e[0])); ul.append(li); });
+    const base = $("#base-chip"); let b = ["ÍNTEGRA", "chip-ok"]; if (fl.base_entregada) b = ["COMPROMETIDA", "chip-error"]; else if (fl.cred_rotada || fl.contencion_activa || fl.honeytoken_usado || v.some((x) => x.aut === "honeytoken" || x.decision === "contener")) b = ["CONTENIDA", "chip-info"];
     base.className = "chip sin-punto " + b[1]; base.textContent = b[0];
     const fin = v.find((x) => x.k === "resultado"); const mc = $("#marcador"); mc.textContent = "";
     const dr = v.filter((x) => x.k === "decision" && x.actor === "rojo").length, da = v.filter((x) => x.k === "decision" && x.actor === "azul").length;
@@ -133,7 +152,7 @@
     if (fin) {
       const r = fin.resultado; bn.hidden = false; bn.className = "banner " + (r.resultado === "VICTORIA_ROJA" ? "r-rojo" : "r-azul"); bn.textContent = "";
       const izq = el("div", "banner-texto"); izq.append(el("h2", "", r.resultado === "VICTORIA_ROJA" ? "Victoria del Equipo Rojo" : "Victoria del Equipo Azul"), el("p", "motivo", r.motivo),
-        el("p", "explica", S.det.tipo === "CAMINOS_GUION" ? "Recorrido posible del grafo, demostrado por el motor (decisiones prefijadas): NO es una victoria de un modelo de IA." : "El motor declaró este resultado a partir del estado verificable."));
+        el("p", "explica", S.det.tipo === "CAMINOS_GUION" ? (S.det.modo === "auto" ? "Desenlace posible del modo automático, demostrado por el motor (líneas base sin IA): NO es una victoria de un modelo de IA." : "Recorrido posible del grafo, demostrado por el motor (decisiones prefijadas): NO es una victoria de un modelo de IA.") : "El motor declaró este resultado a partir del estado verificable."));
       bn.append(izq); ens.hidden = false; $("#ensena-txt").textContent = r.ensena || "";
     } else { bn.hidden = true; ens.hidden = true; }
     marcarGrafo();
@@ -159,14 +178,40 @@
     pausar(); S.det = d; S.items = construirItems(d.eventos_registro, d.grafo); S.t = 0; S.vistos = 0; S.vel = parseFloat($("#sel-vel").value);
     $("#vista-catalogo").hidden = true; $("#vista-reproductor").hidden = false; history.replaceState(null, "", "#" + id);
     $("#r-titulo").textContent = d.titulo;
-    const m = $("#r-meta"); m.textContent = ""; m.append(insignia(d.tipo)); [`Rojo: ${d.modelos.rojo}`, `Azul: ${d.modelos.azul}`, `semilla ${d.semilla}`, `grafo ${d.dificultad}`, `hojas recorridas: ${d.hoja}`, `hash del grafo ${d.hash_grafo.slice(0, 12)}…`, d.cadena_integra ? "cadena de hashes íntegra" : "CADENA ROTA"].forEach((t) => m.append(el("span", "chip sin-punto " + (t === "CADENA ROTA" ? "chip-error" : "chip-neutro"), t)));
+    const m = $("#r-meta"); m.textContent = ""; m.append(insignia(d.tipo)); [`Rojo: ${d.modelos.rojo}`, `Azul: ${d.modelos.azul}`, `semilla ${d.semilla}`, d.modo === "auto" ? "modo automático de credenciales" : `grafo ${d.dificultad}`, `${d.modo === "auto" ? "desenlace" : "hojas recorridas"}: ${d.hoja}`, `hash del grafo ${d.hash_grafo.slice(0, 12)}…`, d.cadena_integra ? "cadena de hashes íntegra" : "CADENA ROTA"].forEach((t) => m.append(el("span", "chip sin-punto " + (t === "CADENA ROTA" ? "chip-error" : "chip-neutro"), t)));
     const a = el("a", "chip chip-info sin-punto", "Ver registro (JSON)"); a.href = "/api/simulacion/" + encodeURIComponent(id); a.target = "_blank"; a.rel = "noopener"; m.append(a);
-    $("#nota-ritmo").textContent = "Reproducción a ritmo narrativo (≈ 10 min): no es la duración real de la ejecución, que fue de milisegundos. " + (INSIGNIA[d.tipo] ? INSIGNIA[d.tipo][2] : "");
+    $("#nota-ritmo").textContent = "Reproducción a ritmo narrativo (≈ 10 min): no es la duración real de la ejecución, que fue de milisegundos. " + (INSIGNIA[d.tipo] ? INSIGNIA[d.tipo][2].replace("el motor y el grafo permiten este final", d.modo === "auto" ? "el motor permite este final" : "el motor y el grafo permiten este final") : "");
     const hit = $("#hitos"); hit.textContent = ""; S.items.filter((x) => x.hito).forEach((x) => { const i = el("i", x.k === "resultado" ? "fin" : x.actor); i.style.left = (x.t * 100) + "%"; i.title = x.titulo; i.addEventListener("click", () => { pausar(); S.t = x.t * total(); aplicarTiempo(); }); hit.append(i); });
     $("#cron").textContent = ""; dibujarGrafo(d.grafo); aplicarTiempo();
   }
 
+  // ── Lanzar una partida (árbitro) ─────────────────────────────────────────────────────────────
+  const token = () => { try { return localStorage.getItem("cs_sesion_general") || ""; } catch (_) { return ""; } };
+  async function prepararLanzar() {
+    let e; try { e = await api("/api/caminos/estado"); } catch (_) { $("#l-nota").textContent = "No se pudo consultar el estado del servidor."; return; }
+    const reales = e.ollama.modelos.filter((m) => /qwen3:8b|llama3\.1:8b/.test(m));
+    const llenar = (id, extra) => { const s = $(id); s.textContent = ""; const g1 = document.createElement("optgroup"); g1.label = "Modelos 8B de Ollama (CAMINOS_IA)"; reales.forEach((m) => { const o = el("option", "", m); o.value = m; g1.append(o); });
+      if (!reales.length) { const o = el("option", "", e.ollama.disponible ? "Sin modelos 8B instalados" : "Ollama desconectado"); o.disabled = true; g1.append(o); } s.append(g1);
+      const g2 = document.createElement("optgroup"); g2.label = "Simples sin IA (CAMINOS_GUION)"; extra.forEach((m) => { const o = el("option", "", m); o.value = m; g2.append(o); }); s.append(g2); };
+    llenar("#l-rojo", ["primera", "aleatorio", "guion:cred_gerente,solicitar_base"]); llenar("#l-azul", ["registro", "aprobar", "rechazar", "aleatorio"]);
+    if (reales[0]) $("#l-rojo").value = reales[0]; if (reales[1] || reales[0]) $("#l-azul").value = reales[1] || reales[0];
+    $("#l-ir").disabled = !token(); if (!token()) $("#l-nota").textContent = "Para lanzar partidas entra como árbitro (sesión «general») desde la Sala de equipo o el Combate; sin sesión solo puedes reproducir las grabaciones.";
+  }
+  $("#l-modo").addEventListener("change", () => { $("#l-dif-wrap").hidden = $("#l-modo").value !== "grafo"; });
+  $("#form-lanzar").addEventListener("submit", async (ev) => {
+    ev.preventDefault(); const b = $("#l-ir"); b.disabled = true; b.textContent = "Jugando…";
+    try {
+      const r = await fetch("/api/caminos/partidas", { method: "POST", headers: { "Content-Type": "application/json", "X-Equipo-Token": token() }, body: JSON.stringify({ modo: $("#l-modo").value, rojo: $("#l-rojo").value, azul: $("#l-azul").value, dificultad: $("#l-dif").value, semilla: parseInt($("#l-sem").value || "1", 10) }) });
+      const d = await r.json(); if (!r.ok) throw new Error(d.error || "Error " + r.status);
+      let intentos = 0; const espera = async () => { intentos++; try { const x = await api("/api/simulacion/" + d.ver); return !x.pendiente; } catch (_) { return false; } };
+      while (!(await espera()) && intentos < 240) await new Promise((x) => setTimeout(x, 500));
+      abrir(d.ver);
+    } catch (e) { const t = el("div", "toast error", e.message); $("#toasts").append(t); setTimeout(() => t.remove(), 5000); }
+    b.disabled = !token(); b.textContent = "Jugar y ver";
+  });
+
   (async function iniciar() {
+    prepararLanzar();
     await cargarCatalogo();
     const h = location.hash.replace("#", ""); if (h.startsWith("sim-")) abrir(h);
   })();
