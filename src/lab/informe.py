@@ -11,7 +11,7 @@ from datetime import datetime
 from . import ataque_ia, sesion
 
 CATEGORIAS = ("partida", "correo", "enlace", "documento", "credencial", "incidente", "mision", "batalla_ia", "acceso",
-              "practica")
+              "practica", "autorizacion")
 NIVELES = ("BAJO", "MEDIO", "ALTO", "CRITICO")
 
 # accion -> (categoría, texto). El texto admite {usuario}, {recurso} y {resultado} (valores de la auditoría).
@@ -43,11 +43,19 @@ ACCIONES = {
     "ATAQUE_IA_LANZADO": ("batalla_ia", "La IA de Rojo lanzó un ataque ({recurso}) como {usuario}: {resultado}"),
     "ATAQUE_IA_RESULTADO": ("batalla_ia", "Resultado del ataque IA ({recurso}): {resultado}"),
     "DEFENSOR_IA_CONFIGURADO": ("batalla_ia", "Azul fijó su defensor IA ({recurso})"),
+    "PARTIDA_PAUSADA": ("partida", "El árbitro pausó la partida ({resultado})"),
+    "PARTIDA_REANUDADA": ("partida", "El árbitro reanudó la partida ({resultado})"),
+    "CORREO_ESCENARIO": ("correo", "Llegó un correo del escenario a {usuario} ({recurso})"),
+    "AUTORIZACION_PENDIENTE": ("autorizacion", "Nueva solicitud de autorización de {usuario} ({recurso})"),
+    "AUTORIZACION_APROBADA": ("autorizacion", "{usuario} aprobó una solicitud de autorización ({recurso})"),
+    "AUTORIZACION_RECHAZADA": ("autorizacion", "{usuario} rechazó una solicitud de autorización ({recurso})"),
+    "AUTORIZACION_EXPIRADA": ("autorizacion", "Una solicitud de autorización venció sin respuesta ({recurso})"),
+    "AUTORIZACION_CANCELADA": ("autorizacion", "Una solicitud de autorización fue cancelada ({recurso})"),
     "RONDA_PRACTICA": ("practica", "Ronda de práctica ({recurso}) como {usuario}: {resultado}"),
 }
 # Lo que Rojo ve DURANTE la partida: sus propias acciones y lo que una campaña real podría medir (clics, adjuntos
 # abiertos, credenciales obtenidas, sus accesos frenados o concedidos). Nunca si Azul reportó, contuvo o revocó.
-VISIBLE_ROJO = {"PARTIDA_INICIADA", "PARTIDA_FINALIZADA", "CORREO_RECIBIDO", "CLIC_ENLACE", "PDF_ABIERTO",
+VISIBLE_ROJO = {"PARTIDA_INICIADA", "PARTIDA_FINALIZADA", "PARTIDA_PAUSADA", "PARTIDA_REANUDADA", "CORREO_RECIBIDO", "CLIC_ENLACE", "PDF_ABIERTO",
                 "CREDENCIAL_COMPROMETIDA", "ATAQUE_IA_LANZADO", "ATAQUE_IA_RESULTADO"}
 
 

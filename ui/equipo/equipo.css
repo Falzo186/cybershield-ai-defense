@@ -1,0 +1,41 @@
+/* Sala de equipo · CyberShield Repair. Reutiliza tokens.css, panel.css y combate.css; aquí solo lo específico. */
+body { background: var(--p-fondo); color: var(--p-texto); font-family: var(--p-sans); margin: 0; }
+[hidden] { display: none !important; }
+.barra { display: flex; flex-wrap: wrap; align-items: center; gap: var(--p-e4); padding: var(--p-e3) var(--p-e5); border-bottom: 1px solid var(--p-borde); background: var(--p-superior); position: sticky; top: 0; z-index: 10; }
+.barra-marca { font-size: var(--p-t-lg); }
+.barra-estados { display: flex; gap: var(--p-e2); flex-wrap: wrap; }
+.barra-arbitro { display: flex; gap: var(--p-e2); align-items: end; flex-wrap: wrap; margin-left: auto; }
+.barra-enlaces { margin-left: auto; font-size: var(--p-t-sm); color: var(--p-texto-3); }
+.barra-enlaces a { color: var(--p-acento); }
+.rejilla-eq { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--p-e4); padding: var(--p-e5); }
+.rejilla-eq .ancho { grid-column: 1 / -1; }
+.entrar { max-width: 520px; margin: var(--p-e8) auto; }
+.form-entrar-eq, .form-sol { display: grid; gap: var(--p-e3); }
+.form-sol { margin-bottom: var(--p-e4); padding-bottom: var(--p-e4); border-bottom: 1px solid var(--p-borde); }
+.grupo-eq h4 { margin: var(--p-e3) 0 var(--p-e2); font-size: var(--p-t-sm); letter-spacing: .06em; text-transform: uppercase; color: var(--p-texto-3); }
+.grupo-eq.rojo h4 { color: var(--c-rojo); } .grupo-eq.azul h4 { color: var(--c-azul); }
+.part { display: flex; align-items: center; gap: var(--p-e3); padding: 6px 0; border-bottom: 1px solid var(--p-borde-suave); }
+.part .punto { width: 10px; height: 10px; border-radius: 50%; background: var(--p-ok); flex: none; }
+.part.fuera .punto { background: transparent; border: 2px solid var(--p-texto-3); }
+.part.fuera { color: var(--p-texto-3); }
+.part .meta { margin-left: auto; font-size: var(--p-t-xs); color: var(--p-texto-3); }
+.sol { border: 1px solid var(--p-borde); border-radius: var(--p-r-md); padding: var(--p-e3); margin-bottom: var(--p-e3); background: var(--p-superficie-2); display: grid; gap: var(--p-e2); }
+.sol .sol-linea { display: flex; flex-wrap: wrap; gap: var(--p-e2); align-items: center; }
+.sol small { color: var(--p-texto-2); }
+.sol .acciones { display: flex; gap: var(--p-e2); }
+.correo { display: flex; gap: var(--p-e3); padding: 8px 0; border-bottom: 1px solid var(--p-borde-suave); align-items: baseline; }
+.correo.nuevo b { color: var(--p-texto); }
+.correo .de { color: var(--p-texto-3); font-size: var(--p-t-xs); }
+.chat { height: 220px; overflow: auto; border: 1px solid var(--p-borde); border-radius: var(--p-r-md); padding: var(--p-e3); background: var(--p-superficie-2); display: grid; gap: 6px; align-content: start; }
+.chat .m b { color: var(--p-acento); } .chat .m time { color: var(--p-texto-3); font-size: var(--p-t-xs); margin-left: 6px; }
+.form-chat { display: flex; gap: var(--p-e2); margin-top: var(--p-e3); }
+.form-chat input { flex: 1; }
+.filtros-log { display: flex; gap: var(--p-e2); flex-wrap: wrap; margin-left: auto; }
+.log-fila { display: grid; grid-template-columns: 64px 90px 90px 1fr; gap: var(--p-e3); padding: 6px var(--p-e4); border-bottom: 1px solid var(--p-borde-suave); font-size: var(--p-t-sm); }
+.log-fila .t { color: var(--p-texto-3); font-variant-numeric: tabular-nums; }
+.vacio-eq { color: var(--p-texto-3); padding: var(--p-e3) 0; }
+.chip-pausada { color: var(--p-aviso); background: var(--p-aviso-flojo); border-color: transparent; font-weight: 700; }
+#lista-aut { display: flex; flex-direction: column; gap: var(--p-e3); }
+.sol { align-self: stretch; align-content: start; justify-items: start; margin: 0; }
+.sol .acciones { margin-top: var(--p-e2); }
+.tarjeta-cuerpo { align-content: start; }

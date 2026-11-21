@@ -495,7 +495,9 @@ const R = (() => {
     const arb = vista.conToken && vista.rol === "general";
     const fase = vista.partida ? vista.partida.fase : "preparacion";
     ocultar("#duracion-wrap, #btn-iniciar-partida", !arb || fase !== "preparacion");
-    ocultar("#btn-finalizar", !arb || fase !== "en_curso");
+    ocultar("#btn-finalizar", !arb || !["en_curso", "pausada"].includes(fase));
+    ocultar("#btn-pausar-partida", !arb || fase !== "en_curso");
+    ocultar("#btn-reanudar-partida", !arb || fase !== "pausada");
     ocultar("#btn-nueva-partida", !arb || fase !== "finalizada");
   }
 
@@ -511,6 +513,9 @@ const R = (() => {
         const s = Math.max(0, Math.round(p.restante_s - (performance.now() - base) / 1000));
         el.textContent = "⏱ " + mmss(s) + (s === 0 ? " · cerrando…" : "");
         el.classList.toggle("pe-ultimo", s <= 60);
+      } else if (p.fase === "pausada") {
+        el.textContent = "⏸ PAUSADA · " + mmss(p.restante_s);
+        el.classList.remove("pe-ultimo");
       } else {
         el.textContent = p.fase === "preparacion" ? "PREPARACIÓN" : "FINALIZADA" + (p.motivo_fin === "tiempo" ? " (tiempo)" : "");
         el.classList.remove("pe-ultimo");
