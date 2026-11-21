@@ -37,7 +37,7 @@ Azul v3 y Rojo v3 cambiaron a la vez (el efecto del Rojo no se aísla); S1–S3 
 P-16 (cruzada ampliada), P-17 (llama v3), P-18 (Rojo v3 aislado), B-2 (umbral), causa del exit code 4, Wazuh real y TLS.
 
 ## 7. Commits
-Ver `git log pre-mision-extra..mision-extra`: 15 commits locales, **sin push**.
+Ver `git log pre-mision-extra..mision-extra`: 17 commits locales, **sin push**.
 
 ## 8. Veredicto técnico honesto
 La misión cumplió lo medible: qwen3:8b pasa de 70 % a 100 % de victorias Azul sin aprobar nada indebido, la demostración curada funciona y está rotulada con honestidad. **No** cumplió que v3 mejorara a ambos modelos (llama empeora) ni abrió una vía de victoria al Rojo en texto libre; eso queda para el modo con caminos. Veredicto: **funcional con una mejora clara en un modelo y una regresión documentada en el otro.**

@@ -19,3 +19,5 @@ Resumen:
 - T0: 2026-11-19 06:54:26 (HAC). T_CIERRE = 13:39. T_FIN = 14:54.
 - Rama `mision-extra` desde `mision-23h`; etiqueta `pre-mision-extra`.
 - Fases A, B, C y D terminadas; cierre: batería 37/39 (1 885/1 887), informe ejecutivo extra en `docs/INFORME_EJECUTIVO_EXTRA.md` y PDF.
+
+**MISIÓN EXTRA FINALIZADA** — 2026-11-21 (T0 2026-11-19 06:54:26). Batería 37/39 (1 885/1 887); las 2 fallas están explicadas y no son regresiones (una arreglada, otra de entorno idéntica en `pre-mision-extra`, B-2). Informe: `docs/INFORME_EJECUTIVO_EXTRA.md/.pdf`.
