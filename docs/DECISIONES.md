@@ -31,3 +31,17 @@
 
 ## Cambios de aserción de pruebas previas
 Ninguno: no se modificó la aserción de ninguna prueba anterior. Las 5 suites que fallaban en la línea base fallaban por causas de entorno (ver `docs/auditoria/00_ESTADO_INICIAL.md`).
+
+## Misión Caminos (2026-11-21)
+
+| Id | Decisión | Por qué | Evidencia |
+|---|---|---|---|
+| D-22 | El modo Caminos es un **grafo de decisión fijo** (16 recorridos, 8/8) y no una ampliación del combate libre | El combate libre dejó al Rojo sin «puerta abierta» (0/240, 0/300). Un grafo fijo da al Rojo un camino genuino sin autoaprendizaje ni memoria entre partidas, y al Azul contrajugadas genuinas. | `docs/CAMINOS.md`, `src/lab/caminos/grafo.py` |
+| D-23 | Las tres variantes (sencillo/intermedio/complejo) comparten el **mismo grafo y las mismas 16 hojas**; cambia lo que el Azul VE | Conservar el equilibrio exacto 8/8 era más importante que inventar hojas; el validador lo exige. | `validar()` |
+| D-24 | Cinco nodos del Rojo tienen una única opción (continuación narrativa) | Añadir una opción de abandono habría añadido hojas Azules y roto el 8/8. La decisión real del Rojo es su primer movimiento y, con sesión, pedir la base o pivotar. Se declara como limitación. | `CAMINOS.md` § Limitación |
+| D-25 | El motor de Caminos **reutiliza** `combate.store` (auditoría con hash) y el Wazuh simulado; reglas Wazuh nuevas 100050–100058 | Evita duplicar la cadena de auditoría; todo sigue rotulado SIMULADO. | `reglas.py` |
+| D-26 | Toda partida lleva `tipo` (`CAMINOS_GUION`/`CAMINOS_IA`) y una victoria Roja de guion **nunca** se presenta como «la IA venció» | Honestidad de procedencia exigida por el encargo. | UI, API, tests |
+| D-27 | Honeytoken en el modo automático = victoria Azul **inmediata**, aunque el Azul apruebe | Es la contramedida de alta confianza del diseño; el resultado lo da el motor al detectar el uso. | `test_caminos_auto` |
+| D-28 | Las credenciales del modo automático (3 válidas, 3 inválidas, 2 señuelo) son **fijas y ficticias**; el Rojo no ve la validez | Sin generación ni descubrimiento autónomo de credenciales. | `ESCENARIO`, tests de visibilidad |
+| D-29 | Modelos 8B **re-descargados** al iniciar Caminos: `~/.ollama` estaba vacío | Autorizado por `MISION_23H/05` (hasta 3 modelos, ≥ 30 GB libres; había 44 GB). Se descargaron `qwen3:8b` y `llama3.1:8b`. | `BLOQUEOS.md` |
+| D-30 | La campaña no cambia prompts a mitad (versión `c1`) y los resultados de los 8B se reportan como salen | Regla 02. | `VERSION_PROMPTS_CAMINOS` |
