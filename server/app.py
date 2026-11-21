@@ -34,6 +34,7 @@ from CyberShield_Repair_Library.components.notifications import notificaciones a
 from CyberShield_Repair_Library.components.email import correos_escenario as esc_correos  # noqa: E402
 from CyberShield_Repair_Library.components.approvals.solicitudes import ErrorSolicitud, Solicitudes  # noqa: E402
 from CyberShield_Repair_Library.components.teams.chat import ChatEquipos, ErrorChat  # noqa: E402
+from CyberShield_Repair_Library.diagnostics.health_checks import salud as _salud  # noqa: E402
 from src.lab import (apps, ataque_ia, atacante, cliente_ollama, correos, documentos, escenarios_empresa,  # noqa: E402
                      harness, informe, motor,
                      repositorio, sesion)
@@ -66,7 +67,7 @@ RESTO = ["politicas", "autorizacion", "herramienta", "bd"]
 CODIGO_ARBITRO = os.getenv("CS_CODIGO_ARBITRO") or f"{secrets.randbelow(10 ** 6):06d}"
 SALA = pt.Sala(CODIGO_ARBITRO)
 RUTAS_PUBLICAS = ("/api/eventos", "/api/estado", "/api/ia/estado", "/api/cronologia", "/api/resultados", "/api/partidas",
-                  "/api/apps", "/api/recursos", "/api/ayuda", "/api/batalla/presupuesto", "/api/escenarios")
+                  "/api/apps", "/api/recursos", "/api/ayuda", "/api/batalla/presupuesto", "/api/escenarios", "/api/salud")
 RUTA_SESION = "/api/sesion"
 RUTA_SALIR = "/api/sesion/salir"   # cerrar la propia sesión: permitido a cualquiera que tenga una
 # El panel de análisis (/api/panel/...) es una vista de solo lectura del laboratorio: no toca la partida, no
@@ -77,7 +78,7 @@ PREFIJOS_PUBLICOS = ("/api/panel/", "/api/combate/")   # el combate: GET públic
 # Rojo envía correos de entrenamiento y Azul los lee en su buzón.
 SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul",
                "/api/evento": "azul", "/api/partida/finalizar": "general", "/api/partida/iniciar": "general",
-               "/api/partida/nueva": "general", "/api/partida/pausar": "general", "/api/partida/reanudar": "general", "/api/correo/enviados": "rojo", "/api/ia/ataque": "rojo",
+               "/api/correo/libre": "rojo", "/api/partida/nueva": "general", "/api/partida/pausar": "general", "/api/partida/reanudar": "general", "/api/correo/enviados": "rojo", "/api/ia/ataque": "rojo",
                "/api/ia/defensor": "azul"}
 # Partida con fases (preparación -> en curso -> finalizada) y temporizador en el servidor. Los correos, misiones y
 # eventos se guardan con PARTIDA_ID; «nueva partida» empieza otra sin reiniciar el proceso.
@@ -483,6 +484,30 @@ def _solicitud_desde_ia(ataque, df, usuario):
         pass
 
 
+@app.get("/api/salud")
+async def salud():
+    """Diagnóstico de salud (público, solo lectura, sin secretos): servidor, base de datos, Ollama por defecto, SSE, partida y tareas."""
+    disp = await _hilo(cliente_ollama.ollama_disponible, HOST)
+
+    def bd():
+        repositorio.por_defecto().conn.execute("SELECT 1").fetchone()
+        return "ok", "base de datos del laboratorio accesible"
+
+    def ollama():
+        return ("ok", f"Ollama responde en {HOST}") if disp else ("degradado", f"Ollama no responde en {HOST}: las partidas sin IA siguen funcionando")
+
+    def sse():
+        return "ok", f"{len(ms.CLIENTES)} cliente(s) SSE conectados"
+
+    def partida():
+        return "ok", f"partida {PARTIDA_ID} en fase {PARTIDA.fase}; {sum(p['conectado'] for p in SALA.listado_publico())} participante(s) conectados"
+
+    def tareas():
+        return "ok", f"ataque IA en curso: {'sí' if ATAQUE_IA is not None else 'no'}; escenario activo: {'sí' if TAREA_ESCENARIO is not None and not TAREA_ESCENARIO.done() else 'no'}"
+
+    return _salud.informe([("servidor", lambda: ("ok", "responde")), ("base_de_datos", bd), ("ollama", ollama), ("sse", sse), ("partida", partida), ("tareas", tareas)])
+
+
 # ---------- chat de equipo (CyberShield Repair) ----------
 _CHAT = {}
 
@@ -691,6 +716,38 @@ async def enviar_correo(body: CorreoIn):
     except KeyError:
         return _error400(f"Usuario desconocido: {para}")
     ms.emitir("auditoria", ms.aud("ATTACKER", "CORREO_ENVIADO", f"{body.plantilla} → {para}", "OK", "MEDIO"))
+    _notificar_buzon(para, c.get("id"), nuevo=True)
+    return c
+
+
+class CorreoLibreIn(BaseModel):
+    asunto: str = Field(..., min_length=1, max_length=120)
+    cuerpo: str = Field(..., min_length=1, max_length=2000)
+    para_usuario: str | None = Field(None, min_length=1, max_length=50)
+
+
+_URL = __import__("re").compile(r"(?i)(?:https?://|ftp://|www\.)\S+")
+
+
+@app.post("/api/correo/libre")
+async def enviar_correo_libre(body: CorreoLibreIn, request: Request):
+    """Solo Rojo: correo de TEXTO PLANO con asunto y contenido propios hacia la identidad de Azul. No admite enlaces ni direcciones web
+    (los enlaces del laboratorio los fija el servidor en las plantillas), así que nada sale ni apunta fuera del laboratorio."""
+    if request.state.equipo != "rojo":
+        return _prohibido("Solo el equipo rojo envía correos.")
+    if cerrada := _partida_cerrada():
+        return cerrada
+    asunto, cuerpo = " ".join(body.asunto.split()), body.cuerpo.strip()
+    if _URL.search(asunto) or _URL.search(cuerpo):
+        return _error400("El correo no puede contener enlaces ni direcciones web: los enlaces del laboratorio los fija el servidor (usa una plantilla).")
+    para = body.para_usuario or USUARIO_EQUIPO.get("azul")
+    if not para:
+        return _prohibido("Falta destinatario: el equipo AZUL aún no ha entrado en la partida.", 409)
+    try:
+        c = repositorio.por_defecto().crear_correo_libre(PARTIDA_ID, para, f"{_participante(request)} (rojo) <rojo@laboratorio.invalid>", asunto, cuerpo)
+    except KeyError:
+        return _error400(f"Usuario desconocido: {para}")
+    ms.emitir("auditoria", ms.aud("ATTACKER", "CORREO_ENVIADO", f"correo libre → {para}", "OK", "MEDIO"))
     _notificar_buzon(para, c.get("id"), nuevo=True)
     return c
 

@@ -22,8 +22,12 @@ UNITARIAS = ["test_lab", "test_motor", "test_correos", "test_reglas", "test_misi
              "test_control_partida", "test_lotes", "test_escenarios_empresa", "test_combate", "test_wazuh_sim"]
 SERVIDOR = ["server/test_partida.py", "server/test_app.py", "server/test_batalla_partida.py", "server/test_resultados.py",
             "server/test_apps.py", "server/test_presupuesto.py", "server/test_combate.py"]
-INTEGRACION = ["e2e/test_reinicio.py", "integraciones/wazuh/test_reglas.py", "server/test_panel.py"]
-NAVEGADOR = ["e2e/demo_partida.py", "e2e/test_combate_ui.py", "e2e/test_combate_extra.py"]
+INTEGRACION = ["e2e/test_reinicio.py", "integraciones/wazuh/test_reglas.py", "server/test_panel.py",
+               # CyberShield Repair: componentes, regresión de la presentación contra el servidor real, controles de Ollama y demostración de 17 pasos
+               "CyberShield_Repair_Library/tests/unit/test_solicitudes.py", "CyberShield_Repair_Library/tests/unit/test_chat.py",
+               "CyberShield_Repair_Library/tests/regression/test_regresion_presentacion.py", "CyberShield_Repair_Library/tests/regression/test_ollama_controles.py",
+               "CyberShield_Repair_Library/tests/demo/demo_academica.py"]
+NAVEGADOR = ["e2e/demo_partida.py", "e2e/test_combate_ui.py", "e2e/test_combate_extra.py", "CyberShield_Repair_Library/tests/e2e_sala_equipo.py"]
 TOTAL = re.compile(r"(\d+)/(\d+)")
 
 

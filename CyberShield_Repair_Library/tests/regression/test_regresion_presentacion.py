@@ -215,11 +215,26 @@ def main(linea_base=False):
         reg(27, "Chat de equipo: aislado por equipo, el árbitro ve ambos, el espectador ninguno, el SSE no lleva el texto",
             ok(m1.status == 200 and m2.status == 200 and ver_rojo == ["plan: probar el correo de soporte"] and ver_azul == ["revisar el buzón"] and ver_esp == [] and len(ver_adm) == 2 and sin_texto and esp_envia == 403),
             f"rojo={ver_rojo}, azul={ver_azul}, esp={ver_esp}, adm={len(ver_adm)}, sse_sin_texto={sin_texto}, esp_envia={esp_envia}")
+        # 28 · Correo libre de Rojo (asunto y contenido propios), sin enlaces, llega y es de solo texto
+        libre = rojo.post("/api/correo/libre", {"asunto": "Revisión de factura", "cuerpo": "Hola, ¿puedes confirmar el pago pendiente de esta semana?"})
+        con_url = rojo.post("/api/correo/libre", {"asunto": "x", "cuerpo": "entra a https://externo.example/login"})
+        de_azul = azul.post("/api/correo/libre", {"asunto": "x", "cuerpo": "y"})
+        cl = [x for x in correos_azul(azul) if x.get("plantilla_id") == "libre:rojo"]
+        reg(28, "Rojo redacta un correo libre: llega a Azul como texto plano; con enlaces 400; Azul no puede enviarlo 403",
+            ok(libre.status == 200 and len(cl) == 1 and cl[0]["asunto"] == "Revisión de factura" and cl[0].get("enlace") is None and con_url.status == 400 and de_azul.status == 403),
+            f"{libre.status}, en_buzon={len(cl)}, con_url={con_url.status}, azul={de_azul.status}")
+        # 29 · Diagnóstico de salud (público, sin secretos)
+        sal = Cliente(base).get("/api/salud")
+        txt = json.dumps(sal.datos, ensure_ascii=False)
+        reg(29, "El diagnóstico de salud responde con estado por componente y sin secretos",
+            ok(sal.status == 200 and {c["nombre"] for c in sal["comprobaciones"]} >= {"servidor", "base_de_datos", "ollama", "sse", "partida", "tareas"} and "246810" not in txt and rojo.token not in txt),
+            f"{sal.status}")
         sse.cerrar()
     res = {"pass": sum(r["estado"] == "PASS" for r in RES), "fail": sum(r["estado"] == "FAIL" for r in RES),
            "no_implementado": sum(r["estado"] == "NO_IMPLEMENTADO" for r in RES), "total": len(RES), "resultados": RES}
     Path(__file__).with_name("ultimo_resultado.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"\nPASS {res['pass']} · FAIL {res['fail']} · NO_IMPLEMENTADO {res['no_implementado']} · total {res['total']}")
+    print(f"Total {res['pass']}/{res['total']}")
     return linea_base or (res["fail"] == 0 and res["no_implementado"] == 0)
 
 

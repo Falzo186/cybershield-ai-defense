@@ -1,8 +1,8 @@
 {
- "pass": 27,
+ "pass": 29,
  "fail": 0,
  "no_implementado": 0,
- "total": 27,
+ "total": 29,
  "resultados": [
   {
    "n": 1,
@@ -165,6 +165,18 @@
    "nombre": "Chat de equipo: aislado por equipo, el árbitro ve ambos, el espectador ninguno, el SSE no lleva el texto",
    "estado": "PASS",
    "detalle": "rojo=['plan: probar el correo de soporte'], azul=['revisar el buzón'], esp=[], adm=2, sse_sin_texto=True, esp_envia=403"
+  },
+  {
+   "n": 28,
+   "nombre": "Rojo redacta un correo libre: llega a Azul como texto plano; con enlaces 400; Azul no puede enviarlo 403",
+   "estado": "PASS",
+   "detalle": "200, en_buzon=1, con_url=400, azul=403"
+  },
+  {
+   "n": 29,
+   "nombre": "El diagnóstico de salud responde con estado por componente y sin secretos",
+   "estado": "PASS",
+   "detalle": "200"
   }
  ]
 }
