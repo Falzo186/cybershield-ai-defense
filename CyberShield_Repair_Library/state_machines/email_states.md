@@ -1,0 +1,4 @@
+# Máquina de estados · Correo (`repositorio`, tablas `correos`, `lecturas`, `reportes`, `archivados`, `aislamientos`)
+Orígenes: **escenario** (`plantilla_id = escenario:<clave>`, legítimo, por tiempo de partida, sin enlace), **plantilla de Rojo** (con enlace de laboratorio fijado por el servidor) y **libre de Rojo** (`libre:rojo`, texto plano, sin enlaces ni URLs).
+Estados de cada correo (derivados de lo persistido, por participante cuando aplica): recibido → leído (por quién) → reportado / archivado → enlace abierto → clicado → acción de riesgo completada (credencial). **Abrir un correo no compromete nada** (riesgo 0). Idempotencia: la entrega del escenario es única por (partida, usuario, clave); `Idempotency-Key` evita duplicar envíos.
+Notificaciones: SSE `correo_nuevo` / `buzon_estado` con solo `{usuario, id, no_leidos}` (el SSE es público y no lleva asunto ni cuerpo); el contador sale de la base (`no_leidos` en `GET /api/buzon`, por participante).
