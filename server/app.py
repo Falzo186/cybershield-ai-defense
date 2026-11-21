@@ -29,6 +29,10 @@ import mock_server as ms  # noqa: E402
 import panel as pn  # noqa: E402
 import combate as cb  # noqa: E402
 import partida as pt  # noqa: E402
+from CyberShield_Repair_Library.components.game_session.idempotencia import AlmacenIdempotencia  # noqa: E402
+from CyberShield_Repair_Library.components.notifications import notificaciones as notif  # noqa: E402
+from CyberShield_Repair_Library.components.email import correos_escenario as esc_correos  # noqa: E402
+from CyberShield_Repair_Library.components.approvals.solicitudes import ErrorSolicitud, Solicitudes  # noqa: E402
 from src.lab import (apps, ataque_ia, atacante, cliente_ollama, correos, documentos, escenarios_empresa,  # noqa: E402
                      harness, informe, motor,
                      repositorio, sesion)
@@ -72,7 +76,7 @@ PREFIJOS_PUBLICOS = ("/api/panel/", "/api/combate/")   # el combate: GET públic
 # Rojo envía correos de entrenamiento y Azul los lee en su buzón.
 SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul",
                "/api/evento": "azul", "/api/partida/finalizar": "general", "/api/partida/iniciar": "general",
-               "/api/partida/nueva": "general", "/api/correo/enviados": "rojo", "/api/ia/ataque": "rojo",
+               "/api/partida/nueva": "general", "/api/partida/pausar": "general", "/api/partida/reanudar": "general", "/api/correo/enviados": "rojo", "/api/ia/ataque": "rojo",
                "/api/ia/defensor": "azul"}
 # Partida con fases (preparación -> en curso -> finalizada) y temporizador en el servidor. Los correos, misiones y
 # eventos se guardan con PARTIDA_ID; «nueva partida» empieza otra sin reiniciar el proceso.
@@ -150,6 +154,28 @@ def _prohibido(msg, status=403):
     return JSONResponse({"error": msg, "mensaje": msg}, status_code=status)
 
 
+IDEMPOTENCIA = AlmacenIdempotencia()
+
+
+@app.middleware("http")
+async def _idempotencia(request: Request, call_next):
+    """Una acción POST repetida con la misma cabecera `Idempotency-Key` devuelve la respuesta de la primera sin ejecutarse otra vez."""
+    clave = request.headers.get("Idempotency-Key")
+    if request.method != "POST" or not clave or not request.url.path.startswith("/api/"):
+        return await call_next(request)
+    k = IDEMPOTENCIA.clave(request.headers.get("X-Equipo-Token"), request.method, request.url.path, clave[:80])
+    previa = IDEMPOTENCIA.obtener(k)
+    if previa is not None:
+        status, cuerpo, tipo = previa
+        from fastapi.responses import Response
+        return Response(content=cuerpo, status_code=status, media_type=tipo, headers={"Idempotent-Replay": "true"})
+    resp = await call_next(request)
+    cuerpo = b"".join([c async for c in resp.body_iterator])
+    IDEMPOTENCIA.guardar(k, resp.status_code, cuerpo, resp.media_type or "application/json")
+    from fastapi.responses import Response
+    return Response(content=cuerpo, status_code=resp.status_code, media_type=resp.media_type, headers=dict(resp.headers))
+
+
 # ---------- verificación de la sesión del participante ----------
 @app.middleware("http")
 async def _verificar_sesion(request: Request, call_next):
@@ -200,7 +226,7 @@ class SesionIn(BaseModel):
 
 
 def _estado_partida():
-    return {**PARTIDA.publico(), "participantes": [p.publico() for p in SALA.participantes()]}
+    return {**PARTIDA.publico(), "participantes": SALA.listado_publico()}
 
 
 def _emitir_partida():
@@ -237,6 +263,33 @@ async def unirse(body: SesionIn, request: Request):
         _emitir_marcador()  # el marcador ya sabe con qué usuario juega Azul
     return {"token": p.token, "participante": p.publico(), "partida": _estado_partida(),
             "usuario_azul": USUARIO_EQUIPO.get("azul")}
+
+
+@app.post("/api/presencia")
+async def latido(request: Request):
+    """Latido de presencia: el cliente lo envía cada ~20 s. Sin latidos ni peticiones durante PRESENCIA_S figura como desconectado."""
+    return {"conectado": True, "presencia_s": pt.PRESENCIA_S}
+
+
+async def _vigilar_presencia():
+    """Reenvía el estado de la partida cuando alguien pasa a desconectado por falta de latidos (no depende de que haga una petición)."""
+    visto = None
+    while True:
+        await asyncio.sleep(10)
+        actual = tuple(sorted((p["nombre"], p["conectado"]) for p in SALA.listado_publico()))
+        if visto is not None and actual != visto:
+            _emitir_partida()
+        visto = actual
+        try:   # las solicitudes que vencen se difunden aunque nadie consulte
+            for sid in _sol().vencer():
+                _emitir_solicitud(_sol().obtener(sid))
+        except Exception:  # noqa: BLE001
+            pass
+
+
+@app.on_event("startup")
+async def _arranque_presencia():
+    asyncio.create_task(_vigilar_presencia())
 
 
 @app.get(RUTA_SESION)
@@ -279,6 +332,185 @@ async def iniciar_partida(body: IniciarPartidaIn):
     repositorio.por_defecto().registrar(None, "PARTIDA_INICIADA", PARTIDA_ID, f"{body.duracion_min} min", "BAJO")
     ms.emitir("auditoria", ms.aud("SYSTEM", "PARTIDA_INICIADA", PARTIDA_ID, f"{body.duracion_min} min", "BAJO"))
     TAREA_TIEMPO = asyncio.create_task(_vigilar_tiempo(PARTIDA))
+    _arrancar_escenario()
+    _emitir_partida()
+    return _estado_partida()
+
+
+TAREA_ESCENARIO = None
+
+
+async def _entregar_escenario(partida):
+    """Entrega los correos del escenario cuando les toca por tiempo de partida (congelado en pausa). Idempotente por clave."""
+    while partida is PARTIDA and partida.fase == "en_curso":
+        usuario = USUARIO_EQUIPO.get("azul")
+        if usuario:
+            repo = repositorio.por_defecto()
+            hechos = repo.claves_escenario_entregadas(PARTIDA_ID, usuario)
+            for c in esc_correos.pendientes(partida.transcurrido_s(), hechos):
+                nuevo = repo.crear_correo_escenario(PARTIDA_ID, usuario, c["clave"], c["de"], c["asunto"], c["cuerpo"])
+                if nuevo:
+                    ms.emitir("auditoria", ms.aud("SYSTEM", "CORREO_ESCENARIO", f"{c['clave']} → {usuario}", "OK", "BAJO"))
+                    _notificar_buzon(usuario, nuevo["id"], nuevo=True)
+        await asyncio.sleep(1)
+
+
+def _arrancar_escenario():
+    global TAREA_ESCENARIO
+    if TAREA_ESCENARIO is not None:
+        TAREA_ESCENARIO.cancel()
+    TAREA_ESCENARIO = asyncio.create_task(_entregar_escenario(PARTIDA))
+
+
+@app.get("/api/escenario/correos")
+async def correos_del_escenario(request: Request):
+    """Calendario de los correos del escenario y cuáles ya se entregaron. Solo árbitro y Azul (Rojo no debe ver el calendario)."""
+    if request.state.equipo not in ("general", "azul"):
+        return _prohibido("El calendario del escenario solo lo ven el árbitro y el equipo azul.")
+    usuario = USUARIO_EQUIPO.get("azul")
+    hechos = repositorio.por_defecto().claves_escenario_entregadas(PARTIDA_ID, usuario) if usuario else set()
+    return {"correos": esc_correos.calendario(hechos), "usuario": usuario}
+
+
+# ---------- solicitudes de autorización (CyberShield Repair §8) ----------
+_SOLICITUDES = {}
+
+
+def _sol():
+    """Almacén de solicitudes sobre la MISMA base del laboratorio; el tiempo es el de la partida (se congela en pausa)."""
+    repo = repositorio.por_defecto()
+    if _SOLICITUDES.get("conn") is not repo.conn:
+        _SOLICITUDES.update(conn=repo.conn, s=Solicitudes(repo.conn, lambda: PARTIDA.transcurrido_s() or 0))
+    return _SOLICITUDES["s"]
+
+
+def _emitir_solicitud(s, aviso=None):
+    ms.emitir("autorizacion", {"id": s["id"], "estado": s["estado"], "riesgo": s["riesgo"], "operacion": s["operacion"], "recurso": s["recurso"],
+                               "jugador": s["jugador"], "identidad": s["identidad"], "resuelta_por": s["resuelta_por"]})
+    ms.emitir("auditoria", ms.aud("SYSTEM", "AUTORIZACION_" + s["estado"], f"#{s['id']} {s['operacion']} · {s['recurso']}", s["estado"],
+                                  "MEDIO" if s["estado"] == "PENDIENTE" else "BAJO"))
+    repositorio.por_defecto().registrar(None, "AUTORIZACION_" + s["estado"], f"autorizacion:{s['id']}", s["resuelta_por"] or s["jugador"], "BAJO")
+
+
+class SolicitudIn(BaseModel):
+    identidad: str = Field(..., min_length=1, max_length=50)
+    operacion: str = Field(..., min_length=1, max_length=200)
+    recurso: str = Field(..., min_length=1, max_length=200)
+    motivo: str = Field(..., min_length=1, max_length=200)
+
+
+@app.post("/api/autorizaciones")
+async def crear_solicitud(body: SolicitudIn, request: Request):
+    """Solo Rojo: su operación pide autorización al equipo Azul. Estado inicial PENDIENTE; vence sola (tiempo de partida)."""
+    if request.state.equipo != "rojo":
+        return _prohibido("Solo el equipo rojo crea solicitudes de autorización.")
+    if err := _partida_cerrada():
+        return err
+    try:
+        repositorio.por_defecto().identidad(body.identidad)
+    except KeyError:
+        return _error400(f"Identidad desconocida: {body.identidad}")
+    try:
+        s, nueva = _sol().crear(PARTIDA_ID, "rojo:" + secrets.token_hex(6), body.identidad, _participante(request), body.operacion, body.recurso, body.motivo)
+    except ErrorSolicitud as e:
+        return _prohibido(e.mensaje, e.status)
+    _emitir_solicitud(s)
+    return s
+
+
+@app.get("/api/autorizaciones")
+async def listar_solicitudes(request: Request, estado: str | None = None):
+    """Azul y árbitro ven todas (con la recomendación); Rojo solo las suyas; el espectador las observa sin recomendación."""
+    _sol().vencer()
+    equipo = request.state.equipo
+    lista = _sol().listar(PARTIDA_ID, estado=estado if estado in ("PENDIENTE", "APROBADA", "RECHAZADA", "EXPIRADA", "CANCELADA") else None,
+                          jugador=_participante(request) if equipo == "rojo" else None)
+    if equipo in ("rojo", "espectador"):
+        lista = [{k: v for k, v in x.items() if k != "recomendacion"} for x in lista]
+    return {"autorizaciones": lista, "pendientes": sum(x["estado"] == "PENDIENTE" for x in lista)}
+
+
+def _decidir(sid, request, accion):
+    if request.state.equipo != "azul":
+        return _prohibido("Solo los jugadores del equipo azul resuelven solicitudes de autorización.")
+    if err := _partida_cerrada():
+        return err
+    try:
+        s = getattr(_sol(), accion)(sid, _participante(request))
+    except ErrorSolicitud as e:
+        return _prohibido(e.mensaje, e.status)
+    _emitir_solicitud(s)
+    return s
+
+
+@app.post("/api/autorizaciones/{sid}/aprobar")
+async def aprobar_solicitud(sid: int, request: Request):
+    """Registra la DECISIÓN humana de Azul. No ejecuta nada: el motor y las capas siguen validando cualquier operación."""
+    return _decidir(sid, request, "aprobar")
+
+
+@app.post("/api/autorizaciones/{sid}/rechazar")
+async def rechazar_solicitud(sid: int, request: Request):
+    return _decidir(sid, request, "rechazar")
+
+
+@app.post("/api/autorizaciones/{sid}/cancelar")
+async def cancelar_solicitud(sid: int, request: Request):
+    if request.state.equipo not in ("rojo", "general"):
+        return _prohibido("Solo quien creó la solicitud (Rojo) o el árbitro puede cancelarla.")
+    s0 = _sol().obtener(sid)
+    if s0 and request.state.equipo == "rojo" and s0["jugador"] != _participante(request):
+        return _prohibido("Solo puedes cancelar tus propias solicitudes.")
+    try:
+        s = _sol().cancelar(sid, _participante(request))
+    except ErrorSolicitud as e:
+        return _prohibido(e.mensaje, e.status)
+    _emitir_solicitud(s)
+    return s
+
+
+def _solicitud_desde_ia(ataque, df, usuario):
+    """Si el defensor IA respondió SOLICITAR_AUTORIZACION, esa operación se convierte en una solicitud REAL para los jugadores de Azul."""
+    try:
+        s, nueva = _sol().crear(PARTIDA_ID, f"ataque_ia:{ataque['id']}", usuario, "ataque IA (Rojo)",
+                                (df or {}).get("herramienta") or "operación solicitada por el ataque IA", "datos de " + usuario,
+                                (df or {}).get("motivo") or "el defensor IA pidió autorización",
+                                recomendacion={"origen": "ia", "decision": "SOLICITAR_AUTORIZACION", "motivo": (df or {}).get("motivo") or ""}, riesgo="MEDIO")
+        if nueva:
+            _emitir_solicitud(s)
+    except Exception:  # noqa: BLE001 - nunca debe romper el cierre del ataque
+        pass
+
+
+@app.post("/api/partida/pausar")
+async def pausar_partida():
+    """Solo el árbitro: en curso -> pausada. Congela el reloj del servidor y bloquea las acciones nuevas (409)."""
+    global TAREA_TIEMPO
+    try:
+        PARTIDA.pausar()
+    except pt.ErrorSesion as e:
+        return _prohibido(e.mensaje, e.status)
+    if TAREA_TIEMPO is not None:
+        TAREA_TIEMPO.cancel()
+        TAREA_TIEMPO = None
+    repositorio.por_defecto().registrar(None, "PARTIDA_PAUSADA", PARTIDA_ID, f"quedaban {PARTIDA.restante_s()} s", "BAJO")
+    ms.emitir("auditoria", ms.aud("SYSTEM", "PARTIDA_PAUSADA", PARTIDA_ID, f"quedaban {PARTIDA.restante_s()} s", "BAJO"))
+    _emitir_partida()
+    return _estado_partida()
+
+
+@app.post("/api/partida/reanudar")
+async def reanudar_partida():
+    """Solo el árbitro: pausada -> en curso, desde el tiempo restante guardado."""
+    global TAREA_TIEMPO
+    try:
+        PARTIDA.reanudar()
+    except pt.ErrorSesion as e:
+        return _prohibido(e.mensaje, e.status)
+    repositorio.por_defecto().registrar(None, "PARTIDA_REANUDADA", PARTIDA_ID, f"restan {PARTIDA.restante_s()} s", "BAJO")
+    ms.emitir("auditoria", ms.aud("SYSTEM", "PARTIDA_REANUDADA", PARTIDA_ID, f"restan {PARTIDA.restante_s()} s", "BAJO"))
+    TAREA_TIEMPO = asyncio.create_task(_vigilar_tiempo(PARTIDA))
+    _arrancar_escenario()
     _emitir_partida()
     return _estado_partida()
 
@@ -426,15 +658,27 @@ async def enviar_correo(body: CorreoIn):
     except KeyError:
         return _error400(f"Usuario desconocido: {para}")
     ms.emitir("auditoria", ms.aud("ATTACKER", "CORREO_ENVIADO", f"{body.plantilla} → {para}", "OK", "MEDIO"))
+    _notificar_buzon(para, c.get("id"), nuevo=True)
     return c
 
 
+def _notificar_buzon(usuario, correo_id=None, nuevo=False):
+    """Difunde SOLO el mínimo (usuario, id, contador): el SSE es público y no debe llevar asunto ni cuerpo. El contador sale de lo persistido."""
+    try:
+        total = notif.no_leidos(repositorio.por_defecto().buzon(PARTIDA_ID, usuario))
+    except Exception:  # noqa: BLE001 - una notificación fallida no debe romper la acción
+        return
+    ms.emitir("correo_nuevo" if nuevo else "buzon_estado",
+              notif.evento_correo_nuevo(usuario, correo_id, total) if nuevo else notif.evento_buzon(usuario, total))
+
+
 @app.get("/api/buzon")
-async def buzon():
+async def buzon(request: Request):
     """Solo Azul (SOLO_EQUIPO): correos de esta partida dirigidos a su usuario."""
     usuario = USUARIO_EQUIPO.get("azul")
     repo = repositorio.por_defecto()
-    return {"usuario": usuario, "correos": repo.buzon(PARTIDA_ID, usuario) if usuario else [],
+    lista = repo.buzon(PARTIDA_ID, usuario) if usuario else []
+    return {"usuario": usuario, "correos": lista, "no_leidos": notif.no_leidos(lista, request.state.participante.nombre),
             "enviados": repo.respuestas(PARTIDA_ID, usuario) if usuario else []}  # carpeta «Enviados» de Azul
 
 
@@ -516,6 +760,8 @@ def _partida_cerrada():
         return _prohibido("La partida aún no ha empezado: el árbitro debe iniciarla.", 409)
     if PARTIDA.fase == "finalizada":
         return _prohibido("La partida ya finalizó: los puntajes están congelados.", 409)
+    if PARTIDA.fase == "pausada":
+        return _prohibido("La partida está en pausa: el árbitro debe reanudarla para continuar.", 409)
     return None
 
 
@@ -652,6 +898,8 @@ async def leer_correo(correo_id: int, request: Request):
     if r is None:
         return _prohibido(*_NO_ES_SUYO)
     regla = _aplicar_regla("correo_abierto", usuario, request, f"correo:{correo_id}") if r == "nuevo" else None
+    if r == "nuevo":
+        _notificar_buzon(usuario)
     return {"leido": True, "nuevo": r == "nuevo", "regla": regla}
 
 
@@ -1488,7 +1736,7 @@ class DefensorIAIn(BaseModel):
 
 
 def _practica_bloqueada():
-    if PARTIDA.fase == "en_curso":
+    if PARTIDA.fase in ("en_curso", "pausada"):
         return _prohibido("Durante la partida la batalla es por ataques IA: Rojo los lanza cuando quiere y el defensor "
                           "de Azul responde siempre. La simulación, la prueba manual y la batalla «mejor de N» son "
                           "práctica: úsalas antes de iniciar o después de finalizar.", 409)
@@ -1640,8 +1888,8 @@ async def _correr_ataque_ia(partida, a, atq, dfn):
                          "ejecucion": None}
             res = ataque_ia.clasificar(p, a["origen_identidad"])
             error = p.get("error") if p["veredicto"] == "ERROR" else None
-        if partida is not PARTIDA or partida.fase != "en_curso":
-            raise asyncio.CancelledError  # la partida terminó mientras se esperaba al modelo: no cuenta
+        if partida is not PARTIDA or partida.fase not in ("en_curso", "pausada"):
+            raise asyncio.CancelledError  # la partida terminó mientras se esperaba al modelo: no cuenta (una pausa NO la cancela)
         df, ej = (p or {}).get("defensa") or {}, (p or {}).get("ejecucion") or {}
         filtro = (p or {}).get("origen_decision") == "filtro_rapido"
         if res["resultado"] != "error_atacante":  # la solicitud llegó al defensor: su estado real queda anotado
@@ -1661,6 +1909,8 @@ async def _correr_ataque_ia(partida, a, atq, dfn):
                                            res["sensibilidad_expuesta"], capa, error, filtro),
             **campos, **_metricas("def", df if df and not filtro else None))
         ATAQUE_IA = None
+        if df.get("decision") == "SOLICITAR_AUTORIZACION" or (p or {}).get("circuito_sesion"):
+            _solicitud_desde_ia(a, df, a["usuario"])
         ms.emitir("ia_ataque", {"en_curso": None, "terminado": _publico_ataque(fila)})
         ms.emitir("auditoria", ms.aud("SYSTEM", "ATAQUE_IA_RESULTADO", f"#{fila['n']} · {fila['usuario']}",
                                       ataque_ia.TITULO[fila["resultado"]],
