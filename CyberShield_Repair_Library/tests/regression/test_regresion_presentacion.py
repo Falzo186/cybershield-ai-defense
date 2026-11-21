@@ -156,11 +156,23 @@ def main(linea_base=False):
         t0 = time.time()
         while time.time() - t0 < 15 and (adm.get("/api/ia/estado").get("ataque") or {}).get("en_curso"):
             time.sleep(0.3)
-        # 19/20 · Pausar y reanudar
+        # 19/20 · Pausar y reanudar (el reloj se congela; durante la pausa no hay operaciones nuevas; al reanudar se continúa)
         pz = adm.post("/api/partida/pausar")
-        rz = adm.post("/api/partida/reanudar")
-        reg(19, "Pausar impide iniciar operaciones nuevas", "NO_IMPLEMENTADO" if falta(pz) else ok(pz.status == 200), f"{pz.status}")
-        reg(20, "Reanudar recupera el flujo", "NO_IMPLEMENTADO" if falta(rz) else ok(rz.status == 200), f"{rz.status}")
+        if falta(pz):
+            reg(19, "Pausar impide iniciar operaciones nuevas", "NO_IMPLEMENTADO", f"{pz.status}")
+            reg(20, "Reanudar recupera el flujo", "NO_IMPLEMENTADO", f"{pz.status}")
+        else:
+            r1 = adm.get("/api/partida")["restante_s"]
+            time.sleep(2.2)
+            r2 = adm.get("/api/partida")
+            bloqueos = [rojo.post("/api/correo", {"plantilla": "soporte_tecnico"}).status, rojo.post("/api/ia/ataque", {"modelo": "falso-atacante", "host": E.url_ollama}).status,
+                        rojo.post("/api/autorizaciones", {"identidad": "ana.perez", "operacion": "x", "recurso": "y", "motivo": "z"}).status]
+            doble = adm.post("/api/partida/pausar").status
+            reg(19, "Pausar congela el reloj e impide operaciones nuevas (409) y no se puede pausar dos veces",
+                ok(pz.status == 200 and r2["fase"] == "pausada" and r2["restante_s"] == r1 and all(b == 409 for b in bloqueos) and doble == 409), f"{pz.status}, congelado={r2['restante_s'] == r1}, bloqueos={bloqueos}, doble={doble}")
+            rz = adm.post("/api/partida/reanudar")
+            r3 = rojo.post("/api/correo", {"plantilla": "soporte_tecnico"}).status
+            reg(20, "Reanudar recupera el flujo (en curso, reloj continúa, las acciones vuelven a funcionar)", ok(rz.status == 200 and rz["fase"] == "en_curso" and rz["restante_s"] <= r1 and r3 == 200), f"{rz.status}, correo={r3}")
         # 21 · Detener cancela tareas pendientes (la partida finalizada rechaza acciones nuevas)
         f21 = adm.post("/api/partida/finalizar")
         post_fin = rojo.post("/api/correo", {"plantilla": "soporte_tecnico"})
@@ -187,6 +199,22 @@ def main(linea_base=False):
         z = [sin.post("/api/correo", {"plantilla": "soporte_tecnico"}).status, esp.post("/api/correo", {"plantilla": "soporte_tecnico"}).status,
              esp.post("/api/partida/finalizar").status]
         reg(26, "Sin permisos no se puede ejecutar acciones (anónimo/espectador -> 403)", ok(all(s == 403 for s in z)), f"{z}")
+        # 27 · Chat de equipo: persistente, aislado por equipo, el espectador no lo lee y el SSE no filtra el texto
+        sse4 = Sse(base, adm.token)
+        time.sleep(0.4)
+        m1 = rojo.post("/api/chat", {"texto": "plan: probar el correo de soporte"})
+        m2 = azul.post("/api/chat", {"texto": "revisar el buzón"})
+        ver_rojo = [x["texto"] for x in rojo.get("/api/chat").get("mensajes", [])]
+        ver_azul = [x["texto"] for x in azul.get("/api/chat").get("mensajes", [])]
+        ver_esp = esp.get("/api/chat").get("mensajes", [])
+        ver_adm = adm.get("/api/chat").get("mensajes", [])
+        evc = sse4.espera("chat", lambda d: d.get("equipo") == "rojo", hasta=3)
+        sin_texto = evc is not None and "texto" not in evc
+        esp_envia = esp.post("/api/chat", {"texto": "hola"}).status
+        sse4.cerrar()
+        reg(27, "Chat de equipo: aislado por equipo, el árbitro ve ambos, el espectador ninguno, el SSE no lleva el texto",
+            ok(m1.status == 200 and m2.status == 200 and ver_rojo == ["plan: probar el correo de soporte"] and ver_azul == ["revisar el buzón"] and ver_esp == [] and len(ver_adm) == 2 and sin_texto and esp_envia == 403),
+            f"rojo={ver_rojo}, azul={ver_azul}, esp={ver_esp}, adm={len(ver_adm)}, sse_sin_texto={sin_texto}, esp_envia={esp_envia}")
         sse.cerrar()
     res = {"pass": sum(r["estado"] == "PASS" for r in RES), "fail": sum(r["estado"] == "FAIL" for r in RES),
            "no_implementado": sum(r["estado"] == "NO_IMPLEMENTADO" for r in RES), "total": len(RES), "resultados": RES}

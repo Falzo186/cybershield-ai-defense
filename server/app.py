@@ -33,6 +33,7 @@ from CyberShield_Repair_Library.components.game_session.idempotencia import Alma
 from CyberShield_Repair_Library.components.notifications import notificaciones as notif  # noqa: E402
 from CyberShield_Repair_Library.components.email import correos_escenario as esc_correos  # noqa: E402
 from CyberShield_Repair_Library.components.approvals.solicitudes import ErrorSolicitud, Solicitudes  # noqa: E402
+from CyberShield_Repair_Library.components.teams.chat import ChatEquipos, ErrorChat  # noqa: E402
 from src.lab import (apps, ataque_ia, atacante, cliente_ollama, correos, documentos, escenarios_empresa,  # noqa: E402
                      harness, informe, motor,
                      repositorio, sesion)
@@ -480,6 +481,38 @@ def _solicitud_desde_ia(ataque, df, usuario):
             _emitir_solicitud(s)
     except Exception:  # noqa: BLE001 - nunca debe romper el cierre del ataque
         pass
+
+
+# ---------- chat de equipo (CyberShield Repair) ----------
+_CHAT = {}
+
+
+def _chat():
+    repo = repositorio.por_defecto()
+    if _CHAT.get("conn") is not repo.conn:
+        _CHAT.update(conn=repo.conn, c=ChatEquipos(repo.conn))
+    return _CHAT["c"]
+
+
+class ChatIn(BaseModel):
+    texto: str = Field(..., min_length=1, max_length=2000)
+
+
+@app.post("/api/chat")
+async def enviar_chat(body: ChatIn, request: Request):
+    """Mensaje al chat de TU equipo (rojo, azul o árbitro). El SSE avisa solo del id y del equipo, nunca del texto."""
+    try:
+        m = _chat().enviar(PARTIDA_ID, request.state.equipo, _participante(request), body.texto)
+    except ErrorChat as e:
+        return _prohibido(e.mensaje, e.status)
+    repositorio.por_defecto().registrar(None, "CHAT_EQUIPO", f"chat:{m['id']}", f"{m['autor']} · {m['equipo']}", "BAJO")
+    ms.emitir("chat", {"id": m["id"], "equipo": m["equipo"]})
+    return m
+
+
+@app.get("/api/chat")
+async def leer_chat(request: Request, desde: int = 0):
+    return {"mensajes": _chat().leer(PARTIDA_ID, request.state.equipo, desde), "equipo": request.state.equipo}
 
 
 @app.post("/api/partida/pausar")

@@ -1,8 +1,8 @@
 {
- "pass": 26,
+ "pass": 27,
  "fail": 0,
  "no_implementado": 0,
- "total": 26,
+ "total": 27,
  "resultados": [
   {
    "n": 1,
@@ -114,15 +114,15 @@
   },
   {
    "n": 19,
-   "nombre": "Pausar impide iniciar operaciones nuevas",
+   "nombre": "Pausar congela el reloj e impide operaciones nuevas (409) y no se puede pausar dos veces",
    "estado": "PASS",
-   "detalle": "200"
+   "detalle": "200, congelado=True, bloqueos=[409, 409, 409], doble=409"
   },
   {
    "n": 20,
-   "nombre": "Reanudar recupera el flujo",
+   "nombre": "Reanudar recupera el flujo (en curso, reloj continúa, las acciones vuelven a funcionar)",
    "estado": "PASS",
-   "detalle": "200"
+   "detalle": "200, correo=200"
   },
   {
    "n": 21,
@@ -159,6 +159,12 @@
    "nombre": "Sin permisos no se puede ejecutar acciones (anónimo/espectador -> 403)",
    "estado": "PASS",
    "detalle": "[403, 403, 403]"
+  },
+  {
+   "n": 27,
+   "nombre": "Chat de equipo: aislado por equipo, el árbitro ve ambos, el espectador ninguno, el SSE no lleva el texto",
+   "estado": "PASS",
+   "detalle": "rojo=['plan: probar el correo de soporte'], azul=['revisar el buzón'], esp=[], adm=2, sse_sin_texto=True, esp_envia=403"
   }
  ]
 }
