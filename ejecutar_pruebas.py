@@ -19,7 +19,7 @@ if hasattr(sys.stdout, "reconfigure"):   # consolas de Windows en cp1252 rompía
 UNITARIAS = ["test_lab", "test_motor", "test_correos", "test_reglas", "test_misiones", "test_documentos", "test_eventos",
              "test_puntaje", "test_cliente", "test_correo_app", "test_incidentes", "test_ataque_ia", "test_informe",
              "test_apps", "test_diagnostico", "test_harness", "test_rag", "test_evaluacion", "test_adversarial", "test_wazuh", "test_correlacion",
-             "test_control_partida", "test_lotes", "test_escenarios_empresa", "test_combate", "test_wazuh_sim", "test_caminos"]
+             "test_control_partida", "test_lotes", "test_escenarios_empresa", "test_combate", "test_wazuh_sim", "test_caminos", "test_caminos_auto"]
 SERVIDOR = ["server/test_partida.py", "server/test_app.py", "server/test_batalla_partida.py", "server/test_resultados.py",
             "server/test_apps.py", "server/test_presupuesto.py", "server/test_combate.py"]
 INTEGRACION = ["e2e/test_reinicio.py", "integraciones/wazuh/test_reglas.py", "server/test_panel.py"]
