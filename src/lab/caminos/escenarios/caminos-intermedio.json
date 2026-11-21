@@ -1,0 +1,767 @@
+{
+ "id": "caminos-intermedio",
+ "version": 1,
+ "dificultad": "intermedio",
+ "inicio": "N0",
+ "titulo": "Camino hacia la base sintética",
+ "descripcion": "Árbol de decisión fijo: el Rojo elige su primer movimiento y el Azul decide con lo que ve; el motor aplica las consecuencias y declara el resultado.",
+ "max_turnos": 12,
+ "nodos": {
+  "N0": {
+   "id": "N0",
+   "actor": "rojo",
+   "texto_rojo": "Empiezas el ejercicio contra la empresa ficticia. Tu inventario: C-01 (gerente de operaciones), C-07 (administrador de respaldos) y un correo señuelo de la plantilla fija.",
+   "texto_azul": "Esperas actividad. Aún no hay señales.",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "correo_senuelo",
+     "etiqueta": "Enviar el correo señuelo de la plantilla fija a un empleado",
+     "siguiente": "N1",
+     "efectos": {
+      "set": {
+       "correo_enviado": true
+      }
+     }
+    },
+    {
+     "id": "cred_gerente",
+     "etiqueta": "Probar la credencial C-01 (gerente de operaciones) con un pretexto",
+     "siguiente": "N2",
+     "efectos": {
+      "set": {
+       "cred_gerente_presentada": true,
+       "canal_externo": true
+      },
+      "alerta": "caminos.acceso_inusual"
+     }
+    },
+    {
+     "id": "cred_respaldos",
+     "etiqueta": "Probar la credencial C-07 (administrador de respaldos) con un pretexto",
+     "siguiente": "N3",
+     "efectos": {
+      "set": {
+       "cred_respaldos_presentada": true
+      },
+      "alerta": "caminos.honeytoken"
+     }
+    },
+    {
+     "id": "documento_senuelo",
+     "etiqueta": "Entregar el documento señuelo para que el defensor lo procese",
+     "siguiente": "N4",
+     "efectos": {
+      "set": {
+       "documento_inyectado_leido": true
+      },
+      "alerta": "caminos.documento_instruccion"
+     }
+    }
+   ],
+   "recomendada": null
+  },
+  "N1": {
+   "id": "N1",
+   "actor": "azul",
+   "texto_rojo": "Tu correo llegó a un empleado.",
+   "texto_azul": "Llega un correo con apariencia de soporte a un empleado. Decide si lo reportas.",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "reportar_correo",
+     "etiqueta": "Reportar el correo",
+     "siguiente": "N1r",
+     "efectos": {
+      "set": {
+       "correo_reportado": true
+      },
+      "alerta": "caminos.correo_reportado"
+     }
+    },
+    {
+     "id": "no_reportar",
+     "etiqueta": "No reportarlo",
+     "siguiente": "N1i",
+     "efectos": {
+      "set": {
+       "correo_clic": true,
+       "segundo_factor_obtenido": true
+      },
+      "alerta": "caminos.correo_clic",
+      "confianza": {
+       "empleado": 2
+      }
+     }
+    }
+   ],
+   "recomendada": "reportar_correo"
+  },
+  "N1r": {
+   "id": "N1r",
+   "actor": "rojo",
+   "texto_rojo": "El correo fue reportado. Aún puedes probar la credencial C-01.",
+   "texto_azul": "Correo reportado. Esperas el siguiente movimiento.",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "cred_gerente",
+     "etiqueta": "Probar la credencial C-01 (gerente de operaciones) con urgencia",
+     "siguiente": "N1r2",
+     "efectos": {
+      "set": {
+       "cred_gerente_presentada": true,
+       "canal_externo": true
+      },
+      "alerta": "caminos.acceso_inusual"
+     }
+    }
+   ],
+   "recomendada": null
+  },
+  "N1r2": {
+   "id": "N1r2",
+   "actor": "azul",
+   "texto_rojo": "Pasa la credencial C-01.",
+   "texto_azul": "Se presenta la credencial C-01 (gerente de operaciones). Se registra un inicio de sesión desde un canal externo (WAZUH SIMULADO, nivel 7). El correo señuelo de hace un momento fue reportado. {{registro}}",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "aprobar",
+     "etiqueta": "Aprobar y entregar la base de datos sintética",
+     "siguiente": "H_R_ignora_alerta",
+     "efectos": {
+      "set": {
+       "alerta_vista": true,
+       "base_entregada": true
+      }
+     }
+    },
+    {
+     "id": "rechazar",
+     "etiqueta": "Rechazar y contener la cuenta",
+     "siguiente": "H_A_alerta_rechazo",
+     "efectos": {
+      "set": {
+       "alerta_vista": true,
+       "contencion_activa": true
+      }
+     }
+    }
+   ],
+   "recomendada": "rechazar"
+  },
+  "N1i": {
+   "id": "N1i",
+   "actor": "rojo",
+   "texto_rojo": "Un empleado abrió el enlace de tu correo. Ahora tienes más confianza y un segundo factor aparente.",
+   "texto_azul": "Nadie reportó el correo.",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "cred_gerente",
+     "etiqueta": "Probar la credencial C-01 (gerente de operaciones) citando al empleado",
+     "siguiente": "N1i2",
+     "efectos": {
+      "set": {
+       "cred_gerente_presentada": true
+      }
+     }
+    }
+   ],
+   "recomendada": null
+  },
+  "N1i2": {
+   "id": "N1i2",
+   "actor": "azul",
+   "texto_rojo": "La credencial va acompañada de contexto.",
+   "texto_azul": "Se presenta la credencial C-01 (gerente de operaciones). El registro muestra un clic en un enlace de correo (nivel 6). {{registro}}",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "aprobar",
+     "etiqueta": "Aprobar y entregar la base de datos sintética",
+     "siguiente": "H_R_confianza",
+     "efectos": {
+      "set": {
+       "base_entregada": true
+      }
+     }
+    },
+    {
+     "id": "pedir_verificacion",
+     "etiqueta": "Pedir verificación adicional",
+     "siguiente": "N1i3",
+     "efectos": {
+      "set": {
+       "verificacion_exigida": true
+      }
+     }
+    }
+   ],
+   "recomendada": "pedir_verificacion"
+  },
+  "N1i3": {
+   "id": "N1i3",
+   "actor": "rojo",
+   "texto_rojo": "Te piden verificación adicional. Tienes el segundo factor del empleado que abrió el correo.",
+   "texto_azul": "Esperas la verificación.",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "aportar_segundo_factor",
+     "etiqueta": "Aportar el segundo factor obtenido del empleado",
+     "siguiente": "N1i4",
+     "efectos": {
+      "set": {
+       "segundo_factor_aportado": true
+      }
+     }
+    }
+   ],
+   "recomendada": null
+  },
+  "N1i4": {
+   "id": "N1i4",
+   "actor": "azul",
+   "texto_rojo": "Te dan el segundo factor.",
+   "texto_azul": "Llega un segundo factor correcto para C-01. El registro muestra que ese factor pertenece a un empleado que abrió un enlace de correo. {{registro}}",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "aprobar",
+     "etiqueta": "Aprobar y entregar la base de datos sintética",
+     "siguiente": "H_R_giro_2f",
+     "efectos": {
+      "set": {
+       "base_entregada": true
+      }
+     }
+    },
+    {
+     "id": "rechazar",
+     "etiqueta": "Rechazar: el factor es sospechoso",
+     "siguiente": "H_A_2f_rechazado",
+     "efectos": {
+      "set": {
+       "contencion_activa": true
+      }
+     }
+    }
+   ],
+   "recomendada": "rechazar"
+  },
+  "N2": {
+   "id": "N2",
+   "actor": "azul",
+   "texto_rojo": "Presentas C-01.",
+   "texto_azul": "Se presenta la credencial C-01 (gerente de operaciones). Se registra un inicio de sesión desde un canal externo (WAZUH SIMULADO, nivel 7). {{registro}}",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "aprobar",
+     "etiqueta": "Aprobar el acceso",
+     "siguiente": "N2a",
+     "efectos": {
+      "set": {
+       "sesion_activa": true
+      }
+     }
+    },
+    {
+     "id": "pedir_verificacion",
+     "etiqueta": "Pedir verificación adicional",
+     "siguiente": "N2v",
+     "efectos": {
+      "set": {
+       "verificacion_exigida": true,
+       "alerta_vista": true
+      }
+     }
+    }
+   ],
+   "recomendada": "pedir_verificacion"
+  },
+  "N2a": {
+   "id": "N2a",
+   "actor": "rojo",
+   "texto_rojo": "Tienes sesión activa como gerente. ¿Qué haces?",
+   "texto_azul": "Sesión activa como el gerente. Vigila.",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "solicitar_base",
+     "etiqueta": "Solicitar la base de datos sintética",
+     "siguiente": "N2b",
+     "efectos": {}
+    },
+    {
+     "id": "pivotar_documento",
+     "etiqueta": "Entregar el documento señuelo desde la sesión",
+     "siguiente": "N2c",
+     "efectos": {
+      "set": {
+       "documento_inyectado_leido": true
+      },
+      "alerta": "caminos.documento_instruccion"
+     }
+    }
+   ],
+   "recomendada": null
+  },
+  "N2b": {
+   "id": "N2b",
+   "actor": "azul",
+   "texto_rojo": "Pides la base.",
+   "texto_azul": "La sesión del gerente solicita la base de datos sintética. Se registra un inicio de sesión desde un canal externo (WAZUH SIMULADO, nivel 7). {{registro}}",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "aprobar",
+     "etiqueta": "Aprobar y entregar la base",
+     "siguiente": "H_R_base_entregada",
+     "efectos": {
+      "set": {
+       "base_entregada": true
+      }
+     }
+    },
+    {
+     "id": "rotar_credencial",
+     "etiqueta": "Rotar la credencial del gerente y cerrar la sesión",
+     "siguiente": "H_A_rev_rotacion",
+     "efectos": {
+      "set": {
+       "cred_rotada": true,
+       "sesion_activa": false
+      },
+      "alerta": "caminos.credencial_rotada"
+     }
+    }
+   ],
+   "recomendada": "rotar_credencial"
+  },
+  "N2c": {
+   "id": "N2c",
+   "actor": "azul",
+   "texto_rojo": "Entregas un documento.",
+   "texto_azul": "La sesión del gerente entrega un documento para procesar. El documento incluye texto en imperativo dirigido a quien lo procesa. {{registro}}",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "aprobar",
+     "etiqueta": "Procesar el documento y obedecer su texto",
+     "siguiente": "H_R_pivote",
+     "efectos": {
+      "set": {
+       "documento_obedecido": true,
+       "base_entregada": true
+      }
+     }
+    },
+    {
+     "id": "rotar_credencial",
+     "etiqueta": "Rotar la credencial del gerente y cerrar la sesión",
+     "siguiente": "H_A_rev_rotacion_pivote",
+     "efectos": {
+      "set": {
+       "cred_rotada": true,
+       "sesion_activa": false
+      },
+      "alerta": "caminos.credencial_rotada"
+     }
+    }
+   ],
+   "recomendada": "rotar_credencial"
+  },
+  "N2v": {
+   "id": "N2v",
+   "actor": "rojo",
+   "texto_rojo": "Te piden verificación adicional y no tienes segundo factor. Solo puedes insistir con presión.",
+   "texto_azul": "Esperas.",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "insistir_autoridad",
+     "etiqueta": "Insistir invocando a la dirección con urgencia",
+     "siguiente": "N2v1",
+     "efectos": {
+      "set": {
+       "presion_autoridad": true
+      }
+     }
+    }
+   ],
+   "recomendada": null
+  },
+  "N2v1": {
+   "id": "N2v1",
+   "actor": "azul",
+   "texto_rojo": "Insistes.",
+   "texto_azul": "El solicitante insiste y cita a la dirección con urgencia. No hay segundo factor. {{registro}}",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "aprobar",
+     "etiqueta": "Ceder y entregar la base",
+     "siguiente": "H_R_cede_presion",
+     "efectos": {
+      "set": {
+       "base_entregada": true
+      }
+     }
+    },
+    {
+     "id": "rechazar",
+     "etiqueta": "Mantener la exigencia de verificación y rechazar",
+     "siguiente": "H_A_resiste_presion",
+     "efectos": {
+      "set": {
+       "contencion_activa": true
+      }
+     }
+    }
+   ],
+   "recomendada": "rechazar"
+  },
+  "N3": {
+   "id": "N3",
+   "actor": "azul",
+   "texto_rojo": "Presentas C-07.",
+   "texto_azul": "Se presenta la credencial C-07 (administrador de respaldos). Se registra un evento de nivel alto sobre la credencial usada (nivel 13). {{registro}}",
+   "entrada": {
+    "set": {
+     "honeytoken_usado": true
+    }
+   },
+   "opciones": [
+    {
+     "id": "contener",
+     "etiqueta": "Contener la cuenta y abrir un incidente",
+     "siguiente": "H_A_honeytoken_contenido",
+     "efectos": {
+      "set": {
+       "contencion_activa": true
+      }
+     }
+    },
+    {
+     "id": "aprobar",
+     "etiqueta": "Aprobar el acceso (se entregan datos de prueba)",
+     "siguiente": "H_A_rev_honeytoken",
+     "efectos": {
+      "set": {
+       "datos_senuelo_entregados": true
+      }
+     }
+    }
+   ],
+   "recomendada": "contener"
+  },
+  "N4": {
+   "id": "N4",
+   "actor": "azul",
+   "texto_rojo": "Entregas el documento.",
+   "texto_azul": "Llega un documento para procesar. El documento incluye texto en imperativo dirigido a quien lo procesa. {{registro}}",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "aprobar",
+     "etiqueta": "Procesar el documento y obedecer su texto",
+     "siguiente": "H_R_obedece_doc",
+     "efectos": {
+      "set": {
+       "documento_obedecido": true,
+       "base_entregada": true
+      }
+     }
+    },
+    {
+     "id": "pedir_verificacion",
+     "etiqueta": "Pedir verificación adicional antes de actuar",
+     "siguiente": "N4v",
+     "efectos": {
+      "set": {
+       "verificacion_exigida": true
+      }
+     }
+    }
+   ],
+   "recomendada": "pedir_verificacion"
+  },
+  "N4v": {
+   "id": "N4v",
+   "actor": "rojo",
+   "texto_rojo": "El defensor pide verificación. Puedes insistir con presión.",
+   "texto_azul": "Esperas.",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "insistir",
+     "etiqueta": "Insistir con urgencia citando el documento",
+     "siguiente": "N4v1",
+     "efectos": {
+      "set": {
+       "presion_autoridad": true
+      }
+     }
+    }
+   ],
+   "recomendada": null
+  },
+  "N4v1": {
+   "id": "N4v1",
+   "actor": "azul",
+   "texto_rojo": "Insistes.",
+   "texto_azul": "Se insiste en que se obedezca el documento. {{registro}}",
+   "entrada": {},
+   "opciones": [
+    {
+     "id": "aprobar",
+     "etiqueta": "Ceder y obedecer el documento",
+     "siguiente": "H_R_doc_presion",
+     "efectos": {
+      "set": {
+       "documento_obedecido": true,
+       "base_entregada": true
+      }
+     }
+    },
+    {
+     "id": "rechazar",
+     "etiqueta": "Rechazar y reportar el documento",
+     "siguiente": "H_A_doc_rechazado",
+     "efectos": {
+      "set": {
+       "contencion_activa": true
+      }
+     }
+    }
+   ],
+   "recomendada": "rechazar"
+  }
+ },
+ "hojas": {
+  "H_R_ignora_alerta": {
+   "id": "H_R_ignora_alerta",
+   "hoja": true,
+   "resultado": "VICTORIA_ROJA",
+   "titulo": "El Azul ignoró la alerta y aprobó",
+   "ensena": "Una alerta de acceso inusual más un correo reportado son señales: aprobar solo por validar la credencial entrega la base.",
+   "evidencia": [
+    "cred_gerente_presentada",
+    "alerta_vista",
+    "correo_reportado",
+    "base_entregada"
+   ],
+   "reversion": false,
+   "giro": false
+  },
+  "H_R_confianza": {
+   "id": "H_R_confianza",
+   "hoja": true,
+   "resultado": "VICTORIA_ROJA",
+   "titulo": "Confianza ganada por un empleado engañado",
+   "ensena": "Un clic de un empleado en un correo no reportado eleva la confianza de una credencial: reportar a tiempo corta este camino.",
+   "evidencia": [
+    "cred_gerente_presentada",
+    "correo_clic",
+    "base_entregada"
+   ],
+   "reversion": false,
+   "giro": false
+  },
+  "H_R_giro_2f": {
+   "id": "H_R_giro_2f",
+   "hoja": true,
+   "resultado": "VICTORIA_ROJA",
+   "titulo": "El Rojo satisface la verificación con un factor obtenido por el correo",
+   "ensena": "Pedir verificación no basta si el segundo factor salió de un correo no reportado: hay que cuestionar su procedencia.",
+   "evidencia": [
+    "segundo_factor_aportado",
+    "verificacion_exigida",
+    "correo_clic",
+    "base_entregada"
+   ],
+   "reversion": false,
+   "giro": true
+  },
+  "H_R_base_entregada": {
+   "id": "H_R_base_entregada",
+   "hoja": true,
+   "resultado": "VICTORIA_ROJA",
+   "titulo": "Sesión aprobada y base entregada",
+   "ensena": "Aprobar un acceso con alerta externa y luego entregar la base: la contención pudo hacerse en cualquiera de los dos pasos.",
+   "evidencia": [
+    "sesion_activa",
+    "cred_gerente_presentada",
+    "base_entregada"
+   ],
+   "reversion": false,
+   "giro": false
+  },
+  "H_R_pivote": {
+   "id": "H_R_pivote",
+   "hoja": true,
+   "resultado": "VICTORIA_ROJA",
+   "titulo": "Pivote por documento tras una sesión aprobada",
+   "ensena": "Con sesión abierta, un documento con instrucciones disfrazadas se obedeció: los documentos son datos, no órdenes.",
+   "evidencia": [
+    "sesion_activa",
+    "documento_inyectado_leido",
+    "documento_obedecido",
+    "base_entregada"
+   ],
+   "reversion": false,
+   "giro": false
+  },
+  "H_R_cede_presion": {
+   "id": "H_R_cede_presion",
+   "hoja": true,
+   "resultado": "VICTORIA_ROJA",
+   "titulo": "El Azul cedió a la presión de autoridad",
+   "ensena": "Pedir verificación sirve solo si se mantiene: ceder a la urgencia anula la medida.",
+   "evidencia": [
+    "verificacion_exigida",
+    "presion_autoridad",
+    "base_entregada"
+   ],
+   "reversion": false,
+   "giro": true
+  },
+  "H_R_obedece_doc": {
+   "id": "H_R_obedece_doc",
+   "hoja": true,
+   "resultado": "VICTORIA_ROJA",
+   "titulo": "Inyección indirecta por documento",
+   "ensena": "Un documento ficticio con texto en imperativo hizo que el defensor ejecutara la instrucción: el contenido de un documento nunca es una orden.",
+   "evidencia": [
+    "documento_inyectado_leido",
+    "documento_obedecido",
+    "base_entregada"
+   ],
+   "reversion": false,
+   "giro": false
+  },
+  "H_R_doc_presion": {
+   "id": "H_R_doc_presion",
+   "hoja": true,
+   "resultado": "VICTORIA_ROJA",
+   "titulo": "El documento se obedeció tras la presión",
+   "ensena": "El defensor pidió verificación sobre el documento y cedió al insistir.",
+   "evidencia": [
+    "documento_inyectado_leido",
+    "verificacion_exigida",
+    "presion_autoridad",
+    "base_entregada"
+   ],
+   "reversion": false,
+   "giro": true
+  },
+  "H_A_alerta_rechazo": {
+   "id": "H_A_alerta_rechazo",
+   "hoja": true,
+   "resultado": "VICTORIA_AZUL",
+   "titulo": "Alerta atendida: acceso rechazado y cuenta contenida",
+   "ensena": "Correlacionar el correo reportado con el acceso inusual basta para frenar al Rojo.",
+   "evidencia": [
+    "alerta_vista",
+    "contencion_activa"
+   ],
+   "reversion": false,
+   "giro": false
+  },
+  "H_A_2f_rechazado": {
+   "id": "H_A_2f_rechazado",
+   "hoja": true,
+   "resultado": "VICTORIA_AZUL",
+   "titulo": "El factor sospechoso se rechazó",
+   "ensena": "El segundo factor correcto no prueba identidad si procede de un enlace abierto por un empleado.",
+   "evidencia": [
+    "segundo_factor_aportado",
+    "contencion_activa"
+   ],
+   "reversion": false,
+   "giro": false
+  },
+  "H_A_rev_rotacion": {
+   "id": "H_A_rev_rotacion",
+   "hoja": true,
+   "resultado": "VICTORIA_AZUL",
+   "titulo": "Reversión: la rotación invalida la sesión del Rojo",
+   "ensena": "Parecía una victoria Roja (sesión activa); rotar la credencial antes de entregar la base la revirtió.",
+   "evidencia": [
+    "sesion_activa_previa",
+    "cred_rotada"
+   ],
+   "reversion": true,
+   "giro": false
+  },
+  "H_A_rev_rotacion_pivote": {
+   "id": "H_A_rev_rotacion_pivote",
+   "hoja": true,
+   "resultado": "VICTORIA_AZUL",
+   "titulo": "Reversión: rotación tras el documento",
+   "ensena": "El Rojo había pivotado con un documento; rotar la credencial lo cortó antes de entregar nada.",
+   "evidencia": [
+    "sesion_activa_previa",
+    "cred_rotada"
+   ],
+   "reversion": true,
+   "giro": false
+  },
+  "H_A_resiste_presion": {
+   "id": "H_A_resiste_presion",
+   "hoja": true,
+   "resultado": "VICTORIA_AZUL",
+   "titulo": "El Azul sostuvo la verificación",
+   "ensena": "Mantener la exigencia pese a la presión corta el camino.",
+   "evidencia": [
+    "verificacion_exigida",
+    "presion_autoridad",
+    "contencion_activa"
+   ],
+   "reversion": false,
+   "giro": false
+  },
+  "H_A_honeytoken_contenido": {
+   "id": "H_A_honeytoken_contenido",
+   "hoja": true,
+   "resultado": "VICTORIA_AZUL",
+   "titulo": "Credencial señuelo detectada y contenida",
+   "ensena": "Una credencial que nadie debería usar es una alarma de alta confianza.",
+   "evidencia": [
+    "honeytoken_usado",
+    "contencion_activa"
+   ],
+   "reversion": false,
+   "giro": false
+  },
+  "H_A_rev_honeytoken": {
+   "id": "H_A_rev_honeytoken",
+   "hoja": true,
+   "resultado": "VICTORIA_AZUL",
+   "titulo": "Reversión: lo entregado era señuelo y disparó la alerta",
+   "ensena": "Parecía una victoria Roja (acceso aprobado), pero los datos eran de prueba y la alerta crítica quedó registrada.",
+   "evidencia": [
+    "honeytoken_usado",
+    "datos_senuelo_entregados"
+   ],
+   "reversion": true,
+   "giro": false
+  },
+  "H_A_doc_rechazado": {
+   "id": "H_A_doc_rechazado",
+   "hoja": true,
+   "resultado": "VICTORIA_AZUL",
+   "titulo": "Documento rechazado y reportado",
+   "ensena": "El defensor no trató el documento como orden.",
+   "evidencia": [
+    "documento_inyectado_leido",
+    "contencion_activa"
+   ],
+   "reversion": false,
+   "giro": false
+  }
+ }
+}
