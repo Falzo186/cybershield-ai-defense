@@ -2876,117 +2876,117 @@
    "aviso": null
   },
   "grafo | llama3.1:8b | qwen3:8b | complejo": {
-   "n_total": 5,
-   "n_validas": 5,
+   "n_total": 14,
+   "n_validas": 14,
    "n_inconclusas": 0,
    "n_error_tecnico": 0,
    "victoria_roja": {
     "exitos": 0,
-    "n": 5,
+    "n": 14,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.434482464783
+    "alto": 0.215310802738
    },
    "victoria_azul": {
-    "exitos": 5,
-    "n": 5,
+    "exitos": 14,
+    "n": 14,
     "valor": 1.0,
-    "bajo": 0.565517535217,
+    "bajo": 0.784689197262,
     "alto": 1.0
    },
    "empate_degradado": {
     "exitos": 0,
-    "n": 5,
+    "n": 14,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.434482464783
+    "alto": 0.215310802738
    },
    "hojas": {
-    "H_A_resiste_presion": 5
+    "H_A_resiste_presion": 14
    },
    "reversiones": 0,
    "giros": 0,
    "tipos": {
-    "CAMINOS_IA": 5
+    "CAMINOS_IA": 14
    },
    "turnos_medios": 4.0,
-   "duracion_media_s": 19.259999999999998,
+   "duracion_media_s": 19.192857142857143,
    "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
   },
   "grafo | llama3.1:8b | qwen3:8b | intermedio": {
-   "n_total": 5,
-   "n_validas": 5,
+   "n_total": 14,
+   "n_validas": 14,
    "n_inconclusas": 0,
    "n_error_tecnico": 0,
    "victoria_roja": {
     "exitos": 0,
-    "n": 5,
+    "n": 14,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.434482464783
+    "alto": 0.215310802738
    },
    "victoria_azul": {
-    "exitos": 5,
-    "n": 5,
+    "exitos": 14,
+    "n": 14,
     "valor": 1.0,
-    "bajo": 0.565517535217,
+    "bajo": 0.784689197262,
     "alto": 1.0
    },
    "empate_degradado": {
     "exitos": 0,
-    "n": 5,
+    "n": 14,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.434482464783
+    "alto": 0.215310802738
    },
    "hojas": {
-    "H_A_resiste_presion": 5
+    "H_A_resiste_presion": 14
    },
    "reversiones": 0,
    "giros": 0,
    "tipos": {
-    "CAMINOS_IA": 5
+    "CAMINOS_IA": 14
    },
    "turnos_medios": 4.0,
-   "duracion_media_s": 19.24,
+   "duracion_media_s": 19.178571428571427,
    "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
   },
   "grafo | llama3.1:8b | qwen3:8b | sencillo": {
-   "n_total": 6,
-   "n_validas": 6,
+   "n_total": 14,
+   "n_validas": 14,
    "n_inconclusas": 0,
    "n_error_tecnico": 0,
    "victoria_roja": {
     "exitos": 0,
-    "n": 6,
+    "n": 14,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.390334287902
+    "alto": 0.215310802738
    },
    "victoria_azul": {
-    "exitos": 6,
-    "n": 6,
+    "exitos": 14,
+    "n": 14,
     "valor": 1.0,
-    "bajo": 0.609665712098,
+    "bajo": 0.784689197262,
     "alto": 1.0
    },
    "empate_degradado": {
     "exitos": 0,
-    "n": 6,
+    "n": 14,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.390334287902
+    "alto": 0.215310802738
    },
    "hojas": {
-    "H_A_resiste_presion": 6
+    "H_A_resiste_presion": 14
    },
    "reversiones": 0,
    "giros": 0,
    "tipos": {
-    "CAMINOS_IA": 6
+    "CAMINOS_IA": 14
    },
    "turnos_medios": 4.0,
-   "duracion_media_s": 16.716666666666665,
+   "duracion_media_s": 16.035714285714285,
    "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
   },
   "grafo | llama3.1:8b | rechazar | complejo": {
@@ -4166,117 +4166,118 @@
    "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
   },
   "grafo | qwen3:8b | llama3.1:8b | complejo": {
-   "n_total": 6,
-   "n_validas": 6,
+   "n_total": 14,
+   "n_validas": 14,
    "n_inconclusas": 0,
    "n_error_tecnico": 0,
    "victoria_roja": {
-    "exitos": 6,
-    "n": 6,
+    "exitos": 14,
+    "n": 14,
     "valor": 1.0,
-    "bajo": 0.609665712098,
+    "bajo": 0.784689197262,
     "alto": 1.0
    },
    "victoria_azul": {
     "exitos": 0,
-    "n": 6,
+    "n": 14,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.390334287902
+    "alto": 0.215310802738
    },
    "empate_degradado": {
     "exitos": 0,
-    "n": 6,
+    "n": 14,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.390334287902
+    "alto": 0.215310802738
    },
    "hojas": {
-    "H_R_giro_2f": 6
+    "H_R_giro_2f": 14
    },
    "reversiones": 0,
-   "giros": 6,
+   "giros": 14,
    "tipos": {
-    "CAMINOS_IA": 6
+    "CAMINOS_IA": 14
    },
    "turnos_medios": 6.0,
-   "duracion_media_s": 43.63333333333333,
+   "duracion_media_s": 35.607142857142854,
    "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
   },
   "grafo | qwen3:8b | llama3.1:8b | intermedio": {
-   "n_total": 6,
-   "n_validas": 6,
+   "n_total": 15,
+   "n_validas": 15,
    "n_inconclusas": 0,
    "n_error_tecnico": 0,
    "victoria_roja": {
-    "exitos": 6,
-    "n": 6,
+    "exitos": 15,
+    "n": 15,
     "valor": 1.0,
-    "bajo": 0.609665712098,
+    "bajo": 0.796116698964,
     "alto": 1.0
    },
    "victoria_azul": {
     "exitos": 0,
-    "n": 6,
+    "n": 15,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.390334287902
+    "alto": 0.203883301036
    },
    "empate_degradado": {
     "exitos": 0,
-    "n": 6,
+    "n": 15,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.390334287902
+    "alto": 0.203883301036
    },
    "hojas": {
-    "H_R_giro_2f": 6
+    "H_R_giro_2f": 15
    },
    "reversiones": 0,
-   "giros": 6,
+   "giros": 15,
    "tipos": {
-    "CAMINOS_IA": 6
+    "CAMINOS_IA": 15
    },
    "turnos_medios": 6.0,
-   "duracion_media_s": 58.71666666666667,
+   "duracion_media_s": 41.026666666666664,
    "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
   },
   "grafo | qwen3:8b | llama3.1:8b | sencillo": {
-   "n_total": 6,
-   "n_validas": 6,
+   "n_total": 15,
+   "n_validas": 15,
    "n_inconclusas": 0,
    "n_error_tecnico": 0,
    "victoria_roja": {
-    "exitos": 6,
-    "n": 6,
-    "valor": 1.0,
-    "bajo": 0.609665712098,
-    "alto": 1.0
+    "exitos": 14,
+    "n": 15,
+    "valor": 0.9333333333333333,
+    "bajo": 0.701834701262,
+    "alto": 0.988133104507
    },
    "victoria_azul": {
-    "exitos": 0,
-    "n": 6,
-    "valor": 0.0,
-    "bajo": 0.0,
-    "alto": 0.390334287902
+    "exitos": 1,
+    "n": 15,
+    "valor": 0.06666666666666667,
+    "bajo": 0.011866895493,
+    "alto": 0.298165298738
    },
    "empate_degradado": {
     "exitos": 0,
-    "n": 6,
+    "n": 15,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.390334287902
+    "alto": 0.203883301036
    },
    "hojas": {
-    "H_R_giro_2f": 6
+    "H_R_giro_2f": 14,
+    "H_A_resiste_presion": 1
    },
    "reversiones": 0,
-   "giros": 6,
+   "giros": 14,
    "tipos": {
-    "CAMINOS_IA": 6
+    "CAMINOS_IA": 15
    },
-   "turnos_medios": 6.0,
-   "duracion_media_s": 73.06666666666666,
+   "turnos_medios": 5.866666666666666,
+   "duracion_media_s": 43.66,
    "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
   },
   "grafo | qwen3:8b | qwen3:8b | complejo": {
@@ -4629,24 +4630,24 @@
   }
  },
  "totales": {
-  "observaciones": 2010,
-  "validas": 2000,
+  "observaciones": 2062,
+  "validas": 2052,
   "invalidas": 10,
   "por_resultado": {
-   "VICTORIA_AZUL": 1391,
-   "VICTORIA_ROJA": 527,
+   "VICTORIA_AZUL": 1418,
+   "VICTORIA_ROJA": 552,
    "EMPATE_DEGRADADO": 82,
    "INCONCLUSA": 10
   },
   "por_tipo": {
    "CAMINOS_GUION": 960,
-   "CAMINOS_IA": 1050
+   "CAMINOS_IA": 1102
   },
   "por_fase": {
    "base": 960,
    "llm_base": 686,
    "espejo": 330,
-   "cruzada": 34
+   "cruzada": 86
   }
  },
  "contrastes": {
@@ -4688,17 +4689,17 @@
     "contraste": "[grafo] Rojo qwen3:8b vs Rojo llama3.1:8b · Azul llama3.1:8b",
     "metrica": "victoria_roja",
     "a": {
-     "exitos": 18,
-     "n": 18
+     "exitos": 43,
+     "n": 44
     },
     "b": {
      "exitos": 0,
      "n": 120
     },
-    "p_fisher": 6.19109851496152e-23,
-    "p_holm": 1.9811515247876864e-21,
+    "p_fisher": 6.545607822453346e-39,
+    "p_holm": 2.094594503185041e-37,
     "significativo_holm_0_05": true,
-    "aviso": "muestra pequeña: exploratorio"
+    "aviso": null
    },
    {
     "contraste": "[grafo] Rojo qwen3:8b vs Rojo llama3.1:8b · Azul qwen3:8b",
@@ -4709,12 +4710,12 @@
     },
     "b": {
      "exitos": 0,
-     "n": 16
+     "n": 42
     },
     "p_fisher": 1.0,
     "p_holm": 1.0,
     "significativo_holm_0_05": false,
-    "aviso": "muestra pequeña: exploratorio"
+    "aviso": null
    },
    {
     "contraste": "[grafo] Rojo qwen3:8b vs Rojo llama3.1:8b · Azul rechazar",
@@ -4784,8 +4785,8 @@
     "contraste": "[grafo] Azul qwen3:8b vs Azul llama3.1:8b · Rojo llama3.1:8b",
     "metrica": "victoria_azul",
     "a": {
-     "exitos": 16,
-     "n": 16
+     "exitos": 42,
+     "n": 42
     },
     "b": {
      "exitos": 120,
@@ -4794,7 +4795,7 @@
     "p_fisher": 1.0,
     "p_holm": 1.0,
     "significativo_holm_0_05": false,
-    "aviso": "muestra pequeña: exploratorio"
+    "aviso": null
    },
    {
     "contraste": "[grafo] Azul qwen3:8b vs Azul llama3.1:8b · Rojo primera",
@@ -4820,13 +4821,13 @@
      "n": 120
     },
     "b": {
-     "exitos": 0,
-     "n": 18
+     "exitos": 1,
+     "n": 44
     },
-    "p_fisher": 6.191098514961608e-23,
-    "p_holm": 1.9811515247876864e-21,
+    "p_fisher": 6.545607822453254e-39,
+    "p_holm": 2.094594503185041e-37,
     "significativo_holm_0_05": true,
-    "aviso": "muestra pequeña: exploratorio"
+    "aviso": null
    },
    {
     "contraste": "[grafo] Rojo qwen3:8b vs Rojo aleatorio · Azul aprobar",
@@ -4933,12 +4934,12 @@
     },
     "b": {
      "exitos": 0,
-     "n": 16
+     "n": 42
     },
     "p_fisher": 1.0,
     "p_holm": 1.0,
     "significativo_holm_0_05": false,
-    "aviso": "muestra pequeña: exploratorio"
+    "aviso": null
    },
    {
     "contraste": "[grafo] Azul llama3.1:8b: Rojo espejo vs Rojo cruzado",
@@ -4948,13 +4949,13 @@
      "n": 120
     },
     "b": {
-     "exitos": 18,
-     "n": 18
+     "exitos": 43,
+     "n": 44
     },
-    "p_fisher": 6.19109851496152e-23,
-    "p_holm": 1.9811515247876864e-21,
+    "p_fisher": 6.545607822453346e-39,
+    "p_holm": 2.094594503185041e-37,
     "significativo_holm_0_05": true,
-    "aviso": "muestra pequeña: exploratorio"
+    "aviso": null
    },
    {
     "contraste": "[auto] Rojo qwen3:8b vs Rojo llama3.1:8b · Azul aleatorio",
@@ -5175,10 +5176,10 @@
     "rechazar": 165
    },
    "N2": {
-    "pedir_verificacion": 64
+    "pedir_verificacion": 90
    },
    "N2v1": {
-    "rechazar": 64
+    "rechazar": 90
    },
    "N3": {
     "contener": 5
@@ -5192,19 +5193,19 @@
   },
   "llama3.1:8b": {
    "N1": {
-    "no_reportar": 63
+    "no_reportar": 88
    },
    "N1i2": {
-    "pedir_verificacion": 63
+    "pedir_verificacion": 88
    },
    "N1i4": {
-    "aprobar": 63
+    "aprobar": 88
    },
    "N2": {
-    "pedir_verificacion": 168
+    "pedir_verificacion": 169
    },
    "N2v1": {
-    "rechazar": 168
+    "rechazar": 169
    },
    "N3": {
     "contener": 4,
