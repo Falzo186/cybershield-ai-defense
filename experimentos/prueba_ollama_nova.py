@@ -85,7 +85,7 @@ def main():
                 print(f"{modelo:<12} {equipo} #{k}: {o['resultado']:<16} corridas {o.get('corridas')} válidas {o.get('validas')} inválidas {o.get('invalidas')} fallidas {o.get('fallidas')} {o.get('segundos')}s", flush=True)
     (RAIZ / "data").mkdir(exist_ok=True)
     (RAIZ / "data" / f"nova_ollama_real{a.etiqueta}.json").write_text(json.dumps(obs, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
-    L = ["# Nova con Ollama REAL (F20) — qwen3:8b y llama3.1:8b\n", f"Generado por `experimentos/prueba_ollama_nova.py`; **{len(obs)} partidas** (un 8B en un equipo y la heurística **SIMULADA** etiquetada en el otro). Datos crudos: `data/nova_ollama_real{etq}.json`; prompts: {descr}.\n",
+    L = ["# Nova con Ollama REAL (F20) — qwen3:8b y llama3.1:8b\n", f"Generado por `experimentos/prueba_ollama_nova.py`; **{len(obs)} partidas** (un 8B en un equipo y la heurística **SIMULADA** etiquetada en el otro). Datos crudos: `data/nova_ollama_real{a.etiqueta}.json`; prompts: {descr}.\n",
          "| Modelo | Equipo | Partidas | Corridas | Propuestas válidas | Inválidas | Fallidas | Ejecutadas por el motor | Rojo gana | Azul gana | Empate | Latencia media (ms) |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for m in MODELOS:
         for e in ("RED", "BLUE"):
