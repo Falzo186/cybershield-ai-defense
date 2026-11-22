@@ -26,3 +26,4 @@ Resumen:
 ## Misión Caminos
 - T0: 2026-11-21 16:42:17 — ver `git log`. Rama `mision-caminos` desde `mision-extra`; etiqueta `pre-mision-caminos`. (La ruta «repair» queda en su propia rama.)
 - Fases 1, 2, 3, 5 y 7 hechas; fase 4 (inyección por documento) cubierta dentro del grafo y medida en la campaña; fase 6: campaña `caminos-v1` con parada por cesión de la GPU (reanudable). Batería 42/42 (1 953).
+**MISIÓN CAMINOS FINALIZADA (con la fase cruzada de la campaña incompleta)** — 2026-11-21 19:46
