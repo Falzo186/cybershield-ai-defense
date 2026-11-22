@@ -357,6 +357,19 @@ def registrar(app, ms=None):
         return JSONResponse({"fuente_activa": "simulated", "estado": "SIMULADO", "etiqueta": "WAZUH SIMULADO",
                              "real": {"estado": "NO_CONFIGURADO" if not os.environ.get("WAZUH_URL") else "NO_VERIFICADO", "detalle": "no hay instancia de Wazuh en este laboratorio; no se simula una conexión real"}, "alertas": al})
 
+    @app.get("/api/nova/historial")
+    async def nova_historial(request: Request):
+        """Historial consultable: resultados persistidos de las partidas Nova (también tras reiniciar el servidor)."""
+        import json as _j
+        import sqlite3
+        try:
+            con = sqlite3.connect(_db())
+            filas = con.execute("SELECT match_id, resultado, detalle, ts_real FROM nova_results ORDER BY ts_real DESC LIMIT 100").fetchall()
+            con.close()
+        except sqlite3.Error:
+            filas = []
+        return JSONResponse({"partidas": [{"match_id": a, "resultado": b, **{k: v for k, v in _j.loads(c).items() if k in ("motivo", "puntos", "continuidad", "tablas_extraidas", "duracion_s")}, "terminada": d} for a, b, c, d in filas]})
+
     @app.get("/api/nova/eventos")
     async def nova_eventos(request: Request, after_seq: int = 0):
         p = _E["p"]

@@ -198,6 +198,8 @@ def generar(host, modelo, system, user, formato=None, timeout=120, temperature=0
     }
     if formato == "json":
         cuerpo["format"] = "json"
+    elif isinstance(formato, dict):
+        cuerpo["format"] = formato      # salida estructurada: JSON Schema (Ollama restringe la generación a ese esquema)
     # Misión 23h: opciones extra (num_ctx, seed…) y keep_alive opcionales; sin ellas el cuerpo es idéntico al de siempre.
     if opciones:
         cuerpo["options"].update(opciones)

@@ -131,6 +131,14 @@ def main():
     t.join(5)
     chk("al terminar la primera, el equipo queda libre", ia._activa["RED"] is None)
 
+    # la IA Azul pide autorización humana
+    m, ia = nueva()
+    ia.configurar("BLUE", "auto")
+    ia.configurar("BLUE", proveedor=Fijo(json.dumps({"verdict": "SOLICITAR_AUTORIZACION", "classification": "AMBIGUA", "confidence": 0.4, "subject": {"kind": "request", "id": "AP-001"}, "reasoning": "no está claro si es legítima",
+                                                    "evidence": [], "recommended_action": {"action_type": "allow", "params": {}}})))
+    r = ia.proponer("BLUE")
+    chk("SOLICITAR_AUTORIZACION: la IA Azul NO actúa sola: crea una tarea para los jugadores humanos", r["propuesta"]["estado"] == "EJECUTADA" and any("Autorizar la acción propuesta por la IA Azul" in t["titulo"] for t in m.tareas.values()))
+
     # esquemas
     chk("validar_propuesta_rojo exige campos, catálogo de objetivo/estrategia, acción del Rojo y candidatas con el patrón", lanza(lambda: validar_propuesta_rojo({}), "INVALID_SCHEMA")
         and lanza(lambda: validar_propuesta_rojo({"operation_name": "a", "justification": "b", "objective": "copia_bd", "strategy": "adivinacion", "risk_level": "BAJO", "proposed_action": {"action_type": "guess_credential"}, "candidate_credentials": ["abc"]}), "INVALID_SCHEMA"))
