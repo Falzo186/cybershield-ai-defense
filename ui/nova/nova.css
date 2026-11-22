@@ -21,3 +21,6 @@ main { padding: var(--p-e5); } .entrar { max-width: 520px; margin: var(--p-e8) a
 .campo input, .campo select { background: #18223b; color: #e6ebf5; border: 1px solid var(--p-borde); border-radius: var(--p-r-sm); padding: 7px 10px; font: inherit; width: 100%; box-sizing: border-box; }
 .campo > span { display: block; margin-bottom: 4px; font-size: var(--p-t-xs); letter-spacing: .05em; text-transform: uppercase; color: #7c8db5; }
 .cat { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px var(--p-e3); font-size: var(--p-t-sm); padding: 6px 0; border-bottom: 1px solid var(--p-borde-suave); }
+.chat-eq { max-height: 180px; overflow: auto; border: 1px solid var(--p-borde); border-radius: var(--p-r-md); padding: var(--p-e3); background: #121a2e; display: grid; gap: 4px; margin-bottom: var(--p-e3); font-size: var(--p-t-sm); }
+.form-chat { display: flex; gap: var(--p-e2); margin-bottom: var(--p-e3); } .form-chat input { flex: 1; background: #18223b; color: #e6ebf5; border: 1px solid var(--p-borde); border-radius: var(--p-r-sm); padding: 7px 10px; }
+.mis { display: flex; gap: var(--p-e3); align-items: center; padding: 6px 0; border-bottom: 1px solid var(--p-borde-suave); } .mis span:first-child { flex: 1; }

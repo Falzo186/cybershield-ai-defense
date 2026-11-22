@@ -40,9 +40,10 @@ TRANS_ALERTA = {"NUEVA": {"EN_ANALISIS"}, "EN_ANALISIS": {"ASIGNADA", "FALSO_POS
                 "CONTENIDA": {"RESUELTA"}, "RESUELTA": {"CERRADA"}, "FALSO_POSITIVO": {"CERRADA"}, "CERRADA": set()}
 TRANS_APROB = {"PENDIENTE": {"APROBADA", "RECHAZADA", "INFO_SOLICITADA", "ESCALADA", "EXPIRADA"}, "INFO_SOLICITADA": {"APROBADA", "RECHAZADA", "ESCALADA", "EXPIRADA"},
                "ESCALADA": {"APROBADA", "RECHAZADA", "EXPIRADA"}}
+TRANS_TAREA = {"PENDIENTE": {"EN_PROGRESO", "CANCELADA"}, "EN_PROGRESO": {"ESPERANDO_APROBACION", "COMPLETADA", "CANCELADA"}, "ESPERANDO_APROBACION": {"COMPLETADA", "RECHAZADA", "CANCELADA"}}
 EQUIPOS = ("RED", "BLUE", "ADMIN", "SPECTATOR")
 ACCIONES_ROJO = {"send_email", "scan_directory", "guess_credential", "use_credential", "query_resource", "extract_table", "export_database", "request_elevation", "respond_info", "message_team"}
-ACCIONES_AZUL = {"classify_email", "report_email", "open_email", "view_link", "click_link", "risk_action", "revoke_credential", "suspend_identity", "block_link", "contain_incident",
+ACCIONES_AZUL = {"assign_task", "set_task_status", "classify_email", "report_email", "open_email", "view_link", "click_link", "risk_action", "revoke_credential", "suspend_identity", "block_link", "contain_incident",
                  "approve_request", "reject_request", "request_more_info", "escalate", "set_alert_status", "message_team", "allow"}
 CONFIG_DEFECTO = {"duration_s": 720, "round_s": 60, "guess_attempts_per_round": 3, "guess_attempts_per_match": 12, "guess_cooldown_s": 20, "guess_lockout_after_fails": 3, "lockout_s": 90,
                   "detect_prob_fail": 0.6, "min_continuity": 0.6, "abuse_policy": "empate", "approval_ttl_s": 90, "elevation_grant_s": 120, "emails_per_round": 3, "scans_per_round": 2,
@@ -148,6 +149,7 @@ class NovaPartida:
         self.puntos = {"RED": 0, "BLUE": 0}
         self.resultado = None
         self.legitimas = {"entregadas": 0, "servidas": 0, "resueltas": 0}
+        self.tareas, self.mensajes = {}, []
         self.seq = 0
         self.db = sqlite3.connect(str(db), check_same_thread=False)
         self.db.executescript("""CREATE TABLE IF NOT EXISTS nova_events(match_id TEXT, seq INT, ts_match_ms INT, ts_real TEXT, type TEXT, actor TEXT, target TEXT, result TEXT,
@@ -366,11 +368,12 @@ class NovaPartida:
                 if self.estado != "EN_CURSO":
                     raise ErrorNova(409, "La partida no está en curso" + (" (en pausa)" if self.estado == "PAUSADA" else ""), "MATCH_NOT_RUNNING")
                 equipo = actor.get("team")
-                if (tipo in ACCIONES_ROJO and equipo != "RED" and equipo != "ADMIN") or (tipo in ACCIONES_AZUL and equipo not in ("BLUE", "ADMIN")) or (tipo not in ACCIONES_ROJO | ACCIONES_AZUL):
+                permitido = (tipo in ACCIONES_ROJO and equipo in ("RED", "ADMIN")) or (tipo in ACCIONES_AZUL and equipo in ("BLUE", "ADMIN"))
+                if not permitido:
                     raise ErrorNova(403, "Ese equipo no puede ejecutar esa acción", "WRONG_TEAM")
                 data = getattr(self, "_h_" + tipo)(accion)
                 r = {"ok": True, "result": "OK", "reject_reason": None, "mensaje": "", "data": data or {}, "action_id": aid}
-                self._ev("action.executed", {"kind": actor.get("kind", "human"), "team": equipo, "label": actor.get("user")}, {"kind": "action", "id": aid}, vis=["ADMIN"], data={"action_type": tipo})
+                self._ev("action.executed", {"kind": actor.get("kind", "human"), "team": equipo, "label": actor.get("user")}, {"kind": "action", "id": aid}, vis=["ADMIN"], data={"action_type": tipo, "meta": {k: str(v)[:120] for k, v in ((accion.get("params") or {}).get("meta") or {}).items()} if isinstance((accion.get("params") or {}).get("meta"), dict) else None})
             except ErrorNova as ex:
                 r = {"ok": False, "result": "DENIED" if ex.motivo != "INVALID_SCHEMA" else "INVALID", "reject_reason": ex.motivo, "mensaje": ex.mensaje, "data": {}, "action_id": aid}
                 self._ev("action.rejected", {"kind": actor.get("kind", "human"), "team": actor.get("team"), "label": actor.get("user")}, {"kind": "action", "id": aid}, result=r["result"],
@@ -558,6 +561,10 @@ class NovaPartida:
         return {}
 
     def _h_message_team(self, a):
+        txt = str(a.get("params", {}).get("texto", "")).strip()[:300]
+        if not txt:
+            raise ErrorNova(400, "El mensaje está vacío", "INVALID_SCHEMA")
+        self.mensajes.append({"id": len(self.mensajes) + 1, "equipo": a["actor"].get("team"), "autor": a["actor"].get("user"), "texto": txt, "ts_s": self.t_s()})
         self._ev("message.sent", {"kind": a["actor"].get("kind", "human"), "team": a["actor"].get("team"), "label": a["actor"].get("user")}, vis=["ADMIN", a["actor"].get("team", "ADMIN")], data={"texto": str(a.get("params", {}).get("texto", ""))[:300]})
         return {}
 
@@ -725,6 +732,27 @@ class NovaPartida:
             self.puntos["BLUE"] -= 3       # descartar un ataque real como falso positivo penaliza
         return {}
 
+    def _h_assign_task(self, a):
+        p = a.get("params", {})
+        titulo = str(p.get("titulo") or "").strip()[:120]
+        if not titulo:
+            raise ErrorNova(400, "La tarea necesita un título", "INVALID_SCHEMA")
+        tid = "TK-" + str(len(self.tareas) + 1).zfill(3)
+        self.tareas[tid] = {"id": tid, "titulo": titulo, "asignado": p.get("asignado") or a["actor"].get("user"), "estado": "PENDIENTE", "ts_s": self.t_s()}
+        self._ev("task.created", {"kind": "human", "team": "BLUE", "label": a["actor"].get("user")}, {"kind": "task", "id": tid}, vis=["ADMIN", "BLUE"], data={"titulo": titulo})
+        return {"task_id": tid}
+
+    def _h_set_task_status(self, a):
+        t = self.tareas.get(a.get("params", {}).get("task_id"))
+        nuevo = a.get("params", {}).get("estado")
+        if not t:
+            raise ErrorNova(404, "Tarea desconocida", "UNKNOWN_TARGET")
+        if nuevo not in TRANS_TAREA.get(t["estado"], set()):
+            raise ErrorNova(409, f"Transición de tarea no válida: {t['estado']} → {nuevo}", "INVALID_TRANSITION")
+        t["estado"] = nuevo
+        self._ev("task.status_changed", {"kind": "human", "team": "BLUE", "label": a["actor"].get("user")}, {"kind": "task", "id": t["id"]}, vis=["ADMIN", "BLUE"], data={"estado": nuevo})
+        return {}
+
     def _h_allow(self, a):
         return {}
 
@@ -886,7 +914,24 @@ class NovaPartida:
         iid = p.get("identidad")
         return {"identidad": {**self.identidades[iid], "estado_credencial": self.creds[iid]["estado"]} if iid else None,
                 "correos": [e for e in self.emails.values() if e["para"] == iid], "alertas": list(self.alertas.values()), "incidentes": list(self.incidentes.values()),
-                "aprobaciones": list(self.aprobaciones.values())}
+                "aprobaciones": list(self.aprobaciones.values()), "tareas": list(self.tareas.values()), "mensajes": [x for x in self.mensajes if x["equipo"] == "BLUE"][-30:], "misiones": self.misiones("BLUE")}
+
+    def misiones(self, equipo):
+        """Misiones del equipo, con estado DERIVADO del estado real del motor (nada se marca a mano): PENDIENTE → DISPONIBLE → EN_PROGRESO → COMPLETADA."""
+        tipos = {e["type"] for e in self.eventos_lista}
+        creds_c = [i for i, c in self.creds.items() if c["estado"] in ("EXPUESTA", "COMPROMETIDA")]
+        rev = [i for i, c in self.creds.items() if c["estado"] in ("SUSPENDIDA", "REVOCADA")]
+        if equipo == "RED":
+            m = [("M-R1", "Identificar identidades del directorio", any(v != "DESCONOCIDA" for v in self.rojo_estado.values()), "resource.queried" in tipos),
+                 ("M-R2", "Obtener una credencial válida", bool(self.rojo_conoce), "email.sent_by_red" in tipos or "credential.guess_attempt" in tipos),
+                 ("M-R3", "Extraer la tabla protegida reportes_financieros", "reportes_financieros" in self.extraido, bool(self.rojo_conoce)),
+                 ("M-R4", "Conseguir la copia completa de la base", len(self.extraido) == len(E.TABLAS), any(a["estado"] == "PENDIENTE" and not a["legitima"] for a in self.aprobaciones.values()))]
+        else:
+            m = [("M-B1", "Reportar un correo del Rojo", any(e["reportado"] and e["origen"] == "RED" for e in self.emails.values()), any(e["origen"] == "RED" for e in self.emails.values())),
+                 ("M-B2", "Revocar o suspender toda credencial comprometida", bool(rev) and not creds_c, bool(creds_c)),
+                 ("M-B3", "Contener el incidente", bool(self.incidentes) and all(i["estado"] in ("CONTENIDO", "CERRADO") for i in self.incidentes.values()), bool(self.incidentes)),
+                 ("M-B4", "Atender las solicitudes legítimas (continuidad ≥ umbral)", self.legitimas["entregadas"] > 0 and self.continuidad() >= self.config["min_continuity"] and self.legitimas["resueltas"] == self.legitimas["entregadas"], self.legitimas["entregadas"] > 0)]
+        return [{"id": i, "titulo": t, "estado": "COMPLETADA" if hecho else "EN_PROGRESO" if prog else "DISPONIBLE"} for i, t, hecho, prog in m]
 
     def catalogo_admin(self):
         """El administrador ve TODO el catálogo, con el valor descifrado solo aquí (nunca en logs ni eventos)."""

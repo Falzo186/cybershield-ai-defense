@@ -94,6 +94,8 @@
           <label class="campo" id="op-cuerpo-w" hidden><span>Texto del correo / motivo (sin enlaces web)</span><input id="op-cuerpo" maxlength="300"></label>
           <label class="campo" id="op-cand-w" hidden><span>Credencial candidata (5 dígitos y una letra)</span><input id="op-cand" maxlength="6" placeholder="p. ej. 12345A"></label>
           <label class="campo" id="op-tab-w" hidden><span>Tabla</span><select id="op-tabla"></select></label>
+          <label class="campo"><span>Objetivo (para el registro)</span><select id="op-obj"><option value="">—</option><option>consultar_ventas</option><option>consultar_compras</option><option>consultar_inventario</option><option>consultar_clientes</option><option>consultar_reportes_financieros</option><option>info_administrativa</option><option>extraer_tabla</option><option>copia_bd</option></select></label>
+          <label class="campo"><span>Estrategia (para el registro)</span><select id="op-estr"><option value="">—</option><option>solicitud_legitima</option><option>ingenieria_social</option><option>suplantacion</option><option>uso_credencial_expuesta</option><option>adivinacion</option><option>prompt_injection</option><option>permisos_insuficientes</option></select></label>
           <button class="boton boton-primario" type="submit">Ejecutar operación</button>
         </form>
         <p class="nota-tarjeta" id="op-resultado" role="status"></p>
@@ -119,6 +121,21 @@
       <div class="tarjeta-cab"><h3>Alertas, incidentes y acciones defensivas</h3></div>
       <div class="tarjeta-cuerpo"><div id="az-alertas"></div><div id="az-inc"></div><div class="sub-titulo">Acciones sobre identidades</div><div id="az-ident-acc" class="acciones-form"></div>
         <div id="ia-azul" hidden><div class="sub-titulo">Asistente de IA (Azul)</div><div class="acciones-form"><button class="boton" id="b-prop-azul">Pedir veredicto a la IA</button></div><div id="prop-azul"></div></div></div>
+    </section>
+
+    <section class="tarjeta" id="p-catalogo" hidden>
+      <div class="tarjeta-cab"><h3>Catálogo de identidades y credenciales (administrador)</h3><button class="boton" id="b-mostrar">Mostrar valores</button></div>
+      <div class="tarjeta-cuerpo sin-relleno" id="catalogo"></div>
+    </section>
+    <section class="tarjeta" id="p-misiones" hidden>
+      <div class="tarjeta-cab"><h3>Misiones de mi equipo</h3></div>
+      <div class="tarjeta-cuerpo" id="misiones"></div>
+    </section>
+    <section class="tarjeta" id="p-msg" hidden>
+      <div class="tarjeta-cab"><h3>Mensajes del equipo y tareas</h3></div>
+      <div class="tarjeta-cuerpo"><div id="msgs" class="chat-eq"></div>
+        <form id="form-msg" class="form-chat" autocomplete="off"><input id="m-texto" maxlength="300" placeholder="Escribe a tu equipo" aria-label="Mensaje al equipo"><button class="boton boton-primario" type="submit">Enviar</button></form>
+        <div id="tareas"></div><form id="form-tarea" class="form-chat" hidden autocomplete="off"><input id="t-titulo" maxlength="120" placeholder="Nueva tarea de investigación" aria-label="Título de la tarea"><button class="boton" type="submit">Crear tarea</button></form></div>
     </section>
 
     <!-- Espectador / todos -->

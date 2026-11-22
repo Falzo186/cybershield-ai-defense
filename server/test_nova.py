@@ -132,6 +132,9 @@ def main():
         adm.post("/api/nova/ia/config", {"RED": {"modo": "assist", "proveedor": {"tipo": "ollama", "endpoint": E.url_ollama, "modelo": "falso-roto"}}})
         ro = pr(rojo, "RED")
         chk("un modelo roto (HTTP 500) da una corrida FALLIDA con error claro y la partida sigue", ro.status == 200 and ro["estado"] == "FALLIDA" and adm.get("/api/nova/estado")["estado"] == "EN_CURSO")
+        w = a1.get("/api/nova/wazuh")
+        chk("la capa Wazuh es separada y honesta: fuente SIMULADA etiquetada, real NO_CONFIGURADO, y el Rojo no accede", w.status == 200 and w["fuente_activa"] == "simulated" and w["real"]["estado"] == "NO_CONFIGURADO"
+            and all(x["source"] == "simulated" for x in w["alertas"]) and rojo.get("/api/nova/wazuh").status == 403)
         adm.post("/api/nova/detener", {})
         salud = Cliente(E.base).get("/api/ia/estado")
         chk("la API sigue sana tras todo el flujo", salud.status == 200)

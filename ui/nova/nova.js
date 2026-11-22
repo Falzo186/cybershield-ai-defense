@@ -56,7 +56,7 @@
       : e.estado === "LISTA" ? "Todo listo. Solo el administrador puede iniciar la partida." : e.estado === "EN_CURSO" ? "Partida EN CURSO." : e.estado === "PAUSADA" ? "⏸ PARTIDA PAUSADA: el reloj está detenido y las acciones están bloqueadas." : "Partida terminada: " + e.estado;
     visible("#p-admin", S.rol === "ADMIN");
     if (S.rol === "ADMIN") pintarAdmin(e);
-    pintarSala(e); pintarVictoria(e);
+    pintarSala(e); pintarVictoria(e); pintarCatalogo(e); pintarEquipo(e);
     visible("#p-rojo-cred", ["RED", "ADMIN"].includes(S.rol) && !!e.rojo); visible("#p-rojo-op", S.rol === "RED" && !!e.rojo);
     if (e.rojo) pintarRojo(e);
     const az = S.rol === "BLUE" && e.azul; for (const id of ["#p-azul-id", "#p-azul-bandeja", "#p-azul-aprob", "#p-azul-alertas"]) visible(id, !!az);
@@ -85,11 +85,31 @@
   $("#b-ia").addEventListener("click", () => { const tipo = $("#ia-prov").value; const prov = tipo === "ollama" ? { tipo, endpoint: $("#ia-endpoint").value.trim(), modelo: $("#ia-modelo").value.trim() } : { tipo };
     intentar(() => api("POST", "/api/nova/ia/config", { RED: { modo: $("#ia-rojo-modo").value, proveedor: prov }, BLUE: { modo: $("#ia-azul-modo").value, proveedor: prov } }), "IA configurada"); });
 
+  // ── Catálogo (admin), misiones y mensajes ───────────────────────────────────────────────────────
+  let mostrar = false;
+  function pintarCatalogo(e) {
+    visible("#p-catalogo", S.rol === "ADMIN" && !!e.catalogo); if (!(S.rol === "ADMIN" && e.catalogo)) return;
+    const c = $("#catalogo"); c.textContent = ""; e.catalogo.forEach((x) => { const f = el("div", "cat"); f.append(el("span", "", `${x.id} · ${x.nombre} (${x.depto})`), el("span", "", `${x.estado}${x.debil ? " · débil" : ""}`), el("b", "", mostrar ? x.credencial : x.credencial.slice(0, 2) + "***" + x.credencial.slice(-1))); c.append(f); });
+    $("#b-mostrar").textContent = mostrar ? "Ocultar valores" : "Mostrar valores";
+  }
+  $("#b-mostrar").addEventListener("click", () => { mostrar = !mostrar; pintarCatalogo(S.est); });
+  function pintarEquipo(e) {
+    const datos = S.rol === "RED" ? e.rojo : S.rol === "BLUE" ? e.azul : null; visible("#p-misiones", !!datos); visible("#p-msg", !!datos); if (!datos) return;
+    const m = $("#misiones"); m.textContent = ""; (datos.misiones || []).forEach((x) => { const f = el("div", "mis"); f.append(el("span", "", x.titulo), el("span", "chip sin-punto " + (x.estado === "COMPLETADA" ? "chip-ok" : x.estado === "EN_PROGRESO" ? "chip-aviso" : "chip-neutro"), x.estado)); m.append(f); });
+    const ms = $("#msgs"); ms.textContent = ""; (datos.mensajes || []).forEach((x) => ms.append(el("div", "", `${x.autor}: ${x.texto}`))); if (!(datos.mensajes || []).length) ms.append(el("div", "vacio-eq", "Sin mensajes todavía."));
+    visible("#form-tarea", S.rol === "BLUE"); const t = $("#tareas"); t.textContent = "";
+    (datos.tareas || []).forEach((x) => { const d = el("div", "ap"); d.append(el("b", "", `${x.id} · ${x.titulo} · ${x.estado}`), el("small", "", "Asignada a " + x.asignado));
+      const sig = { PENDIENTE: "EN_PROGRESO", EN_PROGRESO: "ESPERANDO_APROBACION", ESPERANDO_APROBACION: "COMPLETADA" }[x.estado]; if (sig) { const b = el("button", "boton", "Pasar a " + sig.replace("_", " ")); b.addEventListener("click", () => acc("set_task_status", { task_id: x.id, estado: sig })); d.append(b); } t.append(d); });
+  }
+  $("#form-msg").addEventListener("submit", async (ev) => { ev.preventDefault(); const t = $("#m-texto").value.trim(); if (!t) return; $("#m-texto").value = ""; await acc("message_team", { texto: t }); });
+  $("#form-tarea").addEventListener("submit", async (ev) => { ev.preventDefault(); const t = $("#t-titulo").value.trim(); if (!t) return; $("#t-titulo").value = ""; await acc("assign_task", { titulo: t }, "Tarea creada"); });
+
   // ── Sala / participantes ────────────────────────────────────────────────────────────────────────
   function pintarSala(e) {
     const c = $("#lista-part"); c.textContent = ""; $("#n-part").textContent = String((e.participantes || []).length);
     (e.participantes || []).forEach((p) => { const f = el("div", "part " + (p.equipo === "RED" ? "rojo" : p.equipo === "BLUE" ? "azul" : "")); f.append(el("b", "", p.nombre), el("span", "chip chip-neutro sin-punto", NOMBRE_ROL[p.equipo] || p.equipo));
-      if (p.identidad) f.append(el("span", "chip chip-info sin-punto", p.identidad)); f.append(el("small", "", (p.listo ? "listo" : "no listo") + " · " + (p.conectado ? "conectado" : "desconectado"))); c.append(f); });
+      if (p.identidad) f.append(el("span", "chip chip-info sin-punto", p.identidad));
+      if (S.rol === "ADMIN" && p.equipo === "BLUE" && ["SALA_DE_ESPERA", "LISTA"].includes(e.estado)) { const sel = el("select"); sel.setAttribute("aria-label", "Reasignar identidad de " + p.nombre); ["EMP-01", "EMP-02", "EMP-03", "EMP-04", "EMP-05", "EMP-06"].forEach((i) => { const o = el("option", "", i); o.value = i; sel.append(o); }); sel.value = p.identidad; sel.addEventListener("change", () => intentar(() => api("POST", "/api/nova/reasignar", { jugador: p.nombre, identidad: sel.value }), "Identidad reasignada")); f.append(sel); } f.append(el("small", "", (p.listo ? "listo" : "no listo") + " · " + (p.conectado ? "conectado" : "desconectado"))); c.append(f); });
     if (!e.participantes || !e.participantes.length) c.append(el("div", "vacio-eq", "Todavía no hay participantes."));
     const yo = (e.participantes || []).find((p) => p.nombre === S.nombre);
     visible("#b-unirse", !!S.token && ["RED", "BLUE"].includes(S.rol) && !yo && ["SALA_DE_ESPERA", "LISTA", "EN_CURSO", "PAUSADA"].includes(e.estado));
@@ -121,6 +141,7 @@
     ev.preventDefault(); const a = $("#op-accion").value; const p = {};
     if (!["scan_directory", "request_elevation", "export_database"].includes(a)) p.identidad_id = $("#op-ident").value;
     if (a === "send_email") { p.plantilla = $("#op-plant").value; p.cuerpo = $("#op-cuerpo").value; }
+    const obj = $("#op-obj").value, est = $("#op-estr").value; if (obj || est) p.meta = { objetivo: obj, estrategia: est };
     if (a === "request_elevation") p.motivo = $("#op-cuerpo").value; if (a === "guess_credential") p.candidate_value = $("#op-cand").value.trim().toUpperCase(); if (a === "extract_table") p.tabla = $("#op-tabla").value;
     const r = await api("POST", "/api/nova/accion", { action_type: a, params: p, idempotency_key: "op-" + Date.now() + Math.random().toString(36).slice(2) }, true); const d = await r.json();
     $("#op-resultado").textContent = r.ok ? "Operación aceptada por el motor." + (d.data && d.data.acierto != null ? (d.data.acierto ? " ¡Credencial válida!" : " Credencial incorrecta.") : "") : "Rechazada por el motor: " + d.mensaje + " (" + d.reject_reason + ")";

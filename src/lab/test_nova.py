@@ -300,6 +300,20 @@ def main():
     chk("determinismo: la misma semilla y las mismas acciones dan los mismos eventos, puntos y resultado", corrida() == corrida())
     chk("acciones mal formadas o de otro equipo se rechazan con motivo tipificado", m.ejecutar({"action_type": "extract_table"})["reject_reason"] == "INVALID_SCHEMA"
         and rojo(nueva(), "approve_request", approval_id="AP-001")["reject_reason"] == "WRONG_TEAM" and azul(nueva(), "guess_credential", identidad_id="EMP-01", candidate_value="12345A")["reject_reason"] == "WRONG_TEAM")
+    # ── mensajería, tareas y misiones (F08) ─────────────────────────────────────────────────────────
+    m = nueva()
+    chk("mensajería de equipo: el mensaje se guarda y solo lo ve su equipo", rojo(m, "message_team", texto="Probemos el correo de soporte")["ok"] and azul(m, "message_team", texto="Revisemos el buzón")["ok"]
+        and [x["texto"] for x in m.vista_azul("Azul1")["mensajes"]] == ["Revisemos el buzón"] and rojo(m, "message_team", texto="  ")["reject_reason"] == "INVALID_SCHEMA")
+    tk = azul(m, "assign_task", titulo="Revisar el correo sospechoso", asignado="Azul2")["data"]["task_id"]
+    chk("tareas: PENDIENTE → EN_PROGRESO → ESPERANDO_APROBACION → COMPLETADA sin saltos; el Rojo no puede crearlas", azul(m, "set_task_status", task_id=tk, estado="COMPLETADA")["reject_reason"] == "INVALID_TRANSITION"
+        and azul(m, "set_task_status", task_id=tk, estado="EN_PROGRESO")["ok"] and azul(m, "set_task_status", task_id=tk, estado="ESPERANDO_APROBACION")["ok"] and azul(m, "set_task_status", task_id=tk, estado="COMPLETADA")["ok"]
+        and rojo(m, "assign_task", titulo="x")["reject_reason"] == "WRONG_TEAM")
+    mi = {x["id"]: x["estado"] for x in m.misiones("RED")}
+    exponer(m, "EMP-05")
+    chk("las misiones se DERIVAN del estado real: no se marcan a mano (M-R2 pasa a COMPLETADA solo al tener una credencial)", mi["M-R2"] != "COMPLETADA" and {x["id"]: x["estado"] for x in m.misiones("RED")}["M-R2"] == "COMPLETADA")
+    chk("misiones del Azul: revocar lo comprometido y contener el incidente las completa", (azul(m, "revoke_credential", identidad_id="EMP-05"), azul(m, "contain_incident", incident_id=next(iter(m.incidentes))), True)[2]
+        and {x["id"]: x["estado"] for x in m.misiones("BLUE")}["M-B2"] == "COMPLETADA")
+
     # ── modalidades (D13): modifican parámetros reales y quedan congeladas ───────────────────────────
     mr, mb, mn = nueva(modalidad="RED_ADVANTAGE"), nueva(modalidad="BLUE_ADVANTAGE"), nueva()
     chk("las modalidades cuantifican parámetros reales distintos (intentos, cooldown, detección, retardo del clic)", (mr.config["guess_attempts_per_round"], mb.config["guess_attempts_per_round"], mn.config["guess_attempts_per_round"]) == (5, 2, 3)

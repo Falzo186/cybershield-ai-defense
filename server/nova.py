@@ -54,7 +54,7 @@ def _estado_publico(p, rol, nombre):
     if rol == "RED" or rol == "ADMIN":
         base["rojo"] = {"credenciales": p.vista_rojo(), "plantillas": list(E.PLANTILLAS_ROJO), "tablas": E.TABLAS, "patron": E.PATRON_CREDENCIAL,
                         "aprobaciones": [{k: v for k, v in a.items() if k != "recomendacion"} for a in p.aprobaciones.values() if a["equipo_solicitante"] == "RED"],
-                        "extraido": {t: len(f) for t, f in p.extraido.items()}}
+                        "extraido": {t: len(f) for t, f in p.extraido.items()}, "misiones": p.misiones("RED"), "mensajes": [x for x in p.mensajes if x["equipo"] == "RED"][-30:]}
     if rol == "BLUE" and nombre:
         base["azul"] = p.vista_azul(nombre)
     if rol == "ADMIN":
@@ -340,6 +340,22 @@ def registrar(app, ms=None):
             _emitir("nova_estado", {"estado": p.estado})
         return JSONResponse(r, status_code=200 if r["ok"] else (403 if r["reject_reason"] in ("WRONG_TEAM", "PERMISSION_DENIED", "NOT_YOUR_INBOX", "CREDENTIAL_NOT_KNOWN", "CREDENTIAL_UNUSABLE", "IDENTITY_LOCKED", "FORBIDDEN") else 409 if r["reject_reason"] in ("MATCH_NOT_RUNNING", "INVALID_TRANSITION", "INVALID_STATE")
                                                                   else 429 if r["reject_reason"] in ("COOLDOWN", "BUDGET_EXCEEDED") else 400))
+
+    @app.get("/api/nova/wazuh")
+    async def nova_wazuh(request: Request):
+        """Capa de observabilidad SEPARADA del juego (nunca influye en el resultado): SIMULADO con las alertas del motor en formato Wazuh; el real solo si
+        existe WAZUH_URL (en este laboratorio no hay instancia: NO_CONFIGURADO). Cada alerta lleva `source`."""
+        p = _E["p"]
+        rol = _rol(request)
+        if p is None:
+            return JSONResponse({"fuente_activa": "simulated", "estado": "SIMULADO", "alertas": []})
+        if rol == "RED":
+            return _err("El equipo Rojo no accede al SIEM", 403, "FORBIDDEN")
+        nivel = {"BAJA": 3, "MEDIA": 7, "ALTA": 10, "CRITICA": 13}
+        al = [{"id": a["id"], "timestamp": a["ts_s"], "rule": {"description": a["titulo"], "level": nivel.get(a["severidad"], 5), "groups": ["cybershield_lab", "nova"]}, "agent": {"name": "nova-" + (a["identidad"] or "base")},
+               "source": "simulated", "simulado": True, "etiqueta": "WAZUH SIMULADO"} for a in p.alertas.values()]
+        return JSONResponse({"fuente_activa": "simulated", "estado": "SIMULADO", "etiqueta": "WAZUH SIMULADO",
+                             "real": {"estado": "NO_CONFIGURADO" if not os.environ.get("WAZUH_URL") else "NO_VERIFICADO", "detalle": "no hay instancia de Wazuh en este laboratorio; no se simula una conexión real"}, "alertas": al})
 
     @app.get("/api/nova/eventos")
     async def nova_eventos(request: Request, after_seq: int = 0):
