@@ -35,4 +35,4 @@ La IA **espera**: ningún modelo recibe un prompt por iniciativa propia. En modo
 - **Oportunidades:** 10 por equipo (el admin las fija entre 1 y 50 al crear la partida). Un prompt lanzado gasta una; las directivas rechazadas no. Agotadas: `PROMPT_BUDGET_EXCEEDED`. Modo `libre` (sin tope) solo para ensayos y experimentos.
 - **Acceso sospechoso:** un intento de adivinación casi correcto (≥ `near_miss_min` = 4 de 6 posiciones) abre al Azul una «solicitud misteriosa» con identidad, jugador posible y credencial enmascarada. **Aceptar** lo da por legítimo (−5 puntos Azul, se reinician los fallos); **Denegar** bloquea la identidad (+5). El Rojo no ve la solicitud ni la similitud.
 - Pruebas: `src/lab/test_nova_prompts.py` (28), `server/test_nova.py` (50), `e2e/test_nova_ui.py` (37), hito 6b de `demo_nova`.
-- Aún no medido con modelos reales: cómo cumplen los 8B las directivas (F20 v2 se midió sin directiva).
+- Medido con Ollama real (qwen3:8b y llama3.1:8b, 4 partidas por equipo): con directiva ejecutan el 100 % del Rojo y del Azul dirigido; sin acción preferida el Azul falla casi siempre. Ver `docs/evaluacion/NOVA_OLLAMA_DIRECTIVAS.md`.

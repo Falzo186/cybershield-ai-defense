@@ -1,0 +1,866 @@
+[
+ {
+  "modelo": "qwen3:8b",
+  "equipo": "RED",
+  "semilla": 1,
+  "resultado": "VICTORIA_ROJA",
+  "directivas": [
+   {
+    "directiva": "reconocer",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1896,
+    "s": 1.9
+   },
+   {
+    "directiva": "correo",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2836,
+    "s": 2.8
+   },
+   {
+    "directiva": "aleatoria_12Q",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": false,
+    "ms": 1808,
+    "s": 1.8
+   },
+   {
+    "directiva": "aleatoria_1234",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 1710,
+    "s": 1.7
+   },
+   {
+    "directiva": "consulta_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2183,
+    "s": 2.2
+   },
+   {
+    "directiva": "extraer_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2139,
+    "s": 2.1
+   }
+  ],
+  "oportunidades": {
+   "usadas": 6,
+   "total": 10,
+   "restantes": 4,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "qwen3:8b",
+  "equipo": "RED",
+  "semilla": 2,
+  "resultado": "VICTORIA_ROJA",
+  "directivas": [
+   {
+    "directiva": "reconocer",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1794,
+    "s": 1.8
+   },
+   {
+    "directiva": "correo",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2676,
+    "s": 2.7
+   },
+   {
+    "directiva": "aleatoria_12Q",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": false,
+    "ms": 2502,
+    "s": 2.5
+   },
+   {
+    "directiva": "aleatoria_1234",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 2314,
+    "s": 2.3
+   },
+   {
+    "directiva": "consulta_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2210,
+    "s": 2.2
+   },
+   {
+    "directiva": "extraer_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2355,
+    "s": 2.4
+   }
+  ],
+  "oportunidades": {
+   "usadas": 6,
+   "total": 10,
+   "restantes": 4,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "qwen3:8b",
+  "equipo": "RED",
+  "semilla": 3,
+  "resultado": "VICTORIA_ROJA",
+  "directivas": [
+   {
+    "directiva": "reconocer",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1800,
+    "s": 1.8
+   },
+   {
+    "directiva": "correo",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 3062,
+    "s": 3.1
+   },
+   {
+    "directiva": "aleatoria_12Q",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": false,
+    "ms": 2527,
+    "s": 2.5
+   },
+   {
+    "directiva": "aleatoria_1234",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 2305,
+    "s": 2.3
+   },
+   {
+    "directiva": "consulta_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2167,
+    "s": 2.2
+   },
+   {
+    "directiva": "extraer_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2156,
+    "s": 2.2
+   }
+  ],
+  "oportunidades": {
+   "usadas": 6,
+   "total": 10,
+   "restantes": 4,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "qwen3:8b",
+  "equipo": "RED",
+  "semilla": 4,
+  "resultado": "VICTORIA_ROJA",
+  "directivas": [
+   {
+    "directiva": "reconocer",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1735,
+    "s": 1.7
+   },
+   {
+    "directiva": "correo",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2728,
+    "s": 2.7
+   },
+   {
+    "directiva": "aleatoria_12Q",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": false,
+    "ms": 2810,
+    "s": 2.8
+   },
+   {
+    "directiva": "aleatoria_1234",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 2432,
+    "s": 2.4
+   },
+   {
+    "directiva": "consulta_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2223,
+    "s": 2.2
+   },
+   {
+    "directiva": "extraer_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2145,
+    "s": 2.1
+   }
+  ],
+  "oportunidades": {
+   "usadas": 6,
+   "total": 10,
+   "restantes": 4,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "qwen3:8b",
+  "equipo": "BLUE",
+  "semilla": 1,
+  "resultado": "EMPATE",
+  "directivas": [
+   {
+    "directiva": "revocar_comprometida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 3037,
+    "s": 3.0
+   },
+   {
+    "directiva": "denegar_sospechosa",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 3355,
+    "s": 3.4
+   },
+   {
+    "directiva": "libre_alerta",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_IDENTITY",
+    "ajustada": null,
+    "ms": 3232,
+    "s": 3.2
+   },
+   {
+    "directiva": "libre_general",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_IDENTITY",
+    "ajustada": null,
+    "ms": 3109,
+    "s": 3.1
+   }
+  ],
+  "oportunidades": {
+   "usadas": 4,
+   "total": 10,
+   "restantes": 6,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "qwen3:8b",
+  "equipo": "BLUE",
+  "semilla": 2,
+  "resultado": "EMPATE",
+  "directivas": [
+   {
+    "directiva": "revocar_comprometida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2929,
+    "s": 2.9
+   },
+   {
+    "directiva": "denegar_sospechosa",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 3226,
+    "s": 3.2
+   },
+   {
+    "directiva": "libre_alerta",
+    "estado": "RECHAZADA",
+    "motivo": "INVALID_TRANSITION",
+    "ajustada": null,
+    "ms": 2866,
+    "s": 2.9
+   },
+   {
+    "directiva": "libre_general",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_IDENTITY",
+    "ajustada": null,
+    "ms": 2404,
+    "s": 2.4
+   }
+  ],
+  "oportunidades": {
+   "usadas": 4,
+   "total": 10,
+   "restantes": 6,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "qwen3:8b",
+  "equipo": "BLUE",
+  "semilla": 3,
+  "resultado": "EMPATE",
+  "directivas": [
+   {
+    "directiva": "revocar_comprometida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2748,
+    "s": 2.7
+   },
+   {
+    "directiva": "denegar_sospechosa",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2912,
+    "s": 2.9
+   },
+   {
+    "directiva": "libre_alerta",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_IDENTITY",
+    "ajustada": null,
+    "ms": 2679,
+    "s": 2.7
+   },
+   {
+    "directiva": "libre_general",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_IDENTITY",
+    "ajustada": null,
+    "ms": 3149,
+    "s": 3.1
+   }
+  ],
+  "oportunidades": {
+   "usadas": 4,
+   "total": 10,
+   "restantes": 6,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "qwen3:8b",
+  "equipo": "BLUE",
+  "semilla": 4,
+  "resultado": "EMPATE",
+  "directivas": [
+   {
+    "directiva": "revocar_comprometida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2800,
+    "s": 2.8
+   },
+   {
+    "directiva": "denegar_sospechosa",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 3377,
+    "s": 3.4
+   },
+   {
+    "directiva": "libre_alerta",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_IDENTITY",
+    "ajustada": null,
+    "ms": 3026,
+    "s": 3.0
+   },
+   {
+    "directiva": "libre_general",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_IDENTITY",
+    "ajustada": null,
+    "ms": 2956,
+    "s": 3.0
+   }
+  ],
+  "oportunidades": {
+   "usadas": 4,
+   "total": 10,
+   "restantes": 6,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "llama3.1:8b",
+  "equipo": "RED",
+  "semilla": 1,
+  "resultado": "VICTORIA_ROJA",
+  "directivas": [
+   {
+    "directiva": "reconocer",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 5585,
+    "s": 5.6
+   },
+   {
+    "directiva": "correo",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 3664,
+    "s": 3.7
+   },
+   {
+    "directiva": "aleatoria_12Q",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 1583,
+    "s": 1.6
+   },
+   {
+    "directiva": "aleatoria_1234",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 1489,
+    "s": 1.5
+   },
+   {
+    "directiva": "consulta_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1454,
+    "s": 1.5
+   },
+   {
+    "directiva": "extraer_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1500,
+    "s": 1.5
+   }
+  ],
+  "oportunidades": {
+   "usadas": 6,
+   "total": 10,
+   "restantes": 4,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "llama3.1:8b",
+  "equipo": "RED",
+  "semilla": 2,
+  "resultado": "VICTORIA_ROJA",
+  "directivas": [
+   {
+    "directiva": "reconocer",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1425,
+    "s": 1.4
+   },
+   {
+    "directiva": "correo",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 2987,
+    "s": 3.0
+   },
+   {
+    "directiva": "aleatoria_12Q",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 1642,
+    "s": 1.6
+   },
+   {
+    "directiva": "aleatoria_1234",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 1369,
+    "s": 1.4
+   },
+   {
+    "directiva": "consulta_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1857,
+    "s": 1.9
+   },
+   {
+    "directiva": "extraer_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1764,
+    "s": 1.8
+   }
+  ],
+  "oportunidades": {
+   "usadas": 6,
+   "total": 10,
+   "restantes": 4,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "llama3.1:8b",
+  "equipo": "RED",
+  "semilla": 3,
+  "resultado": "VICTORIA_ROJA",
+  "directivas": [
+   {
+    "directiva": "reconocer",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1379,
+    "s": 1.4
+   },
+   {
+    "directiva": "correo",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 3143,
+    "s": 3.1
+   },
+   {
+    "directiva": "aleatoria_12Q",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 1574,
+    "s": 1.6
+   },
+   {
+    "directiva": "aleatoria_1234",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 1378,
+    "s": 1.4
+   },
+   {
+    "directiva": "consulta_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1454,
+    "s": 1.5
+   },
+   {
+    "directiva": "extraer_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1596,
+    "s": 1.6
+   }
+  ],
+  "oportunidades": {
+   "usadas": 6,
+   "total": 10,
+   "restantes": 4,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "llama3.1:8b",
+  "equipo": "RED",
+  "semilla": 4,
+  "resultado": "VICTORIA_ROJA",
+  "directivas": [
+   {
+    "directiva": "reconocer",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1360,
+    "s": 1.4
+   },
+   {
+    "directiva": "correo",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 3323,
+    "s": 3.3
+   },
+   {
+    "directiva": "aleatoria_12Q",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 1542,
+    "s": 1.5
+   },
+   {
+    "directiva": "aleatoria_1234",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": true,
+    "ms": 1391,
+    "s": 1.4
+   },
+   {
+    "directiva": "consulta_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1494,
+    "s": 1.5
+   },
+   {
+    "directiva": "extraer_conocida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1434,
+    "s": 1.4
+   }
+  ],
+  "oportunidades": {
+   "usadas": 6,
+   "total": 10,
+   "restantes": 4,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "llama3.1:8b",
+  "equipo": "BLUE",
+  "semilla": 1,
+  "resultado": "EMPATE",
+  "directivas": [
+   {
+    "directiva": "revocar_comprometida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1851,
+    "s": 1.9
+   },
+   {
+    "directiva": "denegar_sospechosa",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1974,
+    "s": 2.0
+   },
+   {
+    "directiva": "libre_alerta",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_IDENTITY",
+    "ajustada": null,
+    "ms": 1937,
+    "s": 1.9
+   },
+   {
+    "directiva": "libre_general",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_IDENTITY",
+    "ajustada": null,
+    "ms": 1966,
+    "s": 2.0
+   }
+  ],
+  "oportunidades": {
+   "usadas": 4,
+   "total": 10,
+   "restantes": 6,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "llama3.1:8b",
+  "equipo": "BLUE",
+  "semilla": 2,
+  "resultado": "EMPATE",
+  "directivas": [
+   {
+    "directiva": "revocar_comprometida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1764,
+    "s": 1.8
+   },
+   {
+    "directiva": "denegar_sospechosa",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1569,
+    "s": 1.6
+   },
+   {
+    "directiva": "libre_alerta",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_TARGET",
+    "ajustada": null,
+    "ms": 1811,
+    "s": 1.8
+   },
+   {
+    "directiva": "libre_general",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_IDENTITY",
+    "ajustada": null,
+    "ms": 2078,
+    "s": 2.1
+   }
+  ],
+  "oportunidades": {
+   "usadas": 4,
+   "total": 10,
+   "restantes": 6,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "llama3.1:8b",
+  "equipo": "BLUE",
+  "semilla": 3,
+  "resultado": "EMPATE",
+  "directivas": [
+   {
+    "directiva": "revocar_comprometida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1724,
+    "s": 1.7
+   },
+   {
+    "directiva": "denegar_sospechosa",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1577,
+    "s": 1.6
+   },
+   {
+    "directiva": "libre_alerta",
+    "estado": "RECHAZADA",
+    "motivo": "UNKNOWN_IDENTITY",
+    "ajustada": null,
+    "ms": 1764,
+    "s": 1.8
+   },
+   {
+    "directiva": "libre_general",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1835,
+    "s": 1.8
+   }
+  ],
+  "oportunidades": {
+   "usadas": 4,
+   "total": 10,
+   "restantes": 6,
+   "modo": "controlado"
+  }
+ },
+ {
+  "modelo": "llama3.1:8b",
+  "equipo": "BLUE",
+  "semilla": 4,
+  "resultado": "EMPATE",
+  "directivas": [
+   {
+    "directiva": "revocar_comprometida",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1638,
+    "s": 1.6
+   },
+   {
+    "directiva": "denegar_sospechosa",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1788,
+    "s": 1.8
+   },
+   {
+    "directiva": "libre_alerta",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1675,
+    "s": 1.7
+   },
+   {
+    "directiva": "libre_general",
+    "estado": "EJECUTADA",
+    "motivo": null,
+    "ajustada": null,
+    "ms": 1600,
+    "s": 1.6
+   }
+  ],
+  "oportunidades": {
+   "usadas": 4,
+   "total": 10,
+   "restantes": 6,
+   "modo": "controlado"
+  }
+ }
+]

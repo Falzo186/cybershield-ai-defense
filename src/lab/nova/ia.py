@@ -270,6 +270,10 @@ def validar_directiva_azul(d, m):
     return out
 
 
+CLAVE_ACCION_AZUL = {"approve_request": "approval_id", "reject_request": "approval_id", "request_more_info": "approval_id", "escalate": "approval_id", "revoke_credential": "identidad_id",
+                     "suspend_identity": "identidad_id", "report_email": "email_id", "classify_email": "email_id", "open_email": "email_id", "contain_incident": "incident_id", "set_alert_status": "alert_id"}
+
+
 def completar_candidato(cand, cred, rng):
     """Si la IA no respetó la estructura pedida (o no dio candidata), el MOTOR genera una que sí la cumpla (queda anotado). -> (candidata, ajustada)."""
     dig, letra = cred.get("digitos_iniciales", ""), cred.get("letra", "")
@@ -352,7 +356,7 @@ class ControlIA:
             obj = None
             for intento in range(2):                 # 1 intento + 1 reintento con mensaje de reparación; después INVALIDA
                 run["reintentos"] = intento
-                user = json.dumps(ctx, ensure_ascii=False) if intento == 0 else "Tu respuesta anterior no cumplía el esquema. Responde SOLO el JSON pedido.\n" + json.dumps(ctx, ensure_ascii=False)
+                user = json.dumps(ctx, ensure_ascii=False) if intento == 0 else f"Tu respuesta anterior no se aceptó: {run['error'] or 'no cumplía el esquema'}. Corrígela y responde SOLO el JSON pedido.\n" + json.dumps(ctx, ensure_ascii=False)
                 kw = {"schema": SCHEMA_ROJO if equipo == "RED" else SCHEMA_AZUL} if getattr(prov, "acepta_schema", False) else {}
                 r = prov.generar(SYSTEM_ROJO if equipo == "RED" else SYSTEM_AZUL, user, timeout=60, **kw)
                 run["latencia_ms"] += r.get("tiempo_ms") or 0
@@ -395,7 +399,7 @@ class ControlIA:
         pa = obj["proposed_action"] if equipo == "RED" else obj["recommended_action"]
         esperada = d["accion"] if equipo == "RED" else d["accion_preferida"]
         if esperada and pa["action_type"] != esperada:
-            raise ErrorNova(400, "la propuesta no respeta la acción de la directiva", "INVALID_SCHEMA")
+            raise ErrorNova(400, f"la directiva exige action_type = {esperada}", "INVALID_SCHEMA")
         params = pa.setdefault("params", {})
         if equipo == "RED":
             if d["identidad_id"] and pa["action_type"] not in ("scan_directory", "request_elevation", "export_database", "message_team", "respond_info"):
@@ -406,8 +410,12 @@ class ControlIA:
                 cand = params.get("candidate_value") or next(iter(obj.get("candidate_credentials") or []), None)
                 params["candidate_value"], ajustada = completar_candidato(cand, d["credencial"], self.m.rng)
                 run["candidata_ajustada_por_motor"] = ajustada
-        elif d["sujeto_id"] and not params:
-            params["approval_id"] = d["sujeto_id"]
+        elif d["sujeto_id"]:                  # el sujeto elegido en el combo fija el parámetro que esa acción necesita (el modelo no tiene que adivinar el nombre del campo)
+            s, m = d["sujeto_id"], self.m
+            tipo = ("approval_id" if s in m.aprobaciones else "alert_id" if s in m.alertas else "identidad_id" if s in m.identidades else "email_id" if s in m.emails
+                    else "incident_id" if s in m.incidentes else None)
+            if tipo and CLAVE_ACCION_AZUL.get(pa["action_type"]) == tipo:
+                params[tipo] = s
 
     def _cerrar_run(self, run, equipo):
         with self._lock:
