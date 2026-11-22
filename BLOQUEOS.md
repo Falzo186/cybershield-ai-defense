@@ -9,3 +9,9 @@ La versión actual del encargo manda **omitir** C.2 (victoria Roja guionada en l
 
 ## B-2 · `e2e/test_combate_ui.py`: umbral de rendimiento (2026-11-21)
 La comprobación «200+ eventos: la cronología se pinta en < 4 s» da ≈6,1 s en esta máquina, **igual en `pre-mision-extra`** (medido en un worktree aparte): es el rendimiento actual del equipo, no un cambio de código. No se relajó el umbral para «poner en verde». Pendiente: re-medir con la máquina en reposo o decidir un umbral con criterio. Es la única falla abierta de la batería (1 885/1 887).
+
+## B-3 · Modelos de Ollama ausentes al iniciar la misión Caminos (2026-11-21)
+`~/.ollama` estaba vacío (10 KB): los modelos de las misiones anteriores ya no estaban. Se volvieron a descargar **`qwen3:8b` y `llama3.1:8b`** (≈10 GB; había 44 GB libres) bajo la autorización de `MISION_23H/05` (hasta 3 modelos de ~8B con ≥ 30 GB libres). No se descargó ningún otro.
+
+## B-4 · Campaña de Caminos interrumpida a petición del usuario (2026-11-21)
+El usuario pidió detener Ollama y la campaña para usar la GPU. Se terminó el proceso (1 979 observaciones guardadas, **reanudable**: ids deterministas). Se reanudó con un tope de tiempo hasta las 19:46 y se detiene de nuevo para que el usuario use la GPU.

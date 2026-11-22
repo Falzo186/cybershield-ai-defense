@@ -426,3 +426,11 @@ siguen siendo 21. El cálculo vive ahora en `experimentos/avance.py`, verificabl
 - Batería: 37/39 suites · 1 885/1 887 (2 fallos explicados en `docs/PRUEBAS.md`; uno arreglado, uno de entorno abierto).
 - Avance (fórmula histórica, pesos sin tocar): sin cambios, 100 % de los 18 criterios del encargo; no mide el sistema.
 - Pendiente: P-16 (cruzada ampliada), P-17 (llama v3), P-18 (Rojo v3 aislado), B-2 (umbral de rendimiento).
+
+---
+
+# Misión Caminos (2026-11-21): modo con caminos, modo automático de credenciales y Simulación grabada
+- Qué se hizo: grafo de 16 recorridos (8 Rojos/8 Azules, 3 reversiones, 3 giros) con validador y 3 variantes; motor de caminos con proveedores (guion, líneas base, 8B); modo automático de credenciales (lockout, honeytoken, alertas Wazuh simuladas); ventana `/simulacion/` con 9 grabaciones (6 de guion + 3 victorias Rojas reales de 8B) y lanzamiento desde la UI; campaña `caminos-v1`.
+- Batería: 42/42 suites · 1 953/1 953.
+- Avance (fórmula histórica, pesos sin tocar): sin cambios; no mide el sistema.
+- Pendiente: P-19 (fase cruzada incompleta), P-20, P-21 (alinear con el paquete del profesor o retomar `Rebuilt`).

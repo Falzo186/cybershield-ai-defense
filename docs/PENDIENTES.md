@@ -20,3 +20,6 @@
 | P-16 | Cruzada de `combate-v2` con n=30 por sentido | media | el tope de 4 h se agotó tras el espejo | ampliar a 8 repeticiones (≈ 3 h más) | abierto (2026-11-21) |
 | P-17 | Azul llama3.1:8b con prompts v3 sobre-rechaza (87,5 % de legítimas falladas) | alta | el modelo no casa el par «recurso:acción» en la lista de derechos; 3 iteraciones de prompt no lo corrigieron | otro formato del registro, otro modelo o ajuste fino | abierto (2026-11-21) |
 | P-18 | Efecto aislado del Rojo v3 | baja | se cambiaron Azul v3 y Rojo v3 a la vez | campaña con Rojo v3 y Azul v2 | abierto (2026-11-21) |
+| P-19 | Campaña de Caminos: la fase cruzada quedó con pocas partidas (la GPU se cedió al usuario) | media | tiempo de GPU | reanudar `campana_caminos.py` con los mismos argumentos | abierto (2026-11-21) |
+| P-20 | Modo Caminos: 5 nodos del Rojo con una única opción | baja | decisión D-24 (mantener 8/8) | un grafo con más opciones del Rojo manteniendo el equilibrio | abierto |
+| P-21 | Alinear el proyecto actual con el paquete del profesor (extracción con victoria y descarga, adivinación con límites, 6 identidades Nova) o retomar `Rebuilt` desde F06 | alta | decisión del usuario pendiente | ver `docs/ESTUDIO_PAQUETE_PROFESOR.md` | abierto |

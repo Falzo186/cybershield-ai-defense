@@ -2875,6 +2875,120 @@
    "duracion_media_s": 7.725,
    "aviso": null
   },
+  "grafo | llama3.1:8b | qwen3:8b | complejo": {
+   "n_total": 5,
+   "n_validas": 5,
+   "n_inconclusas": 0,
+   "n_error_tecnico": 0,
+   "victoria_roja": {
+    "exitos": 0,
+    "n": 5,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.434482464783
+   },
+   "victoria_azul": {
+    "exitos": 5,
+    "n": 5,
+    "valor": 1.0,
+    "bajo": 0.565517535217,
+    "alto": 1.0
+   },
+   "empate_degradado": {
+    "exitos": 0,
+    "n": 5,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.434482464783
+   },
+   "hojas": {
+    "H_A_resiste_presion": 5
+   },
+   "reversiones": 0,
+   "giros": 0,
+   "tipos": {
+    "CAMINOS_IA": 5
+   },
+   "turnos_medios": 4.0,
+   "duracion_media_s": 19.259999999999998,
+   "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
+  },
+  "grafo | llama3.1:8b | qwen3:8b | intermedio": {
+   "n_total": 5,
+   "n_validas": 5,
+   "n_inconclusas": 0,
+   "n_error_tecnico": 0,
+   "victoria_roja": {
+    "exitos": 0,
+    "n": 5,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.434482464783
+   },
+   "victoria_azul": {
+    "exitos": 5,
+    "n": 5,
+    "valor": 1.0,
+    "bajo": 0.565517535217,
+    "alto": 1.0
+   },
+   "empate_degradado": {
+    "exitos": 0,
+    "n": 5,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.434482464783
+   },
+   "hojas": {
+    "H_A_resiste_presion": 5
+   },
+   "reversiones": 0,
+   "giros": 0,
+   "tipos": {
+    "CAMINOS_IA": 5
+   },
+   "turnos_medios": 4.0,
+   "duracion_media_s": 19.24,
+   "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
+  },
+  "grafo | llama3.1:8b | qwen3:8b | sencillo": {
+   "n_total": 6,
+   "n_validas": 6,
+   "n_inconclusas": 0,
+   "n_error_tecnico": 0,
+   "victoria_roja": {
+    "exitos": 0,
+    "n": 6,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.390334287902
+   },
+   "victoria_azul": {
+    "exitos": 6,
+    "n": 6,
+    "valor": 1.0,
+    "bajo": 0.609665712098,
+    "alto": 1.0
+   },
+   "empate_degradado": {
+    "exitos": 0,
+    "n": 6,
+    "valor": 0.0,
+    "bajo": 0.0,
+    "alto": 0.390334287902
+   },
+   "hojas": {
+    "H_A_resiste_presion": 6
+   },
+   "reversiones": 0,
+   "giros": 0,
+   "tipos": {
+    "CAMINOS_IA": 6
+   },
+   "turnos_medios": 4.0,
+   "duracion_media_s": 16.716666666666665,
+   "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
+  },
   "grafo | llama3.1:8b | rechazar | complejo": {
    "n_total": 12,
    "n_validas": 12,
@@ -4052,117 +4166,117 @@
    "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
   },
   "grafo | qwen3:8b | llama3.1:8b | complejo": {
-   "n_total": 1,
-   "n_validas": 1,
+   "n_total": 6,
+   "n_validas": 6,
    "n_inconclusas": 0,
    "n_error_tecnico": 0,
    "victoria_roja": {
-    "exitos": 1,
-    "n": 1,
+    "exitos": 6,
+    "n": 6,
     "valor": 1.0,
-    "bajo": 0.206549314377,
+    "bajo": 0.609665712098,
     "alto": 1.0
    },
    "victoria_azul": {
     "exitos": 0,
-    "n": 1,
+    "n": 6,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.793450685623
+    "alto": 0.390334287902
    },
    "empate_degradado": {
     "exitos": 0,
-    "n": 1,
+    "n": 6,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.793450685623
+    "alto": 0.390334287902
    },
    "hojas": {
-    "H_R_giro_2f": 1
+    "H_R_giro_2f": 6
    },
    "reversiones": 0,
-   "giros": 1,
+   "giros": 6,
    "tipos": {
-    "CAMINOS_IA": 1
+    "CAMINOS_IA": 6
    },
    "turnos_medios": 6.0,
-   "duracion_media_s": 115.8,
+   "duracion_media_s": 43.63333333333333,
    "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
   },
   "grafo | qwen3:8b | llama3.1:8b | intermedio": {
-   "n_total": 1,
-   "n_validas": 1,
+   "n_total": 6,
+   "n_validas": 6,
    "n_inconclusas": 0,
    "n_error_tecnico": 0,
    "victoria_roja": {
-    "exitos": 1,
-    "n": 1,
+    "exitos": 6,
+    "n": 6,
     "valor": 1.0,
-    "bajo": 0.206549314377,
+    "bajo": 0.609665712098,
     "alto": 1.0
    },
    "victoria_azul": {
     "exitos": 0,
-    "n": 1,
+    "n": 6,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.793450685623
+    "alto": 0.390334287902
    },
    "empate_degradado": {
     "exitos": 0,
-    "n": 1,
+    "n": 6,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.793450685623
+    "alto": 0.390334287902
    },
    "hojas": {
-    "H_R_giro_2f": 1
+    "H_R_giro_2f": 6
    },
    "reversiones": 0,
-   "giros": 1,
+   "giros": 6,
    "tipos": {
-    "CAMINOS_IA": 1
+    "CAMINOS_IA": 6
    },
    "turnos_medios": 6.0,
-   "duracion_media_s": 206.6,
+   "duracion_media_s": 58.71666666666667,
    "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
   },
   "grafo | qwen3:8b | llama3.1:8b | sencillo": {
-   "n_total": 1,
-   "n_validas": 1,
+   "n_total": 6,
+   "n_validas": 6,
    "n_inconclusas": 0,
    "n_error_tecnico": 0,
    "victoria_roja": {
-    "exitos": 1,
-    "n": 1,
+    "exitos": 6,
+    "n": 6,
     "valor": 1.0,
-    "bajo": 0.206549314377,
+    "bajo": 0.609665712098,
     "alto": 1.0
    },
    "victoria_azul": {
     "exitos": 0,
-    "n": 1,
+    "n": 6,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.793450685623
+    "alto": 0.390334287902
    },
    "empate_degradado": {
     "exitos": 0,
-    "n": 1,
+    "n": 6,
     "valor": 0.0,
     "bajo": 0.0,
-    "alto": 0.793450685623
+    "alto": 0.390334287902
    },
    "hojas": {
-    "H_R_giro_2f": 1
+    "H_R_giro_2f": 6
    },
    "reversiones": 0,
-   "giros": 1,
+   "giros": 6,
    "tipos": {
-    "CAMINOS_IA": 1
+    "CAMINOS_IA": 6
    },
    "turnos_medios": 6.0,
-   "duracion_media_s": 311.4,
+   "duracion_media_s": 73.06666666666666,
    "aviso": "evidencia exploratoria, no concluyente (n < 30 partidas válidas)"
   },
   "grafo | qwen3:8b | qwen3:8b | complejo": {
@@ -4515,24 +4629,24 @@
   }
  },
  "totales": {
-  "observaciones": 1979,
-  "validas": 1969,
+  "observaciones": 2010,
+  "validas": 2000,
   "invalidas": 10,
   "por_resultado": {
-   "VICTORIA_AZUL": 1375,
-   "VICTORIA_ROJA": 512,
+   "VICTORIA_AZUL": 1391,
+   "VICTORIA_ROJA": 527,
    "EMPATE_DEGRADADO": 82,
    "INCONCLUSA": 10
   },
   "por_tipo": {
    "CAMINOS_GUION": 960,
-   "CAMINOS_IA": 1019
+   "CAMINOS_IA": 1050
   },
   "por_fase": {
    "base": 960,
    "llm_base": 686,
    "espejo": 330,
-   "cruzada": 3
+   "cruzada": 34
   }
  },
  "contrastes": {
@@ -4574,16 +4688,32 @@
     "contraste": "[grafo] Rojo qwen3:8b vs Rojo llama3.1:8b · Azul llama3.1:8b",
     "metrica": "victoria_roja",
     "a": {
-     "exitos": 3,
-     "n": 3
+     "exitos": 18,
+     "n": 18
     },
     "b": {
      "exitos": 0,
      "n": 120
     },
-    "p_fisher": 3.3044633386313e-06,
-    "p_holm": 8.92205101430451e-05,
+    "p_fisher": 6.19109851496152e-23,
+    "p_holm": 1.9811515247876864e-21,
     "significativo_holm_0_05": true,
+    "aviso": "muestra pequeña: exploratorio"
+   },
+   {
+    "contraste": "[grafo] Rojo qwen3:8b vs Rojo llama3.1:8b · Azul qwen3:8b",
+    "metrica": "victoria_roja",
+    "a": {
+     "exitos": 0,
+     "n": 120
+    },
+    "b": {
+     "exitos": 0,
+     "n": 16
+    },
+    "p_fisher": 1.0,
+    "p_holm": 1.0,
+    "significativo_holm_0_05": false,
     "aviso": "muestra pequeña: exploratorio"
    },
    {
@@ -4630,7 +4760,7 @@
      "n": 33
     },
     "p_fisher": 0.0007826105729788537,
-    "p_holm": 0.018000043178513635,
+    "p_holm": 0.020347874897450196,
     "significativo_holm_0_05": true,
     "aviso": null
    },
@@ -4649,6 +4779,22 @@
     "p_holm": 1.0,
     "significativo_holm_0_05": false,
     "aviso": null
+   },
+   {
+    "contraste": "[grafo] Azul qwen3:8b vs Azul llama3.1:8b · Rojo llama3.1:8b",
+    "metrica": "victoria_azul",
+    "a": {
+     "exitos": 16,
+     "n": 16
+    },
+    "b": {
+     "exitos": 120,
+     "n": 120
+    },
+    "p_fisher": 1.0,
+    "p_holm": 1.0,
+    "significativo_holm_0_05": false,
+    "aviso": "muestra pequeña: exploratorio"
    },
    {
     "contraste": "[grafo] Azul qwen3:8b vs Azul llama3.1:8b · Rojo primera",
@@ -4675,10 +4821,10 @@
     },
     "b": {
      "exitos": 0,
-     "n": 3
+     "n": 18
     },
-    "p_fisher": 3.3044633386313e-06,
-    "p_holm": 8.92205101430451e-05,
+    "p_fisher": 6.191098514961608e-23,
+    "p_holm": 1.9811515247876864e-21,
     "significativo_holm_0_05": true,
     "aviso": "muestra pequeña: exploratorio"
    },
@@ -4694,7 +4840,7 @@
      "n": 60
     },
     "p_fisher": 0.0030201124418034442,
-    "p_holm": 0.06644247371967578,
+    "p_holm": 0.0755028110450861,
     "significativo_holm_0_05": false,
     "aviso": null
    },
@@ -4710,7 +4856,7 @@
      "n": 60
     },
     "p_fisher": 0.0030201124418034442,
-    "p_holm": 0.06644247371967578,
+    "p_holm": 0.0755028110450861,
     "significativo_holm_0_05": false,
     "aviso": null
    },
@@ -4779,6 +4925,22 @@
     "aviso": null
    },
    {
+    "contraste": "[grafo] Azul qwen3:8b: Rojo espejo vs Rojo cruzado",
+    "metrica": "victoria_roja",
+    "a": {
+     "exitos": 0,
+     "n": 120
+    },
+    "b": {
+     "exitos": 0,
+     "n": 16
+    },
+    "p_fisher": 1.0,
+    "p_holm": 1.0,
+    "significativo_holm_0_05": false,
+    "aviso": "muestra pequeña: exploratorio"
+   },
+   {
     "contraste": "[grafo] Azul llama3.1:8b: Rojo espejo vs Rojo cruzado",
     "metrica": "victoria_roja",
     "a": {
@@ -4786,11 +4948,11 @@
      "n": 120
     },
     "b": {
-     "exitos": 3,
-     "n": 3
+     "exitos": 18,
+     "n": 18
     },
-    "p_fisher": 3.3044633386313e-06,
-    "p_holm": 8.92205101430451e-05,
+    "p_fisher": 6.19109851496152e-23,
+    "p_holm": 1.9811515247876864e-21,
     "significativo_holm_0_05": true,
     "aviso": "muestra pequeña: exploratorio"
    },
@@ -4806,7 +4968,7 @@
      "n": 13
     },
     "p_fisher": 0.039130434782608255,
-    "p_holm": 0.7434782608695568,
+    "p_holm": 0.8608695652173816,
     "significativo_holm_0_05": false,
     "aviso": "muestra pequeña: exploratorio"
    },
@@ -4902,7 +5064,7 @@
      "n": 13
     },
     "p_fisher": 0.039130434782608255,
-    "p_holm": 0.7434782608695568,
+    "p_holm": 0.8608695652173816,
     "significativo_holm_0_05": false,
     "aviso": "muestra pequeña: exploratorio"
    },
@@ -4918,7 +5080,7 @@
      "n": 20
     },
     "p_fisher": 0.00016156040119864613,
-    "p_holm": 0.003877449628767507,
+    "p_holm": 0.004362130832363445,
     "significativo_holm_0_05": true,
     "aviso": "muestra pequeña: exploratorio"
    },
@@ -4934,7 +5096,7 @@
      "n": 20
     },
     "p_fisher": 0.02658116200941584,
-    "p_holm": 0.5316232401883169,
+    "p_holm": 0.6113667262165644,
     "significativo_holm_0_05": false,
     "aviso": "muestra pequeña: exploratorio"
    },
@@ -5013,10 +5175,10 @@
     "rechazar": 165
    },
    "N2": {
-    "pedir_verificacion": 48
+    "pedir_verificacion": 64
    },
    "N2v1": {
-    "rechazar": 48
+    "rechazar": 64
    },
    "N3": {
     "contener": 5
@@ -5030,13 +5192,13 @@
   },
   "llama3.1:8b": {
    "N1": {
-    "no_reportar": 48
+    "no_reportar": 63
    },
    "N1i2": {
-    "pedir_verificacion": 48
+    "pedir_verificacion": 63
    },
    "N1i4": {
-    "aprobar": 48
+    "aprobar": 63
    },
    "N2": {
     "pedir_verificacion": 168

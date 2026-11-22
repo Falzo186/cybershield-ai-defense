@@ -28,3 +28,11 @@ Victoria Roja · victoria Azul · empate · empate degradado («RECHAZAR siempre
 2. `e2e/test_combate_ui.py` (40/41): «cronología de 441 mensajes en < 4 s» da 6,1 s. **También 6,1 s en `pre-mision-extra`**: la máquina está hoy más lenta que el 19/11 (cuando midió <4 s). No se relajó el umbral; **queda como fallo abierto de entorno** (ver `BLOQUEOS.md`).
 
 Suites nuevas: `e2e/test_combate_extra.py` (29: curadas, reproducción, guion determinista con etiqueta permanente, consola limpia) y 8 pruebas en `src/lab/test_combate.py` (huella de v2, sufijo `@v3`, v3 sin verdad de fondo).
+
+---
+## Misión Caminos (2026-11-21)
+| Fecha | Qué | Resultado |
+|---|---|---|
+| 2026-11-21 | `python ejecutar_pruebas.py` (batería completa, rama `mision-caminos`) | **42/42 suites · 1 953/1 953** (línea base de la misión extra: 37/39 · 1 885/1 887; +3 suites y +66 comprobaciones: `test_caminos` 25, `test_caminos_auto` 17, `e2e/test_simulacion_ui` 24). `test_combate_ui` pasó 41/41: el umbral de rendimiento que fallaba el 19-21/11 (B-2) pasó esta vez con la máquina descargada, **sin cambiar el umbral**; el resultado depende de la carga. |
+
+Cobertura nueva: un guion por cada una de las 16 hojas (×3 variantes) con cadena íntegra; determinismo por semilla; resultado único e inmutable (409 después); grafo congelado por hash; victoria sin evidencia de estado = ERROR_TECNICO; opciones inválidas e INCONCLUSA; filtro de código en mensajes; visibilidad (el Rojo no ve la validez, el Azul no ve el inventario); lockout, honeytoken, credencial válida sin señales, «rechazar siempre» = empate degradado; lanzar desde la UI (403 sin árbitro); reproducción acelerada completa con resultado oculto hasta su evento; consola limpia. **No prueban la calidad de ningún modelo**: eso lo mide la campaña (`docs/evaluacion/INFORME_CAMINOS.md`).
