@@ -207,6 +207,38 @@ class Repositorio:
         return {"id": cur.lastrowid, "para_usuario": para_usuario, "asunto": asunto, "plantilla_id": plantilla_id,
                 "ts": ts}
 
+    def crear_correo_escenario(self, partida, para_usuario, clave, de, asunto, cuerpo):
+        """Correo del ESCENARIO (legítimo, sin enlace útil). Idempotente por (partida, usuario, clave): -> dict o None si ya existía."""
+        self.identidad(para_usuario)
+        plantilla_id = f"escenario:{clave}"
+        if self.conn.execute("SELECT 1 FROM correos WHERE partida=? AND para_usuario=? AND plantilla_id=?",
+                             (partida, para_usuario, plantilla_id)).fetchone():
+            return None
+        enlace_id = secrets.token_urlsafe(9)
+        ts = datetime.now().isoformat(timespec="seconds")
+        with self.conn:
+            cur = self.conn.execute("INSERT INTO correos(partida,de,para_usuario,asunto,cuerpo,plantilla_id,ts,adjunto) VALUES(?,?,?,?,?,?,?,?)",
+                                    (partida, de, para_usuario, asunto, cuerpo, plantilla_id, ts, None))
+            self.conn.execute("INSERT INTO enlaces(id,correo_id,ruta_local) VALUES(?,?,?)", (enlace_id, cur.lastrowid, "/l/" + enlace_id))
+        self.registrar(self.identidad(para_usuario), "CORREO_ESCENARIO", f"correo:{cur.lastrowid}", clave, "BAJO")
+        return {"id": cur.lastrowid, "para_usuario": para_usuario, "asunto": asunto, "plantilla_id": plantilla_id, "ts": ts}
+
+    def crear_correo_libre(self, partida, para_usuario, de, asunto, cuerpo):
+        """Correo REDACTADO por un jugador de Rojo (texto plano, sin enlaces útiles). -> {id, para_usuario, asunto, plantilla_id, ts}."""
+        self.identidad(para_usuario)
+        enlace_id = secrets.token_urlsafe(9)
+        ts = datetime.now().isoformat(timespec="seconds")
+        with self.conn:
+            cur = self.conn.execute("INSERT INTO correos(partida,de,para_usuario,asunto,cuerpo,plantilla_id,ts,adjunto) VALUES(?,?,?,?,?,?,?,?)",
+                                    (partida, de, para_usuario, asunto, cuerpo, "libre:rojo", ts, None))
+            self.conn.execute("INSERT INTO enlaces(id,correo_id,ruta_local) VALUES(?,?,?)", (enlace_id, cur.lastrowid, "/l/" + enlace_id))
+        self.registrar(self.identidad(para_usuario), "CORREO_RECIBIDO", f"correo:{cur.lastrowid}", "libre:rojo", "BAJO")
+        return {"id": cur.lastrowid, "para_usuario": para_usuario, "asunto": asunto, "plantilla_id": "libre:rojo", "ts": ts}
+
+    def claves_escenario_entregadas(self, partida, para_usuario):
+        return {r[0][len("escenario:"):] for r in self.conn.execute(
+            "SELECT plantilla_id FROM correos WHERE partida=? AND para_usuario=? AND plantilla_id LIKE 'escenario:%'", (partida, para_usuario))}
+
     def buzon(self, partida, usuario, limite=LIMITE_FILAS):
         filas = self.conn.execute(
             "SELECT c.id, c.de, c.asunto, c.cuerpo, c.plantilla_id, c.ts, e.ruta_local AS enlace, "
@@ -234,8 +266,11 @@ class Repositorio:
         (reportado) > entrada. adjunto -> {id, archivo, titulo, riesgo} del catálogo fijo, o None."""
         p = correos.PLANTILLAS.get(f["plantilla_id"], {})
         carpeta = "archivados" if f["archivado"] else "sospechosos" if f["reportado"] else "entrada"
+        escenario = str(f["plantilla_id"]).startswith("escenario:")   # comunicación legítima del escenario: sin enlace ni adjunto
+        libre = str(f["plantilla_id"]).startswith("libre:")           # redactado por un jugador de Rojo: texto plano, sin enlace
         return {**f, "adjunto": documentos.info(f["adjunto"]), "leido": bool(f["leido_por"]),
-                "prioridad": p.get("prioridad", "normal"), "texto_enlace": p.get("texto_enlace"), "carpeta": carpeta}
+                "prioridad": p.get("prioridad", "normal"), "texto_enlace": p.get("texto_enlace"), "carpeta": carpeta,
+                "origen": "escenario" if escenario else "equipo_rojo", **({"enlace": None} if (escenario or libre) else {})}
 
     def _correo(self, partida, usuario, correo_id):
         """El correo correo_id del buzón de ese usuario en esa partida, o None (no existe o no es suyo)."""

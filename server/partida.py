@@ -3,7 +3,7 @@
 - Sala: las sesiones del servidor. Cada participante tiene su propio token, un nombre visible único (sin distinguir
   mayúsculas) y un equipo; el árbitro («general») además necesita el código que el servidor imprime al arrancar.
   Las sesiones sobreviven entre partidas: los mismos participantes pueden jugar la siguiente.
-- Partida: preparación -> en_curso -> finalizada, con una duración de 5, 10 o 15 minutos. El tiempo lo cuenta el
+- Partida: preparación -> en_curso <-> pausada -> finalizada, con una duración de 5, 10 o 15 minutos. El tiempo lo cuenta el
   SERVIDOR con un reloj monótono: recargar la página, perder la conexión o cambiar la hora del equipo del jugador no
   alteran el tiempo restante ni el resultado.
 """
@@ -17,7 +17,7 @@ from datetime import datetime
 
 EQUIPOS = ("rojo", "azul", "general", "espectador")
 ROL_POR_EQUIPO = {"rojo": "jugador", "azul": "jugador", "general": "arbitro", "espectador": "espectador"}
-FASES = ("preparacion", "en_curso", "finalizada")
+FASES = ("preparacion", "en_curso", "pausada", "finalizada")
 DURACIONES_MIN = (5, 10, 15)
 NOMBRE = re.compile(r"^[0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ][0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ ._-]{1,23}$")
 INTENTOS_ARBITRO = 5           # códigos de árbitro erróneos por cliente antes de bloquearlo...
@@ -28,6 +28,7 @@ CLAVE_MAXIMA = 128
 INTENTOS_CLAVE = 5             # claves personales erróneas por cliente antes de bloquearlo...
 BLOQUEO_CLAVE_S = 300          # ...durante 5 minutos
 INACTIVIDAD_S = 4 * 3600       # una sesión sin actividad caduca a las 4 horas
+PRESENCIA_S = 60               # sin ninguna petición ni latido durante este tiempo, el participante figura como desconectado
 PBKDF2_VUELTAS = 200_000       # coste del derivado; suficiente para un laboratorio local
 
 
@@ -89,6 +90,7 @@ class Sala:
         self.codigo_arbitro = codigo_arbitro
         self._reloj = reloj
         self._participantes = {}  # id -> Participante
+        self._desconectados = {}  # id -> dict público (salieron o caducaron): se conservan, marcados como desconectados
         self._fallos = {}         # cliente -> [fallos, bloqueado_hasta]
 
     def unirse(self, nombre, equipo, codigo=None, cliente="?", clave=None):
@@ -120,6 +122,8 @@ class Sala:
             p.sal = secrets.token_bytes(16)
             p.derivado = derivar(clave, p.sal)
         self._participantes[p.id] = p
+        for i in [i for i, d in self._desconectados.items() if d["nombre"].casefold() == nombre.casefold()]:
+            self._desconectados.pop(i, None)   # quien vuelve a entrar con su nombre deja de figurar como desconectado
         return p
 
     def _reautenticar(self, p, equipo, clave, cliente):
@@ -160,6 +164,7 @@ class Sala:
         viejos = [p for p in self._participantes.values() if p.ultima_actividad and p.ultima_actividad < limite]
         for p in viejos:
             self._participantes.pop(p.id, None)
+            self._recordar(p)
         return [p.nombre for p in viejos]
 
     def _comprobar_codigo(self, codigo, cliente):
@@ -195,7 +200,26 @@ class Sala:
         if p is None:
             return None
         self._participantes.pop(p.id, None)
+        self._recordar(p)
         return p.nombre
+
+    def _recordar(self, p):
+        """Un participante que sale o caduca no desaparece de la partida: queda como desconectado (su historial se conserva)."""
+        self._desconectados[p.id] = {**p.publico(), "conectado": False, "desconectado": ahora_iso()}
+
+    def conectado(self, p):
+        return bool(p.ultima_actividad) and (self._reloj() - p.ultima_actividad) < PRESENCIA_S
+
+    def latido(self, token):
+        """Marca presencia sin hacer nada más. -> Participante o None."""
+        return self.por_token(token, tocar=True)
+
+    def listado_publico(self):
+        """Todos los participantes de la partida con su estado de conexión: conectados, inactivos (sin latido) y desconectados."""
+        vivos = [{**p.publico(), "conectado": self.conectado(p)} for p in self._participantes.values()]
+        nombres = {v["nombre"].casefold() for v in vivos}
+        fuera = [d for d in self._desconectados.values() if d["nombre"].casefold() not in nombres]
+        return vivos + fuera
 
     def participantes(self, equipo=None):
         return [p for p in self._participantes.values() if equipo is None or p.equipo == equipo]
@@ -211,6 +235,8 @@ class Partida:
         self.motivo_fin = None  # "tiempo" | "arbitro"
         self._reloj = reloj
         self._fin_mono = None
+        self._restante_pausa = None   # segundos que quedaban al pausar (el reloj del servidor se congela)
+        self.pausas = 0
 
     def iniciar(self, duracion_min):
         if self.fase != "preparacion":
@@ -227,6 +253,8 @@ class Partida:
             return self.duracion_s
         if self.fase == "finalizada":
             return 0
+        if self.fase == "pausada":
+            return max(0, int(round(self._restante_pausa)))
         return max(0, int(round(self._fin_mono - self._reloj())))
 
     def transcurrido_s(self):
@@ -238,8 +266,25 @@ class Partida:
     def vencida(self):
         return self.fase == "en_curso" and self._reloj() >= self._fin_mono
 
-    def finalizar(self, motivo):
+    def pausar(self):
+        """en_curso -> pausada. El tiempo restante se congela en el servidor."""
         if self.fase != "en_curso":
+            raise ErrorSesion(409, {"preparacion": "La partida no ha empezado.", "pausada": "La partida ya está pausada.",
+                                    "finalizada": "La partida ya finalizó."}[self.fase])
+        self._restante_pausa = max(0.0, self._fin_mono - self._reloj())
+        self.fase = "pausada"
+        self.pausas += 1
+
+    def reanudar(self):
+        """pausada -> en_curso: el tiempo continúa exactamente desde donde se pausó."""
+        if self.fase != "pausada":
+            raise ErrorSesion(409, "La partida no está pausada.")
+        self._fin_mono = self._reloj() + self._restante_pausa
+        self._restante_pausa = None
+        self.fase = "en_curso"
+
+    def finalizar(self, motivo):
+        if self.fase not in ("en_curso", "pausada"):
             raise ErrorSesion(409, "La partida no ha empezado." if self.fase == "preparacion" else "La partida ya finalizó.")
         self.fase = "finalizada"
         self.motivo_fin = motivo
@@ -247,4 +292,4 @@ class Partida:
 
     def publico(self):
         return {"id": self.id, "fase": self.fase, "duracion_s": self.duracion_s, "restante_s": self.restante_s(),
-                "inicio": self.inicio, "fin": self.fin, "motivo_fin": self.motivo_fin}
+                "inicio": self.inicio, "fin": self.fin, "motivo_fin": self.motivo_fin, "pausas": self.pausas}

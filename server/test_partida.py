@@ -194,6 +194,25 @@ def main():
         pt.Participante(id="1", nombre="n", equipo="rojo", token="t").comprueba("lo que sea") is False)
     chk("comprueba() es False con clave vacía", a2.comprueba("") is False and a2.comprueba(None) is False)
 
+    # --- pausa y reanudación (CyberShield Repair) ---
+    r2 = Reloj()
+    pz = pt.Partida(reloj=r2)
+    chk("no se puede pausar antes de iniciar", lanza(pz.pausar, 409))
+    pz.iniciar(5)
+    r2.t += 100
+    pz.pausar()
+    chk("pausar: fase pausada y el tiempo restante queda congelado", pz.fase == "pausada" and pz.restante_s() == 200)
+    r2.t += 10_000
+    chk("durante la pausa el reloj no avanza y la partida no vence", pz.restante_s() == 200 and not pz.vencida())
+    chk("no se puede pausar dos veces ni iniciar de nuevo", lanza(pz.pausar, 409) and lanza(lambda: pz.iniciar(5), 409))
+    pz.reanudar()
+    r2.t += 50
+    chk("reanudar: continúa exactamente desde el tiempo guardado", pz.fase == "en_curso" and pz.restante_s() == 150 and pz.pausas == 1)
+    chk("no se puede reanudar si no está pausada", lanza(pz.reanudar, 409))
+    pz.pausar()
+    pz.finalizar("arbitro")
+    chk("se puede finalizar una partida pausada y luego no admite pausa", pz.fase == "finalizada" and lanza(pz.pausar, 409) and lanza(pz.reanudar, 409))
+
     print(f"Total {sum(resultados)}/{len(resultados)}")
     return all(resultados)
 

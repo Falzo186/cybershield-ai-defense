@@ -53,6 +53,8 @@
           </select>
         </label>
         <button type="button" id="btn-iniciar-partida" class="btn btn-mini btn-primary" title="Empieza la partida: desde ahora cuentan correos, clics, reportes y misiones">▶ INICIAR PARTIDA</button>
+        <button type="button" id="btn-pausar-partida" class="btn btn-mini" title="Congela el reloj y bloquea las acciones nuevas hasta reanudar">⏸ PAUSAR</button>
+        <button type="button" id="btn-reanudar-partida" class="btn btn-mini btn-primary" title="Reanuda la partida desde el tiempo guardado">▶ REANUDAR</button>
         <button type="button" id="btn-finalizar" class="btn btn-mini btn-danger" title="Congela los puntajes de Rojo y Azul y declara el ganador"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bandera"></use></svg> FINALIZAR PARTIDA</button>
         <button type="button" id="btn-nueva-partida" class="btn btn-mini" title="Prepara otra partida con los mismos participantes"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refrescar"></use></svg> NUEVA PARTIDA</button>
       </div>
@@ -62,6 +64,7 @@
       <span id="marcador-partida" class="marcador-partida" role="status" aria-live="polite" hidden title="Partida Rojo/Azul del buzón: puntos de misiones de Azul, riesgo acumulado y eventos clave"></span> <!-- Único cambio en esta interfaz: el acceso al panel de análisis (dashboard, experimentos, SOC,
            cronología y correlación). Sin él la funcionalidad nueva no sería alcanzable desde la app. -->
       <a id="enlace-panel" class="enlace-panel" href="/panel/" title="Panel de operaciones y análisis: experimentos, RAG, harness, SOC, cronología y correlación">Panel de análisis</a>
+      <a id="enlace-equipo" class="enlace-panel" href="/equipo/" title="Sala de equipo: participantes conectados, solicitudes de autorización, buzón, chat de equipo y registro de eventos">Sala de equipo</a>
       <a id="enlace-combate" class="enlace-panel" href="/combate/" title="Teatro de batalla: combate IA vs IA con victoria y derrota verificadas por el motor, Wazuh simulado e historial">Combate IA vs IA</a>
     </div>
     <div class="hdr-bottom">

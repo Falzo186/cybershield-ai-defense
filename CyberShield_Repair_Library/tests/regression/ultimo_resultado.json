@@ -1,0 +1,182 @@
+{
+ "pass": 29,
+ "fail": 0,
+ "no_implementado": 0,
+ "total": 29,
+ "resultados": [
+  {
+   "n": 1,
+   "nombre": "Entrar a la aplicación no inicia una partida",
+   "estado": "PASS",
+   "detalle": ""
+  },
+  {
+   "n": 2,
+   "nombre": "Entrar a una pantalla no inicia inferencias (0 llamadas /api/chat)",
+   "estado": "PASS",
+   "detalle": "llamadas=0"
+  },
+  {
+   "n": 3,
+   "nombre": "Un administrador puede crear una partida (nueva en preparación)",
+   "estado": "PASS",
+   "detalle": "200"
+  },
+  {
+   "n": 4,
+   "nombre": "La partida solo comienza por acción del árbitro (rojo/azul/espectador 403)",
+   "estado": "PASS",
+   "detalle": "403,403,403,200"
+  },
+  {
+   "n": 5,
+   "nombre": "Los jugadores conectados aparecen en tiempo real (SSE)",
+   "estado": "PASS",
+   "detalle": ""
+  },
+  {
+   "n": 6,
+   "nombre": "Los jugadores aparecen en el equipo correcto",
+   "estado": "PASS",
+   "detalle": ""
+  },
+  {
+   "n": 7,
+   "nombre": "Los usuarios no pueden ejecutar acciones de otro equipo (403)",
+   "estado": "PASS",
+   "detalle": "[403, 403, 403, 403]"
+  },
+  {
+   "n": 8,
+   "nombre": "Las desconexiones se reflejan (visible como desconectado, historial conservado)",
+   "estado": "PASS",
+   "detalle": ""
+  },
+  {
+   "n": 9,
+   "nombre": "Los correos programados del escenario llegan a la bandeja correcta (y Rojo no ve el calendario)",
+   "estado": "PASS",
+   "detalle": "llegó=True, rojo_403=True"
+  },
+  {
+   "n": 10,
+   "nombre": "Los correos del equipo Rojo llegan a la bandeja Azul",
+   "estado": "PASS",
+   "detalle": "200, buzon=2"
+  },
+  {
+   "n": 11,
+   "nombre": "Los correos leídos actualizan su estado",
+   "estado": "PASS",
+   "detalle": ""
+  },
+  {
+   "n": 12,
+   "nombre": "Notificaciones de correo nuevo y contador de no leídos",
+   "estado": "PASS",
+   "detalle": "evento=sí, contador=sí"
+  },
+  {
+   "n": 13,
+   "nombre": "Las solicitudes de autorización llegan a los jugadores del equipo Azul (lista y SSE)",
+   "estado": "PASS",
+   "detalle": "200, lista=200, sse=sí"
+  },
+  {
+   "n": 14,
+   "nombre": "Aceptar/rechazar actualiza el estado en todos los clientes (SSE + lista; doble decisión 409; Rojo 403)",
+   "estado": "PASS",
+   "detalle": "rechazar=200, sse=sí, doble=409, rojo=403"
+  },
+  {
+   "n": 15,
+   "nombre": "Las operaciones se validan en backend (plantilla/usuario inválidos -> 4xx)",
+   "estado": "PASS",
+   "detalle": "422,400"
+  },
+  {
+   "n": 16,
+   "nombre": "Ollama responde con el modelo configurado",
+   "estado": "PASS",
+   "detalle": "200, probar=True"
+  },
+  {
+   "n": 17,
+   "nombre": "Un error de Ollama no bloquea la partida",
+   "estado": "PASS",
+   "detalle": "probar_roto=False, fase=en_curso, correo=200"
+  },
+  {
+   "n": 18,
+   "nombre": "No hay inferencias duplicadas (segundo ataque simultáneo -> 409)",
+   "estado": "PASS",
+   "detalle": "409"
+  },
+  {
+   "n": 19,
+   "nombre": "Pausar congela el reloj e impide operaciones nuevas (409) y no se puede pausar dos veces",
+   "estado": "PASS",
+   "detalle": "200, congelado=True, bloqueos=[409, 409, 409], doble=409"
+  },
+  {
+   "n": 20,
+   "nombre": "Reanudar recupera el flujo (en curso, reloj continúa, las acciones vuelven a funcionar)",
+   "estado": "PASS",
+   "detalle": "200, correo=200"
+  },
+  {
+   "n": 21,
+   "nombre": "Finalizar/detener impide nuevas acciones y cancela lo pendiente",
+   "estado": "PASS",
+   "detalle": "200,409"
+  },
+  {
+   "n": 22,
+   "nombre": "Los eventos quedan registrados (cronología con inicio, correos y finalización)",
+   "estado": "PASS",
+   "detalle": "200"
+  },
+  {
+   "n": 23,
+   "nombre": "No se duplican correos ante el mismo reintento (idempotencia)",
+   "estado": "PASS",
+   "detalle": "correos=1 tras 2 envíos con la misma clave"
+  },
+  {
+   "n": 24,
+   "nombre": "No se duplican notificaciones",
+   "estado": "PASS",
+   "detalle": "depende del sistema de notificaciones (12)"
+  },
+  {
+   "n": 25,
+   "nombre": "Los usuarios ven estados coherentes (misma fase, id y participantes)",
+   "estado": "PASS",
+   "detalle": ""
+  },
+  {
+   "n": 26,
+   "nombre": "Sin permisos no se puede ejecutar acciones (anónimo/espectador -> 403)",
+   "estado": "PASS",
+   "detalle": "[403, 403, 403]"
+  },
+  {
+   "n": 27,
+   "nombre": "Chat de equipo: aislado por equipo, el árbitro ve ambos, el espectador ninguno, el SSE no lleva el texto",
+   "estado": "PASS",
+   "detalle": "rojo=['plan: probar el correo de soporte'], azul=['revisar el buzón'], esp=[], adm=2, sse_sin_texto=True, esp_envia=403"
+  },
+  {
+   "n": 28,
+   "nombre": "Rojo redacta un correo libre: llega a Azul como texto plano; con enlaces 400; Azul no puede enviarlo 403",
+   "estado": "PASS",
+   "detalle": "200, en_buzon=1, con_url=400, azul=403"
+  },
+  {
+   "n": 29,
+   "nombre": "El diagnóstico de salud responde con estado por componente y sin secretos",
+   "estado": "PASS",
+   "detalle": "200"
+  }
+ ]
+}

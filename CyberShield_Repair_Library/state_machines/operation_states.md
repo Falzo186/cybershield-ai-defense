@@ -1,0 +1,2 @@
+# Operaciones (ataque IA de Rojo) — `server/app.py::ATAQUE_IA`, tabla `ataques_ia`
+`validando → en_curso → terminado | cancelado`. Solo hay **una** operación a la vez (el segundo intento da 409) y cada una lleva un número y un id. Se cancela si la partida finaliza (su respuesta tardía NO cuenta, verificado en `test_ollama_controles.py`); una **pausa no la cancela** (termina y se registra). Un error técnico del modelo produce `fallo_seguro` (se deniega), nunca un éxito simulado. Tope: `MAX_ATAQUES` por partida.

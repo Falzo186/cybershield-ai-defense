@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CyberShield · Sala de equipo</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../panel/panel.css">
+<link rel="stylesheet" href="../combate/combate.css">
+<link rel="stylesheet" href="equipo.css">
+</head>
+<body>
+<a class="saltar" href="#principal">Saltar al contenido</a>
+<header class="barra">
+  <div class="barra-marca"><b>CyberShield</b> · Sala de equipo</div>
+  <div class="barra-estados" aria-live="polite">
+    <span class="chip chip-neutro" id="chip-conexion">Conectando…</span>
+    <span class="chip chip-neutro sin-punto" id="chip-partida">PREPARACIÓN</span>
+    <span class="chip chip-neutro sin-punto" id="chip-yo">sin sesión</span>
+  </div>
+  <div class="barra-arbitro" id="controles-arbitro" hidden>
+    <label class="campo corto"><span>Duración</span><select id="sel-dur"><option value="5">5 min</option><option value="10" selected>10 min</option><option value="15">15 min</option></select></label>
+    <button class="boton boton-primario" id="btn-iniciar">Iniciar</button>
+    <button class="boton" id="btn-pausar">Pausar</button>
+    <button class="boton" id="btn-reanudar">Reanudar</button>
+    <button class="boton boton-peligro" id="btn-finalizar">Finalizar</button>
+    <button class="boton" id="btn-nueva">Nueva partida</button>
+  </div>
+  <nav class="barra-enlaces"><a href="/">Partida Rojo/Azul</a> · <a href="/combate/">Combate IA vs IA</a> · <a href="/panel/">Panel</a></nav>
+</header>
+
+<section class="entrar tarjeta" id="entrar" hidden>
+  <div class="tarjeta-cab"><h3>Entrar a la partida</h3></div>
+  <form class="tarjeta-cuerpo form-entrar-eq" id="form-entrar" autocomplete="off">
+    <label class="campo"><span>Nombre de usuario</span><input id="e-nombre" maxlength="24" required></label>
+    <label class="campo"><span>Equipo</span><select id="e-rol"><option value="rojo">Equipo Rojo</option><option value="azul">Equipo Azul</option><option value="espectador">Espectador</option><option value="general">Árbitro (administrador)</option></select></label>
+    <label class="campo" id="e-codigo-wrap" hidden><span>Código de árbitro (consola del servidor)</span><input id="e-codigo" inputmode="numeric" maxlength="12"></label>
+    <button class="boton boton-primario" type="submit">Entrar</button>
+    <span class="error-form" id="e-error" role="alert"></span>
+  </form>
+</section>
+
+<main class="rejilla-eq" id="principal" tabindex="-1" hidden>
+  <section class="tarjeta" aria-labelledby="t-part">
+    <div class="tarjeta-cab"><h3 id="t-part">Participantes</h3><span class="chip chip-neutro sin-punto" id="n-conectados">0 conectados</span></div>
+    <div class="tarjeta-cuerpo" id="lista-part"></div>
+  </section>
+
+  <section class="tarjeta" aria-labelledby="t-aut">
+    <div class="tarjeta-cab"><h3 id="t-aut">Solicitudes de autorización</h3><span class="chip chip-aviso sin-punto" id="n-pend" hidden></span></div>
+    <div class="tarjeta-cuerpo">
+      <form id="form-sol" class="form-sol" hidden autocomplete="off">
+        <label class="campo"><span>Identidad involucrada</span><input id="s-ident" value="ana.perez" maxlength="50" required></label>
+        <label class="campo"><span>Operación</span><input id="s-op" placeholder="p. ej. consultar_clientes" maxlength="200" required></label>
+        <label class="campo"><span>Recurso</span><input id="s-rec" placeholder="p. ej. clientes" maxlength="200" required></label>
+        <label class="campo"><span>Motivo</span><input id="s-mot" placeholder="p. ej. informe trimestral" maxlength="200" required></label>
+        <button class="boton boton-primario" type="submit">Pedir autorización a Azul</button>
+      </form>
+      <div id="lista-aut"></div>
+    </div>
+  </section>
+
+  <section class="tarjeta" aria-labelledby="t-buz" id="panel-buzon">
+    <div class="tarjeta-cab"><h3 id="t-buz">Buzón del equipo Azul</h3><span class="chip chip-info sin-punto" id="n-nl" hidden></span></div>
+    <div class="tarjeta-cuerpo" id="lista-buzon"></div>
+  </section>
+
+  <section class="tarjeta" aria-labelledby="t-chat">
+    <div class="tarjeta-cab"><h3 id="t-chat">Chat de mi equipo</h3><span class="chip chip-neutro sin-punto" id="chat-eq">—</span></div>
+    <div class="tarjeta-cuerpo">
+      <div class="chat" id="chat" tabindex="0" aria-live="polite"></div>
+      <form id="form-chat" class="form-chat" autocomplete="off"><input id="c-texto" maxlength="500" placeholder="Escribe a tu equipo" aria-label="Mensaje al equipo"><button class="boton boton-primario" type="submit">Enviar</button></form>
+    </div>
+  </section>
+
+  <section class="tarjeta ancho" aria-labelledby="t-log">
+    <div class="tarjeta-cab"><h3 id="t-log">Registro de eventos</h3>
+      <div class="filtros-log"><select id="f-cat" aria-label="Categoría"><option value="">Todas las categorías</option></select>
+        <select id="f-eq" aria-label="Equipo"><option value="">Todos los equipos</option><option>rojo</option><option>azul</option><option>sistema</option></select>
+        <input id="f-q" type="search" placeholder="Buscar texto" maxlength="80" aria-label="Buscar en el registro"></div></div>
+    <div class="tarjeta-cuerpo sin-relleno" id="lista-log"></div>
+  </section>
+</main>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script src="equipo.js"></script>
+</body>
+</html>

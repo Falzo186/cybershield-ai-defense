@@ -106,6 +106,9 @@ const API = (() => {
     credenciales: () => req("GET", "/api/credenciales"),
     revocarCredencial: () => req("POST", "/api/credenciales/revocar", {}),
     finalizarPartida: () => req("POST", "/api/partida/finalizar", {}), // solo token general
+    pausarPartida: () => req("POST", "/api/partida/pausar", {}),       // solo token general
+    reanudarPartida: () => req("POST", "/api/partida/reanudar", {}),   // solo token general
+    latido: () => req("POST", "/api/presencia", {}),                   // presencia: el servidor marca desconectado a quien deja de enviarlo
     // Fase F: batalla de la partida. Rojo lanza ataques IA; Azul elige (y el servidor comprueba) su defensor.
     iaEstado: () => req("GET", "/api/ia/estado"),
     lanzarAtaqueIA: (modelo, host, tecnica, intensidad) => req("POST", "/api/ia/ataque",

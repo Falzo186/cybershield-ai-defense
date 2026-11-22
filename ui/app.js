@@ -121,7 +121,7 @@
   // Durante una partida en curso la práctica (simulación, manual, batalla «mejor de N») queda en pausa: el servidor
   // la rechaza con 409 y aquí el botón lo explica. La batalla de la partida está en su propia ventana.
   function aplicarControles() {
-    const enPartida = !!(estado.partida && estado.partida.fase === "en_curso");
+    const enPartida = !!(estado.partida && ["en_curso", "pausada"].includes(estado.partida.fase));
     const sinOllama = usaOllama() && !ollamaListo();
     R.setCorriendo(estado.corriendo, sinOllama || enPartida,
       enPartida ? "Práctica en pausa durante la partida: usa «Batalla de la partida»" : "Inicie Ollama");
@@ -1029,6 +1029,9 @@
       if (!window.confirm("¿Preparar una partida nueva? Correos, misiones y marcador empiezan de cero (los participantes se conservan).")) return;
       try { await API.nuevaPartida(); } catch (e) { R.toast(e.message); }
     });
+    $("btn-pausar-partida").addEventListener("click", async () => { try { await API.pausarPartida(); } catch (e) { R.toast(e.message); } });
+    $("btn-reanudar-partida").addEventListener("click", async () => { try { await API.reanudarPartida(); } catch (e) { R.toast(e.message); } });
+    setInterval(() => { if (API.tieneToken()) API.latido().catch(() => {}); }, 20000); // presencia de este participante
     $("btn-finalizar").addEventListener("click", async () => {
       if (!window.confirm("¿Finalizar la partida? Se congelan los puntajes y Rojo/Azul ya no podrán actuar.")) return;
       try { await API.finalizarPartida(); } catch (e) { R.toast(e.message); } // el resultado llega por SSE

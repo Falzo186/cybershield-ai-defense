@@ -629,6 +629,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .pe-en_curso { color: var(--ok); border-color: var(--ok); }
 .pe-en_curso.pe-ultimo { color: var(--bad); border-color: var(--bad); }
 .pe-finalizada { color: var(--texto-sec); }
+.pe-pausada { color: var(--warn); border-color: var(--warn); font-weight: 700; }
 .unirse-card { text-align: left; max-width: 440px; }
 .unirse-card h2 { justify-content: flex-start; }
 .unirse-campo { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; font-size: 13px; color: var(--texto-sec); }
