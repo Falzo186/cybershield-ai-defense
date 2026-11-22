@@ -21,7 +21,7 @@ SEC = Secretos(pepper="prueba-ollama", clave_fernet=Fernet.generate_key())
 
 
 def nueva(semilla):
-    m = NovaPartida(config={"seed": semilla, "duration_s": 300}, secretos=SEC)
+    m = NovaPartida(config={"seed": semilla, "duration_s": 300, "ai_prompt_mode": "libre"}, secretos=SEC)
     m.abrir_sala()
     m.unirse("Rojo1", "RED")
     m.unirse("Azul1", "BLUE")

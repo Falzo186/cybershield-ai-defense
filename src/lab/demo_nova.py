@@ -4,6 +4,7 @@ import sys
 
 from cryptography.fernet import Fernet
 
+from .nova.ia import ControlIA
 from .nova.motor import ErrorNova, NovaPartida, Secretos
 
 SEC = Secretos(pepper="demo", clave_fernet=Fernet.generate_key())
@@ -41,6 +42,16 @@ def main():
     hito("5. correo del Rojo; el empleado no conectado pulsa y la credencial queda COMPROMETIDA", r["ok"] and m.creds["EMP-05"]["estado"] == "COMPROMETIDA")
     q = acc(m, "RED", "Rojo1", "query_resource", identidad_id="EMP-05")
     hito("6. consultar un recurso protegido genera una alerta real para el Azul", q["ok"] and any("recurso protegido" in al["titulo"] for al in m.alertas.values()))
+    ia = ControlIA(m)
+    ia.configurar("RED", "assist")
+    try:
+        ia.proponer("RED")
+        espera = False
+    except ErrorNova as e:
+        espera = e.motivo == "DIRECTIVA_REQUIRED"
+    run = ia.proponer("RED", {"accion": "extract_table", "objetivo": "extraer_tabla", "identidad_id": "EMP-05", "tabla": "reportes_financieros", "credencial": {"modo": "conocida"}})
+    hito("6b. la IA espera: sin directiva no se lanza; con la credencial obtenida elegida en el combo propone y gasta 1 de 10 oportunidades", espera and run["propuesta"]["estado"] == "PROPUESTA"
+         and ia.oportunidades("RED")["restantes"] == 9)
     x = acc(m, "RED", "Rojo1", "extract_table", identidad_id="EMP-05", tabla="reportes_financieros")
     hito("7. extracción W1 completada por el motor", x["ok"])
     hito("8. resultado VICTORIA_ROJA y partida FINALIZADA", m.estado == "FINALIZADA" and m.resultado["resultado"] == "VICTORIA_ROJA")

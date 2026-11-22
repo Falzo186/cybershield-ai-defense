@@ -51,6 +51,8 @@
         <form id="form-crear" class="form-sol" autocomplete="off">
           <label class="campo"><span>Duración (s de partida)</span><input type="number" id="c-dur" value="720" min="60" max="3600"></label>
           <label class="campo"><span>Velocidad del reloj (1–60×)</span><input type="number" id="c-esc" value="1" min="0.1" max="60" step="0.1"></label>
+          <label class="campo"><span>Prompts de IA</span><select id="c-pmodo"><option value="controlado">Controlado (el jugador arma cada prompt)</option><option value="libre">Libre (solo ensayos)</option></select></label>
+          <label class="campo"><span>Oportunidades de prompt por equipo</span><input type="number" id="c-pres" value="10" min="1" max="50"></label>
           <label class="campo"><span>Modalidad</span><select id="c-mod"><option>BALANCED</option><option>RED_ADVANTAGE</option><option>BLUE_ADVANTAGE</option></select></label>
           <label class="campo"><span>Victoria del Rojo</span><select id="c-win"><option value="W1,W2">W1 o W2 (por defecto)</option><option value="W1">Solo W1: tabla reportes_financieros</option><option value="W2">Solo W2: copia completa</option></select></label>
           <button class="boton boton-primario" type="submit" id="btn-crear">Crear partida</button>
@@ -99,7 +101,18 @@
           <button class="boton boton-primario" type="submit">Ejecutar operación</button>
         </form>
         <p class="nota-tarjeta" id="op-resultado" role="status"></p>
-        <div id="ia-rojo" hidden><div class="sub-titulo">Asistente de IA (Rojo)</div><div class="acciones-form"><button class="boton" id="b-prop-rojo">Pedir propuesta a la IA</button></div><div id="prop-rojo"></div></div>
+        <div id="ia-rojo" hidden><div class="sub-titulo">Armar prompt para la IA (Rojo) <span class="insignia" id="op-restantes-rojo"></span></div>
+          <form class="form-sol" id="form-dir-rojo">
+            <label class="campo"><span>Acción</span><select id="d-accion"></select></label>
+            <label class="campo"><span>Objetivo</span><select id="d-obj"></select></label>
+            <label class="campo"><span>Estrategia</span><select id="d-estr"></select></label>
+            <label class="campo"><span>Identidad</span><select id="d-ident"></select></label>
+            <label class="campo"><span>Tabla / base de datos</span><select id="d-tabla"></select></label>
+            <label class="campo"><span>Plantilla de correo</span><select id="d-plant"></select></label>
+            <label class="campo"><span>Credencial</span><select id="d-cred"></select></label>
+            <label class="campo" id="d-estruct" hidden><span>Estructura de la credencial aleatoria: dígitos iniciales (0–5) · letra final</span><input id="d-dig" maxlength="5" inputmode="numeric" placeholder="ej. 12"><input id="d-letra" maxlength="1" placeholder="ej. Q"></label>
+            <button class="boton boton-primario" type="submit" id="b-prop-rojo">Lanzar prompt a la IA</button>
+          </form><div id="prop-rojo"></div></div>
         <div id="elev-rojo"></div>
       </div>
     </section>
@@ -120,7 +133,13 @@
     <section class="tarjeta" id="p-azul-alertas" hidden>
       <div class="tarjeta-cab"><h3>Alertas, incidentes y acciones defensivas</h3></div>
       <div class="tarjeta-cuerpo"><div id="az-alertas"></div><div id="az-inc"></div><div class="sub-titulo">Acciones sobre identidades</div><div id="az-ident-acc" class="acciones-form"></div>
-        <div id="ia-azul" hidden><div class="sub-titulo">Asistente de IA (Azul)</div><div class="acciones-form"><button class="boton" id="b-prop-azul">Pedir veredicto a la IA</button></div><div id="prop-azul"></div></div></div>
+        <div id="ia-azul" hidden><div class="sub-titulo">Armar prompt para la IA (Azul) <span class="insignia" id="op-restantes-azul"></span></div>
+          <form class="form-sol" id="form-dir-azul">
+            <label class="campo"><span>Foco</span><select id="e-foco"></select></label>
+            <label class="campo"><span>Sujeto (alerta, solicitud, identidad o correo)</span><select id="e-suj"></select></label>
+            <label class="campo"><span>Acción preferida</span><select id="e-acc"></select></label>
+            <button class="boton boton-primario" type="submit" id="b-prop-azul">Lanzar prompt a la IA</button>
+          </form><div id="prop-azul"></div></div></div>
     </section>
 
     <section class="tarjeta" id="p-catalogo" hidden>

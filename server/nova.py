@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, Response
 from src.lab.nova import escenario as E
 from src.lab import cliente_ollama
 from src.lab.nova import ia as IA
-from src.lab.nova.motor import ErrorNova, NovaPartida, Reloj, Secretos
+from src.lab.nova.motor import ACCIONES_AZUL, ACCIONES_ROJO, ErrorNova, NovaPartida, Reloj, Secretos
 
 ROL = {"general": "ADMIN", "rojo": "RED", "azul": "BLUE", "espectador": "SPECTATOR"}
 _E = {"p": None, "tarea": None, "ms": None, "ia": None}
@@ -65,7 +65,10 @@ def _estado_publico(p, rol, nombre):
     if ctl is not None:
         base["ia"] = {"modos": p.config["ai_mode"], "proveedores": {eq: {"kind": pr.kind, "etiqueta": pr.etiqueta, "endpoint": pr.endpoint, "modelo": pr.modelo} for eq, pr in ctl.proveedores.items()
                                                                   if rol in ("ADMIN", "SPECTATOR") or eq == {"RED": "RED", "BLUE": "BLUE"}.get(rol)},
-                      "corridas": len(ctl.runs)}
+                      "corridas": len(ctl.runs),
+                      "oportunidades": {eq: ctl.oportunidades(eq) for eq in ("RED", "BLUE") if rol in ("ADMIN", "SPECTATOR") or eq == rol},
+                      "catalogo_directiva": {"acciones_rojo": sorted(ACCIONES_ROJO), "objetivos": list(IA.OBJETIVOS), "estrategias": list(IA.ESTRATEGIAS), "identidades": [i["id"] for i in E.IDENTIDADES],
+                                             "tablas": E.TABLAS, "plantillas": list(E.PLANTILLAS_ROJO), "focos_azul": list(IA.FOCOS_AZUL), "acciones_azul": sorted(ACCIONES_AZUL)}}
     if rol == "SPECTATOR":
         base["publico"] = {"extraido": {t: len(f) for t, f in p.extraido.items()}, "alertas": len(p.alertas), "incidentes": len(p.incidentes)}
     return base
@@ -122,11 +125,16 @@ def registrar(app, ms=None):
             return _err("Ya hay una partida Nova sin terminar: deténla antes de crear otra", 409, "MATCH_EXISTS")
         cfg = {}
         for k in ("duration_s", "round_s", "guess_attempts_per_round", "guess_attempts_per_match", "guess_cooldown_s", "guess_lockout_after_fails", "lockout_s", "min_continuity", "detect_prob_fail",
-                  "approval_ttl_s", "elevation_grant_s", "click_delay_s", "seed", "modalidad", "abuse_policy"):
+                  "approval_ttl_s", "elevation_grant_s", "click_delay_s", "seed", "modalidad", "abuse_policy", "ai_prompt_mode", "ai_prompt_budget", "near_miss_min"):
             if k in cuerpo:
                 cfg[k] = cuerpo[k]
         if "win" in cuerpo and isinstance(cuerpo["win"], dict):
             cfg["win"] = {**E.WIN_POR_DEFECTO, **{k: v for k, v in cuerpo["win"].items() if k in E.WIN_POR_DEFECTO}}
+        if cfg.get("ai_prompt_mode", "controlado") not in ("controlado", "libre"):
+            return _err("ai_prompt_mode debe ser controlado o libre")
+        for k_, lo, hi in (("ai_prompt_budget", 1, 50), ("near_miss_min", 2, 6)):
+            if k_ in cfg and (not isinstance(cfg[k_], int) or isinstance(cfg[k_], bool) or not lo <= cfg[k_] <= hi):
+                return _err(f"{k_} debe ser un entero entre {lo} y {hi}")
         if cfg.get("modalidad", "BALANCED") not in ("RED_ADVANTAGE", "BLUE_ADVANTAGE", "BALANCED"):
             return _err("modalidad no válida")
         try:
@@ -291,7 +299,7 @@ def registrar(app, ms=None):
         if rol not in ("ADMIN", "RED", "BLUE") or (rol != "ADMIN" and eq != rol):
             return _err("Solo puedes pedir propuestas a la IA de tu propio equipo", 403, "WRONG_TEAM")
         try:
-            run = await asyncio.get_running_loop().run_in_executor(None, _E["ia"].proponer, eq)
+            run = await asyncio.get_running_loop().run_in_executor(None, _E["ia"].proponer, eq, cuerpo.get("directiva"))
         except ErrorNova as e:
             return _err(e.mensaje, e.status, e.motivo)
         _emitir("nova_evento", {"seq": p.seq, "estado": p.estado})

@@ -104,7 +104,7 @@ def main():
         dt = adm.post("/api/nova/detener", {})
         chk("detener pasa a FINALIZADA sin dejar tareas vivas: el reloj queda quieto", dt["estado"] == "FINALIZADA" and (lambda t: (time.sleep(1.2), adm.get("/api/nova/estado")["t_s"] == t)[1])(adm.get("/api/nova/estado")["t_s"]))
         # ── IA de Nova: configuración, assist, anti-SSRF, Ollama falso con JSON inválido ───────────────────────
-        adm.post("/api/nova/partida", {"time_scale": 30, "duration_s": 600})
+        adm.post("/api/nova/partida", {"time_scale": 30, "duration_s": 600, "ai_prompt_mode": "libre"})
         adm.post("/api/nova/sala")
         rojo.post("/api/nova/unirse", {})
         a1.post("/api/nova/unirse", {})
@@ -137,6 +137,41 @@ def main():
         w = a1.get("/api/nova/wazuh")
         chk("la capa Wazuh es separada y honesta: fuente SIMULADA etiquetada, real NO_CONFIGURADO, y el Rojo no accede", w.status == 200 and w["fuente_activa"] == "simulated" and w["real"]["estado"] == "NO_CONFIGURADO"
             and all(x["source"] == "simulated" for x in w["alertas"]) and rojo.get("/api/nova/wazuh").status == 403)
+        adm.post("/api/nova/detener", {})
+        # ── prompts CONTROLADOS: directiva de catálogo, oportunidades por equipo y acceso sospechoso ──────────
+        cr = adm.post("/api/nova/partida", {"time_scale": 30, "duration_s": 600, "ai_prompt_budget": 2, "guess_cooldown_s": 0, "guess_attempts_per_round": 9, "detect_prob_fail": 0.0})
+        chk("el modo por defecto es controlado y el administrador fija las oportunidades por equipo", cr.status == 200 and cr["config"]["ai_prompt_mode"] == "controlado" and cr["config"]["ai_prompt_budget"] == 2
+            and adm.post("/api/nova/partida", {"ai_prompt_budget": 0}).status in (400, 409) and adm.post("/api/nova/partida", {"ai_prompt_mode": "otro"}).status in (400, 409))
+        adm.post("/api/nova/sala")
+        rojo.post("/api/nova/unirse", {})
+        a1.post("/api/nova/unirse", {})
+        adm.post("/api/nova/lista")
+        adm.post("/api/nova/iniciar", {"confirm": True, "idempotency_key": "demo-5"})
+        adm.post("/api/nova/ia/config", {"RED": {"modo": "assist", "proveedor": {"tipo": "scripted"}}, "BLUE": {"modo": "assist", "proveedor": {"tipo": "scripted"}}})
+        er = rojo.get("/api/nova/estado")
+        chk("el Rojo ve su contador y el catálogo de directivas, pero no el contador del Azul", er["ia"]["oportunidades"] == {"RED": {"usadas": 0, "total": 2, "restantes": 2, "modo": "controlado"}} and "acciones_rojo" in er["ia"]["catalogo_directiva"])
+        sin = pr(rojo, "RED")
+        chk("sin directiva la IA no se lanza (400 DIRECTIVA_REQUIRED) y no se gasta nada", sin.status == 400 and sin["motivo"] == "DIRECTIVA_REQUIRED" and rojo.get("/api/nova/estado")["ia"]["oportunidades"]["RED"]["usadas"] == 0)
+        dp = lambda c, eq, d: c.post("/api/nova/ia/proponer", {"equipo": eq, "directiva": d})  # noqa: E731
+        base = {"accion": "scan_directory", "objetivo": "info_administrativa"}
+        chk("una directiva fuera del catálogo se rechaza (400) y una credencial aún no obtenida no se puede elegir (409)", dp(rojo, "RED", {**base, "accion": "borrar"}).status == 400
+            and dp(rojo, "RED", {"accion": "query_resource", "objetivo": "consultar_ventas", "identidad_id": "EMP-01", "credencial": {"modo": "conocida"}}).status == 409)
+        ok1 = dp(rojo, "RED", base)
+        chk("una directiva válida lanza la IA (SIMULADA), queda registrada y gasta una oportunidad", ok1.status == 200 and ok1["provider_kind"] == "scripted" and ok1["directiva"]["accion"] == "scan_directory"
+            and rojo.get("/api/nova/estado")["ia"]["oportunidades"]["RED"]["restantes"] == 1)
+        dp(rojo, "RED", base)
+        agot = dp(rojo, "RED", base)
+        chk("al agotar las oportunidades la IA ya no se lanza (429 PROMPT_BUDGET_EXCEEDED)", agot.status == 429 and agot["motivo"] == "PROMPT_BUDGET_EXCEEDED")
+        chk("el Azul no puede gastar los prompts del Rojo, y conserva los suyos", dp(a1, "RED", base).status == 403 and a1.get("/api/nova/estado")["ia"]["oportunidades"]["BLUE"]["restantes"] == 2)
+        real = next(x["credencial"] for x in adm.get("/api/nova/estado")["catalogo"] if x["id"] == "EMP-01")
+        cerca = real[:4] + ("0" if real[4] != "0" else "1") + ("A" if real[5] != "A" else "B")
+        g = acc(rojo, "guess_credential", identidad_id="EMP-01", candidate_value=cerca)
+        ea = a1.get("/api/nova/estado")["azul"]
+        sosp = [x for x in ea["aprobaciones"] if x["operacion"] == "acceso_sospechoso"]
+        chk("un intento casi correcto llega al Azul como solicitud misteriosa con identidad y jugador, y el Rojo no ve nada de eso", g.status == 200 and len(sosp) == 1 and sosp[0]["detalle"]["identidad"] == "EMP-01"
+            and "approval" not in str(rojo.get("/api/nova/estado")["rojo"]["aprobaciones"]))
+        den = acc(a1, "reject_request", approval_id=sosp[0]["id"])
+        chk("el Azul deniega y la identidad queda bloqueada para el Rojo", den.status == 200 and acc(rojo, "guess_credential", identidad_id="EMP-01", candidate_value="11111A")["reject_reason"] == "IDENTITY_LOCKED")
         adm.post("/api/nova/detener", {})
         salud = Cliente(E.base).get("/api/ia/estado")
         chk("la API sigue sana tras todo el flujo", salud.status == 200)

@@ -48,7 +48,7 @@ ACCIONES_AZUL = {"assign_task", "set_task_status", "classify_email", "report_ema
 CONFIG_DEFECTO = {"duration_s": 720, "round_s": 60, "guess_attempts_per_round": 3, "guess_attempts_per_match": 12, "guess_cooldown_s": 20, "guess_lockout_after_fails": 3, "lockout_s": 90,
                   "detect_prob_fail": 0.6, "min_continuity": 0.6, "abuse_policy": "empate", "approval_ttl_s": 90, "elevation_grant_s": 120, "emails_per_round": 3, "scans_per_round": 2,
                   "click_prob_unconnected": 1.0, "click_delay_s": 25, "modalidad": "BALANCED", "ai_mode": {"RED": "off", "BLUE": "off"}, "win": E.WIN_POR_DEFECTO, "seed": 1,
-                  "model_down_policy": "pause"}
+                  "model_down_policy": "pause", "ai_prompt_budget": 10, "ai_prompt_mode": "controlado", "near_miss_min": 4}
 
 
 class ErrorNova(Exception):
@@ -477,6 +477,8 @@ class NovaPartida:
         self.fallos_identidad[iid] = self.fallos_identidad.get(iid, 0) + 1
         self._ev("credential.guess_fail", actor, {"kind": "credential", "id": iid}, vis=["ADMIN", "RED"])
         bloqueo = self.fallos_identidad[iid] >= c["guess_lockout_after_fails"]
+        if not bloqueo:
+            self._sospecha_acceso(iid, cand, actor)
         if bloqueo:
             self.bloqueo_hasta[iid] = t + c["lockout_s"]
             self.fallos_identidad[iid] = 0
@@ -485,6 +487,20 @@ class NovaPartida:
         elif self.rng.random() < c["detect_prob_fail"]:     # detección probabilística con RNG sembrado
             self._alerta("Intento de acceso denegado", iid, "MEDIA", "credential.guess_fail")
         return {"acierto": False, "identidad": iid, "bloqueada": bloqueo}
+
+    def _sospecha_acceso(self, iid, cand, actor):
+        """Un intento fallido muy parecido a la credencial real (>= `near_miss_min` de 6 posiciones) abre una solicitud misteriosa para el AZUL:
+        el motor NO decide; los humanos aceptan (lo dan por legítimo) o deniegan (bloquea la identidad). El Rojo no se entera ni recibe la similitud."""
+        real = self.secretos.descifrar(self.creds[iid]["enc"])
+        coinc = sum(1 for x, y in zip(cand, real) if x == y)
+        if coinc < self.config["near_miss_min"] or any(a["estado"] == "PENDIENTE" and a["operacion"] == "acceso_sospechoso" and a["identidad"] == iid for a in self.aprobaciones.values()):
+            return None
+        ap = self._crear_aprobacion({"kind": "system", "team": "SYSTEM", "label": "Detección de accesos"}, f"Intento de acceso con una credencial muy parecida a la de {self.identidades[iid]['nombre']}", "acceso_sospechoso",
+                                    self.identidades[iid]["recurso"], False, solicitante_identidad=iid)
+        ap["riesgo"] = "ALTO"
+        ap["recomendacion"] = {"origen": "reglas", "decision": "RECHAZAR", "motivo": "la credencial presentada se parece a la real pero no coincide"}
+        ap["detalle"] = {"identidad": iid, "nombre": self.identidades[iid]["nombre"], "jugador_posible": self._jugador_de(iid), "candidato": self.secretos.enmascarar(cand), "coincidencias": coinc, "de": 6}
+        return ap
 
     def _h_use_credential(self, a):
         return self._h_query_resource(a)
@@ -789,6 +805,10 @@ class NovaPartida:
             self.legitimas["resueltas"] += 1
             self.legitimas["servidas"] += 1
             self.puntos["BLUE"] += 3
+        elif ap["operacion"] == "acceso_sospechoso":       # Azul lo acepta como acceso legítimo: era un ataque, la defensa pierde puntos y el contador de fallos se reinicia
+            self.fallos_identidad[ap["identidad"]] = 0
+            self.puntos["BLUE"] -= 5
+            self._ev("access.suspicious_accepted", actor, {"kind": "identity", "id": ap["identidad"]}, vis=["ADMIN", "BLUE"])
         elif ap["operacion"] == "db_export":       # la consecuencia SÍ cambia el estado del escenario: concede el permiso db_export por un tiempo
             self.grants_db_export_hasta = self.t_s() + self.config["elevation_grant_s"]
             self.puntos["BLUE"] -= 10
@@ -798,7 +818,11 @@ class NovaPartida:
     def _h_reject_request(self, a):
         ap = self._ap(a)
         self._aprob_estado(ap, "RECHAZADA", {"kind": a["actor"].get("kind", "human"), "team": "BLUE", "label": a["actor"].get("user")})
-        if ap["legitima"]:
+        if ap["operacion"] == "acceso_sospechoso":       # denegar bloquea la identidad atacada: la consecuencia cambia el estado
+            self.bloqueo_hasta[ap["identidad"]] = self.t_s() + self.config["lockout_s"]
+            self.puntos["BLUE"] += 5
+            self._ev("credential.lockout", {"kind": "system", "team": "SYSTEM"}, {"kind": "identity", "id": ap["identidad"]}, data={"hasta_s": self.bloqueo_hasta[ap["identidad"]], "motivo": "acceso sospechoso denegado"})
+        elif ap["legitima"]:
             self.legitimas["resueltas"] += 1
             self.puntos["BLUE"] -= 3       # rechazar una solicitud legítima penaliza
         else:
@@ -925,7 +949,7 @@ class NovaPartida:
             m = [("M-R1", "Identificar identidades del directorio", any(v != "DESCONOCIDA" for v in self.rojo_estado.values()), "resource.queried" in tipos),
                  ("M-R2", "Obtener una credencial válida", bool(self.rojo_conoce), "email.sent_by_red" in tipos or "credential.guess_attempt" in tipos),
                  ("M-R3", "Extraer la tabla protegida reportes_financieros", "reportes_financieros" in self.extraido, bool(self.rojo_conoce)),
-                 ("M-R4", "Conseguir la copia completa de la base", len(self.extraido) == len(E.TABLAS), any(a["estado"] == "PENDIENTE" and not a["legitima"] for a in self.aprobaciones.values()))]
+                 ("M-R4", "Conseguir la copia completa de la base", len(self.extraido) == len(E.TABLAS), any(a["estado"] == "PENDIENTE" and a["operacion"] == "db_export" for a in self.aprobaciones.values()))]
         else:
             m = [("M-B1", "Reportar un correo del Rojo", any(e["reportado"] and e["origen"] == "RED" for e in self.emails.values()), any(e["origen"] == "RED" for e in self.emails.values())),
                  ("M-B2", "Revocar o suspender toda credencial comprometida", bool(rev) and not creds_c, bool(creds_c)),

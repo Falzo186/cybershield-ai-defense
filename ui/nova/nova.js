@@ -59,6 +59,7 @@
     pintarSala(e); pintarVictoria(e); pintarCatalogo(e); pintarEquipo(e);
     visible("#p-rojo-cred", ["RED", "ADMIN"].includes(S.rol) && !!e.rojo); visible("#p-rojo-op", S.rol === "RED" && !!e.rojo);
     if (e.rojo) pintarRojo(e);
+    pintarConstructor(e);
     const az = S.rol === "BLUE" && e.azul; for (const id of ["#p-azul-id", "#p-azul-bandeja", "#p-azul-aprob", "#p-azul-alertas"]) visible(id, !!az);
     if (az) pintarAzul(e); else if (S.rol === "ADMIN" && e.azul_todos) pintarAdminAzul(e);
     pintarPub(e);
@@ -73,7 +74,7 @@
     if (e.ia) { $("#ia-estado").textContent = `IA Roja: ${e.ia.modos.RED} · ${e.ia.proveedores.RED.etiqueta} — IA Azul: ${e.ia.modos.BLUE} · ${e.ia.proveedores.BLUE.etiqueta} — corridas registradas: ${e.ia.corridas}`; }
   }
   $("#form-crear").addEventListener("submit", (ev) => { ev.preventDefault();
-    intentar(() => api("POST", "/api/nova/partida", { duration_s: parseInt($("#c-dur").value, 10), time_scale: parseFloat($("#c-esc").value), modalidad: $("#c-mod").value, win: { reglas: $("#c-win").value.split(",") } }), "Partida creada (en configuración)"); });
+    intentar(() => api("POST", "/api/nova/partida", { duration_s: parseInt($("#c-dur").value, 10), time_scale: parseFloat($("#c-esc").value), modalidad: $("#c-mod").value, ai_prompt_mode: $("#c-pmodo").value, ai_prompt_budget: parseInt($("#c-pres").value, 10) || 10, win: { reglas: $("#c-win").value.split(",") } }), "Partida creada (en configuración)"); });
   $("#b-sala").addEventListener("click", () => intentar(() => api("POST", "/api/nova/sala"), "Sala de espera abierta"));
   $("#b-lista").addEventListener("click", () => intentar(() => api("POST", "/api/nova/lista"), "Partida marcada LISTA"));
   $("#b-iniciar").addEventListener("click", () => { if (window.confirm("¿Iniciar la partida? Esta acción la inicia de verdad.")) intentar(() => api("POST", "/api/nova/iniciar", { confirm: true, idempotency_key: "ui-" + Date.now() + "-" + Math.random().toString(36).slice(2) }), "Partida iniciada"); });
@@ -147,8 +148,8 @@
     $("#op-resultado").textContent = r.ok ? "Operación aceptada por el motor." + (d.data && d.data.acierto != null ? (d.data.acierto ? " ¡Credencial válida!" : " Credencial incorrecta.") : "") : "Rechazada por el motor: " + d.mensaje + " (" + d.reject_reason + ")";
     if (!r.ok) toast(d.mensaje, "error"); await refrescar();
   });
-  async function propuesta(eq, cont) {
-    try { const r = await api("POST", "/api/nova/ia/proponer", { equipo: eq }); const c = $(cont); c.textContent = "";
+  async function propuesta(eq, cont, directiva) {
+    try { const r = await api("POST", "/api/nova/ia/proponer", { equipo: eq, directiva }); const c = $(cont); c.textContent = "";
       const d = el("div", "prop"); const o = r.salida_estructurada || {};
       d.append(el("b", "", `${r.provider_kind === "scripted" ? "SIMULADO – no es una IA" : "Ollama " + (r.modelo || "")} · corrida ${r.run_id} · ${r.estado}`));
       if (r.propuesta && r.propuesta.estado === "INVALIDA") d.append(el("span", "", "La IA respondió algo que no cumple el esquema: no se ejecuta nada.")); else if (r.estado === "FALLIDA") d.append(el("span", "", "La IA falló: " + (r.error || "sin detalle")));
@@ -160,7 +161,26 @@
       c.append(d); await refrescar();
     } catch (e) { toast(e.message, "error"); }
   }
-  $("#b-prop-rojo").addEventListener("click", () => propuesta("RED", "#prop-rojo")); $("#b-prop-azul").addEventListener("click", () => propuesta("BLUE", "#prop-azul"));
+  // ── Constructor de prompts: el jugador elige PARTES de catálogo; la IA solo se lanza al pulsar y cada lanzamiento gasta una oportunidad ──
+  function llena(sel, vals, vacio) { const s = $(sel); const sig = JSON.stringify([vals, vacio]); if (s.dataset.sig === sig) return; s.dataset.sig = sig; const previo = s.value; s.textContent = ""; if (vacio != null) { const o = el("option", "", vacio); o.value = ""; s.append(o); }
+    vals.forEach((v) => { const o = el("option", "", v.t || String(v).replace(/_/g, " ")); o.value = v.v || v; s.append(o); }); if ([...s.options].some((o) => o.value === previo)) s.value = previo; }
+  function pintarConstructor(e) {
+    const c = e.ia && e.ia.catalogo_directiva; if (!c) return; const op = e.ia.oportunidades || {};
+    const txt = (o) => o ? (o.modo === "controlado" ? `Oportunidades: ${o.restantes} de ${o.total}` : "Prompts libres (ensayo)") : "";
+    $("#op-restantes-rojo").textContent = txt(op.RED); $("#op-restantes-azul").textContent = txt(op.BLUE);
+    $("#b-prop-rojo").disabled = !!(op.RED && op.RED.modo === "controlado" && op.RED.restantes === 0); $("#b-prop-azul").disabled = !!(op.BLUE && op.BLUE.modo === "controlado" && op.BLUE.restantes === 0);
+    if (e.rojo) { llena("#d-accion", c.acciones_rojo); llena("#d-obj", c.objetivos); llena("#d-estr", c.estrategias, "(sin estrategia)"); llena("#d-ident", c.identidades, "(ninguna)"); llena("#d-tabla", c.tablas, "(ninguna)"); llena("#d-plant", c.plantillas, "(ninguna)");
+      const desbloq = (e.rojo.credenciales || []).filter((x) => x.credencial).map((x) => ({ v: "conocida:" + x.id, t: `Usar la credencial obtenida de ${x.id} (${x.credencial})` }));
+      llena("#d-cred", [{ v: "ninguna", t: "Sin credencial" }, { v: "aleatoria", t: "Inventar una credencial aleatoria con esta estructura" }, ...desbloq]); $("#d-estruct").hidden = $("#d-cred").value !== "aleatoria"; }
+    if (e.azul || e.rol === "ADMIN") { llena("#e-foco", c.focos_azul); llena("#e-acc", c.acciones_azul, "(la IA decide)");
+      const a = e.azul || {}; const sujetos = [...(a.alertas || []).map((x) => x.id), ...(a.aprobaciones || []).filter((x) => ["PENDIENTE", "INFO_SOLICITADA", "ESCALADA"].includes(x.estado)).map((x) => x.id), ...c.identidades, ...(a.correos || []).map((x) => x.id)];
+      llena("#e-suj", sujetos, "(ninguno)"); }
+  }
+  $("#d-cred").addEventListener("change", () => { $("#d-estruct").hidden = $("#d-cred").value !== "aleatoria"; });
+  $("#form-dir-rojo").addEventListener("submit", (ev) => { ev.preventDefault(); const cr = $("#d-cred").value; const credencial = cr.startsWith("conocida:") ? { modo: "conocida" } : cr === "aleatoria" ? { modo: "aleatoria", digitos_iniciales: $("#d-dig").value.trim(), letra: $("#d-letra").value.trim().toUpperCase() } : { modo: "ninguna" };
+    const ident = cr.startsWith("conocida:") ? cr.split(":")[1] : $("#d-ident").value;
+    propuesta("RED", "#prop-rojo", { accion: $("#d-accion").value, objetivo: $("#d-obj").value, estrategia: $("#d-estr").value, identidad_id: ident, tabla: $("#d-tabla").value, plantilla: $("#d-plant").value, credencial }); });
+  $("#form-dir-azul").addEventListener("submit", (ev) => { ev.preventDefault(); propuesta("BLUE", "#prop-azul", { foco: $("#e-foco").value, sujeto_id: $("#e-suj").value, accion_preferida: $("#e-acc").value }); });
 
   // ── Azul ────────────────────────────────────────────────────────────────────────────────────────
   const acc = (tipo, p, ok) => intentar(async () => { const r = await api("POST", "/api/nova/accion", { action_type: tipo, params: p, idempotency_key: "az-" + Date.now() + Math.random().toString(36).slice(2) }, true); const d = await r.json(); if (!r.ok) throw new Error(d.mensaje); return d; }, ok);
@@ -176,9 +196,9 @@
       B("Reportar", () => acc("report_email", { email_id: m.id }, "Correo reportado")); f.append(bt); bz.append(f); });
     const ap = $("#az-aprob"); ap.textContent = ""; const pend = a.aprobaciones.filter((x) => ["PENDIENTE", "INFO_SOLICITADA", "ESCALADA"].includes(x.estado)); $("#n-aprob").hidden = !pend.length; $("#n-aprob").textContent = pend.length + " pendiente(s)";
     if (!a.aprobaciones.length) ap.append(el("div", "vacio-eq", "No hay solicitudes."));
-    a.aprobaciones.forEach((x) => { const d = el("div", "ap"); d.append(el("b", "", `${x.id} · ${x.operacion} → ${x.recurso} · ${x.estado}`), el("small", "", `Solicitante: ${x.solicitante} · riesgo ${x.riesgo} · ${x.motivo}`), el("small", "", `Recomendación (${x.recomendacion.origen === "ia" ? "IA" : "reglas, no IA"}): ${x.recomendacion.decision} — ${x.recomendacion.motivo}`));
+    a.aprobaciones.forEach((x) => { const d = el("div", "ap"); d.append(el("b", "", `${x.id} · ${x.operacion} → ${x.recurso} · ${x.estado}`), el("small", "", `Solicitante: ${x.solicitante} · riesgo ${x.riesgo} · ${x.motivo}`), ...(x.detalle ? [el("b", "", `⚠ SOLICITUD MISTERIOSA: alguien presentó una credencial parecida (${x.detalle.candidato}, ${x.detalle.coincidencias} de ${x.detalle.de} posiciones) para ${x.detalle.identidad} · ${x.detalle.nombre}. Posible jugador: ${x.detalle.jugador_posible || "sin asignar"}. ¿Fue él?`)] : []), el("small", "", `Recomendación (${x.recomendacion.origen === "ia" ? "IA" : "reglas, no IA"}): ${x.recomendacion.decision} — ${x.recomendacion.motivo}`));
       if (["PENDIENTE", "INFO_SOLICITADA", "ESCALADA"].includes(x.estado)) { const bt = el("div", "acciones-form"); const B = (t, tipo, cls) => { const b = el("button", "boton" + (cls ? " " + cls : ""), t); b.addEventListener("click", () => acc(tipo, { approval_id: x.id }, t)); bt.append(b); };
-        B("Aprobar", "approve_request", "boton-primario"); B("Rechazar", "reject_request", "boton-peligro"); B("Pedir más información", "request_more_info"); B("Escalar", "escalate"); d.append(bt); } ap.append(d); });
+        B(x.detalle ? "Aceptar (fui yo / lo permito)" : "Aprobar", "approve_request", "boton-primario"); B(x.detalle ? "Denegar y bloquear identidad" : "Rechazar", "reject_request", "boton-peligro"); B("Pedir más información", "request_more_info"); B("Escalar", "escalate"); d.append(bt); } ap.append(d); });
     const al = $("#az-alertas"); al.textContent = ""; a.alertas.slice(-6).reverse().forEach((x) => { const d = el("div", "al"); d.append(el("b", "", `${x.id} · ${x.severidad} · ${x.estado}`), el("span", "", x.titulo));
       const sig = { NUEVA: "EN_ANALISIS", EN_ANALISIS: "ASIGNADA", ASIGNADA: "CONTENIDA", CONTENIDA: "RESUELTA", RESUELTA: "CERRADA" }[x.estado]; if (sig) { const b = el("button", "boton", "Pasar a " + sig.replace("_", " ")); b.addEventListener("click", () => acc("set_alert_status", { alert_id: x.id, estado: sig })); d.append(b); } al.append(d); });
     if (!a.alertas.length) al.append(el("div", "vacio-eq", "Sin alertas."));

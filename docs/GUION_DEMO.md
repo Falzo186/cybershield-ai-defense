@@ -121,11 +121,12 @@ Reemplaza al guion de la misión de 23 h para exposiciones: incluye una partida 
 **Plan B sin Ollama:** reproduce las 6 grabaciones (no necesitan GPU) y lanza partidas con los modelos simples (rotuladas GUION).
 
 ## Nova (≈ 8 min)
-Reproducible sin IA: `python -m src.lab.demo_nova` verifica los 9 hitos; en UI, `e2e/test_nova_ui.py` recorre lo mismo con 5 navegadores.
+Reproducible sin IA: `python -m src.lab.demo_nova` verifica los 10 hitos; en UI, `e2e/test_nova_ui.py` recorre lo mismo con 5 navegadores.
 1. Admin crea la partida en `/nova/`; entran Rojo, Azul y un espectador. Mostrar la sala de espera: **no inicia sola**.
 2. Admin pulsa Iniciar (con confirmación). Estado EN_CURSO.
 3. Rojo envía un correo con enlace `lab://` a EMP-05 (no conectada). Pasado el retardo, el empleado guionizado pulsa y la credencial queda COMPROMETIDA.
 4. Rojo consulta el recurso protegido: aparece una alerta en el panel Azul.
 5. Azul pide autorización humana (tarea) y un humano aprueba o rechaza; mostrar que cambia el estado.
+   (Prompts de IA: el jugador arma el prompt con los combos y lo lanza; muestra el contador «Oportunidades: N de 10», la credencial obtenida desbloqueada en el combo y la opción de credencial aleatoria.)
 6. Rojo extrae `reportes_financieros`: el **motor** declara VICTORIA_ROJA; el espectador lo ve y se descarga solo lo extraído.
 7. Mostrar historial de partidas. Aclarar: todo ficticio y local; lo simulado va etiquetado; Wazuh real NO_CONFIGURADO.

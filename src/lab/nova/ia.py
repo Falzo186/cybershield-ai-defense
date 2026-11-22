@@ -82,6 +82,17 @@ class ScriptedProvider:
         return {"ok": True, "contenido": json.dumps(obj, ensure_ascii=False), "error": None, "tiempo_ms": 1, "tokens": None}
 
     def _rojo(self, c):
+        d = c.get("directiva")
+        if d:                                                 # la directiva manda: el simulado la cumple tal cual (la candidata aleatoria la completa el motor)
+            p = {k: v for k, v in (("identidad_id", d["identidad_id"]), ("tabla", d["tabla"]), ("plantilla", d["plantilla"])) if v}
+            if d["accion"] == "send_email":
+                p.setdefault("plantilla", "aviso_soporte")
+                p["cuerpo"] = "Confirma tu identidad de laboratorio."
+            if d["accion"] == "guess_credential" and d["credencial"]["modo"] != "aleatoria":
+                p["candidate_value"] = "12345A"
+            if d["accion"] == "request_elevation":
+                p["motivo"] = "Necesito una copia completa para una auditoría."
+            return self._prop("Directiva: " + d["accion"], d["identidad_id"], d["estrategia"] or "ingenieria_social", d["objetivo"], {"action_type": d["accion"], "target": d["identidad_id"] or "-", "params": p})
         creds = {x["id"]: x for x in c["identidades"]}
         conocidas = [i for i, x in creds.items() if x["estado"] == "VALIDA_DESCUBIERTA"]
         for i in conocidas:                                   # 1) usar lo descubierto contra una tabla permitida
@@ -102,6 +113,15 @@ class ScriptedProvider:
                 "objective": objetivo, "strategy": estrategia, "proposed_action": accion, "expected_result": "el motor decide", "risk_level": "MEDIO"}
 
     def _azul(self, c):
+        d = c.get("directiva")
+        if d and d.get("accion_preferida"):
+            s = d.get("sujeto_id") or "-"
+            clave = {"approve_request": "approval_id", "reject_request": "approval_id", "request_more_info": "approval_id", "escalate": "approval_id", "revoke_credential": "identidad_id",
+                     "suspend_identity": "identidad_id", "block_link": "link_id", "report_email": "email_id", "classify_email": "email_id", "open_email": "email_id", "contain_incident": "incident_id",
+                     "set_alert_status": "alert_id"}.get(d["accion_preferida"])
+            return {"verdict": "RECHAZAR" if d["accion_preferida"] == "reject_request" else "CONTENER" if d["accion_preferida"] in ("revoke_credential", "suspend_identity") else "INVESTIGAR",
+                    "classification": "SOSPECHOSA", "confidence": 0.7, "subject": {"kind": d["foco"], "id": s}, "reasoning": "directiva del jugador Azul", "evidence": [],
+                    "recommended_action": {"action_type": d["accion_preferida"], "target": s, "params": {clave: s} if clave and s != "-" else {}}}
         if self.politica == "rechazar_todo":
             sujeto = (c.get("pendientes") or [{}])[0]
             return {"verdict": "RECHAZAR", "classification": "SOSPECHOSA", "confidence": 1.0, "subject": {"kind": "request", "id": sujeto.get("id", "-")}, "reasoning": "línea base: rechazar todo",
@@ -194,6 +214,71 @@ def contexto_azul(m):
             "acciones": sorted(ACCIONES_AZUL), "politica": "Una elevación a copia completa solo se aprueba con verificación fuerte; rechazar a empleados legítimos también tiene costo."}
 
 
+# ── constructor de prompts controlado (el humano elige PARTES de catálogo; nunca texto libre) ───────────────────
+MODOS_CREDENCIAL = ("ninguna", "conocida", "aleatoria")
+FOCOS_AZUL = ("general", "alerta", "solicitud", "identidad", "correo")
+
+
+def validar_directiva_rojo(d, m):
+    """-> directiva limpia o ErrorNova. Cada campo sale de un catálogo cerrado; una credencial «conocida» exige que el Rojo la haya obtenido de verdad."""
+    if not isinstance(d, dict):
+        raise ErrorNova(400, "Falta la directiva del prompt (elige las partes en los desplegables)", "DIRECTIVA_REQUIRED")
+    out = {"accion": d.get("accion"), "objetivo": d.get("objetivo"), "estrategia": d.get("estrategia") or None, "identidad_id": d.get("identidad_id") or None,
+           "tabla": d.get("tabla") or None, "plantilla": d.get("plantilla") or None}
+    if out["accion"] not in ACCIONES_ROJO:
+        raise ErrorNova(400, "Acción fuera del catálogo del Rojo", "INVALID_SCHEMA")
+    if out["objetivo"] not in OBJETIVOS or (out["estrategia"] and out["estrategia"] not in ESTRATEGIAS):
+        raise ErrorNova(400, "Objetivo o estrategia fuera del catálogo", "INVALID_SCHEMA")
+    if out["identidad_id"] and out["identidad_id"] not in [i["id"] for i in E.IDENTIDADES]:
+        raise ErrorNova(400, "Identidad desconocida", "INVALID_SCHEMA")
+    if out["tabla"] and out["tabla"] not in E.TABLAS:
+        raise ErrorNova(400, "Tabla desconocida", "INVALID_SCHEMA")
+    if out["plantilla"] and out["plantilla"] not in E.PLANTILLAS_ROJO:
+        raise ErrorNova(400, "Plantilla desconocida", "INVALID_SCHEMA")
+    cr = d.get("credencial") or {}
+    modo = cr.get("modo") or "ninguna"
+    if modo not in MODOS_CREDENCIAL:
+        raise ErrorNova(400, "Modo de credencial no válido", "INVALID_SCHEMA")
+    cred = {"modo": modo}
+    if modo == "conocida":
+        if not out["identidad_id"] or out["identidad_id"] not in m.rojo_conoce:
+            raise ErrorNova(409, "Esa credencial todavía no está desbloqueada: el Rojo no la ha obtenido", "CREDENTIAL_NOT_KNOWN")
+    elif modo == "aleatoria":
+        dig, letra = str(cr.get("digitos_iniciales") or ""), str(cr.get("letra") or "")
+        if out["accion"] != "guess_credential" or not out["identidad_id"]:
+            raise ErrorNova(400, "La credencial aleatoria solo aplica a guess_credential con una identidad elegida", "INVALID_SCHEMA")
+        if not re.fullmatch(r"[0-9]{0,5}", dig) or not re.fullmatch(r"[A-Z]?", letra):
+            raise ErrorNova(400, "Estructura de credencial no válida (hasta 5 dígitos iniciales y una letra mayúscula)", "INVALID_SCHEMA")
+        cred.update(digitos_iniciales=dig, letra=letra)
+    out["credencial"] = cred
+    return out
+
+
+def validar_directiva_azul(d, m):
+    if not isinstance(d, dict):
+        raise ErrorNova(400, "Falta la directiva del prompt (elige las partes en los desplegables)", "DIRECTIVA_REQUIRED")
+    out = {"foco": d.get("foco") or "general", "sujeto_id": d.get("sujeto_id") or None, "accion_preferida": d.get("accion_preferida") or None}
+    if out["foco"] not in FOCOS_AZUL:
+        raise ErrorNova(400, "Foco fuera del catálogo", "INVALID_SCHEMA")
+    if out["accion_preferida"] and out["accion_preferida"] not in ACCIONES_AZUL:
+        raise ErrorNova(400, "Acción preferida fuera del catálogo del Azul", "INVALID_SCHEMA")
+    if out["sujeto_id"]:
+        s = out["sujeto_id"]
+        conocidos = set(m.alertas) | set(m.aprobaciones) | set(m.identidades) | set(m.emails) | set(m.incidentes)
+        if s not in conocidos:
+            raise ErrorNova(404, "El sujeto elegido no existe en la partida", "UNKNOWN_TARGET")
+    return out
+
+
+def completar_candidato(cand, cred, rng):
+    """Si la IA no respetó la estructura pedida (o no dio candidata), el MOTOR genera una que sí la cumpla (queda anotado). -> (candidata, ajustada)."""
+    dig, letra = cred.get("digitos_iniciales", ""), cred.get("letra", "")
+    if re.match(E.PATRON_CREDENCIAL, str(cand or "")) and str(cand).startswith(dig) and (not letra or str(cand)[-1] == letra):
+        return str(cand), False
+    resto = "".join(str(rng.randrange(10)) for _ in range(5 - len(dig)))
+    return dig + resto + (letra or chr(rng.randrange(65, 91))), True
+
+
 # ── controlador de corridas ───────────────────────────────────────────────────────────────────────────────
 class ControlIA:
     """Una corrida por equipo a la vez; `ai_runs` persistido; respuestas tardías ignoradas; modos off/assist/auto con presupuesto por ronda."""
@@ -202,6 +287,7 @@ class ControlIA:
         self.m = partida
         self.proveedores = {"RED": ScriptedProvider("RED"), "BLUE": ScriptedProvider("BLUE")}
         self.runs, self.propuestas, self._activa, self._lock = [], {}, {"RED": None, "BLUE": None}, threading.RLock()
+        self.usadas = {"RED": 0, "BLUE": 0}
         self.acciones_ronda = {}
         m = partida
         m.db.executescript("""CREATE TABLE IF NOT EXISTS nova_ai_runs(run_id TEXT PRIMARY KEY, match_id TEXT, team TEXT, provider_kind TEXT, endpoint TEXT, modelo TEXT, entrada TEXT, salida_cruda TEXT,
@@ -227,21 +313,39 @@ class ControlIA:
                           run["latencia_ms"], run["tokens"], run["estado"], run["reintentos"], run["error"], run["ts_real"]))
         self.m.db.commit()
 
-    def proponer(self, equipo):
-        """Genera UNA propuesta del equipo. -> run. En modo `auto` la ejecuta por el pipeline; en `assist` queda PROPUESTA para que un humano la confirme."""
+    def oportunidades(self, equipo):
+        """-> {usadas, total, restantes, modo}. En modo `controlado` cada prompt lanzado consume una oportunidad; `libre` no tiene tope (solo experimentos)."""
+        total = self.m.config["ai_prompt_budget"]
+        return {"usadas": self.usadas[equipo], "total": total, "restantes": max(0, total - self.usadas[equipo]), "modo": self.m.config["ai_prompt_mode"]}
+
+    def proponer(self, equipo, directiva=None):
+        """Genera UNA propuesta del equipo. -> run. En modo `auto` la ejecuta por el pipeline; en `assist` queda PROPUESTA para que un humano la confirme.
+        En modo de prompt `controlado` solo se lanza cuando un jugador manda una `directiva` (partes de catálogo) y consume una de las oportunidades del equipo."""
         m = self.m
         if self.modo(equipo) == "off":
             raise ErrorNova(409, "La IA de este equipo está apagada (modo off): solo actúan los humanos", "AI_OFF")
         if m.estado != "EN_CURSO":
             raise ErrorNova(409, "La partida no está en curso", "MATCH_NOT_RUNNING")
+        controlado = m.config["ai_prompt_mode"] == "controlado"
+        if controlado:
+            directiva = (validar_directiva_rojo if equipo == "RED" else validar_directiva_azul)(directiva, m)
+            if self.usadas[equipo] >= m.config["ai_prompt_budget"]:
+                raise ErrorNova(429, "Sin oportunidades de prompt para este equipo", "PROMPT_BUDGET_EXCEEDED")
+        else:
+            directiva = None
         with self._lock:
             if self._activa[equipo]:
                 raise ErrorNova(409, "Ya hay una inferencia en curso para este equipo (no se duplican)", "AI_BUSY")
+            if controlado:
+                self.usadas[equipo] += 1
             run = {"run_id": "AI-" + uuid.uuid4().hex[:8], "team": equipo, "provider_kind": None, "endpoint": None, "modelo": None, "entrada": None, "salida_cruda": None, "salida_estructurada": None,
                    "latencia_ms": 0, "tokens": None, "estado": "EN_COLA", "reintentos": 0, "error": None, "ts_real": time.strftime("%Y-%m-%dT%H:%M:%S")}
             self._activa[equipo] = run["run_id"]
         prov = self.proveedores[equipo]
         ctx = contexto_rojo(m) if equipo == "RED" else contexto_azul(m)
+        if directiva:
+            ctx = {**ctx, "directiva": directiva, "instruccion_directiva": "Cíñete EXACTAMENTE a la directiva: usa la acción, identidad y objetivo indicados; no cambies de acción."}
+            run["directiva"] = directiva
         run.update(provider_kind=prov.kind, endpoint=getattr(prov, "endpoint", None), modelo=getattr(prov, "modelo", None), entrada=ctx, estado="EN_CURSO")
         m._ev("ai.run_started", {"kind": "ai", "team": equipo}, {"kind": "ai_run", "id": run["run_id"]}, vis=["ADMIN", equipo], data={"provider_kind": prov.kind, "etiqueta": prov.etiqueta})
         try:
@@ -261,6 +365,8 @@ class ControlIA:
                 obj = co.extraer_json(r["contenido"], ())
                 try:
                     (validar_propuesta_rojo if equipo == "RED" else validar_veredicto_azul)(obj)
+                    if directiva:
+                        self._ajustar_a_directiva(equipo, obj, directiva, run)
                     break
                 except ErrorNova as e:
                     obj, run["error"] = None, e.mensaje
@@ -283,6 +389,25 @@ class ControlIA:
         except Exception as exc:  # noqa: BLE001 - un fallo de la IA no corrompe la partida
             run.update(estado="FALLIDA", error=f"{type(exc).__name__}: {exc}"[:160])
             return self._cerrar_run(run, equipo)
+
+    def _ajustar_a_directiva(self, equipo, obj, d, run):
+        """La directiva manda: una propuesta que cambia de acción/identidad se rechaza como INVALID_SCHEMA; una candidata fuera de estructura la corrige el motor."""
+        pa = obj["proposed_action"] if equipo == "RED" else obj["recommended_action"]
+        esperada = d["accion"] if equipo == "RED" else d["accion_preferida"]
+        if esperada and pa["action_type"] != esperada:
+            raise ErrorNova(400, "la propuesta no respeta la acción de la directiva", "INVALID_SCHEMA")
+        params = pa.setdefault("params", {})
+        if equipo == "RED":
+            if d["identidad_id"] and pa["action_type"] not in ("scan_directory", "request_elevation", "export_database", "message_team", "respond_info"):
+                params["identidad_id"] = d["identidad_id"]
+            if d["tabla"] and pa["action_type"] == "extract_table":
+                params["tabla"] = d["tabla"]
+            if d["credencial"]["modo"] == "aleatoria":
+                cand = params.get("candidate_value") or next(iter(obj.get("candidate_credentials") or []), None)
+                params["candidate_value"], ajustada = completar_candidato(cand, d["credencial"], self.m.rng)
+                run["candidata_ajustada_por_motor"] = ajustada
+        elif d["sujeto_id"] and not params:
+            params["approval_id"] = d["sujeto_id"]
 
     def _cerrar_run(self, run, equipo):
         with self._lock:

@@ -33,7 +33,7 @@ Ningún dato es real; Wazuh es **simulado** (no hay que instalarlo).
 1. `pip install -r requirements.txt` (incluye `cryptography`, necesaria para las credenciales de laboratorio).
 2. Arranca el servidor como en el resto de la guía y abre `/nova/` (admin, sala, Rojo, Azul y espectador entran por roles).
 3. Ollama es opcional: sin él la IA queda en `off` o usa el proveedor SIMULADO etiquetado. Con Ollama, configura el endpoint desde la vista del admin (el servidor rechaza destinos no permitidos: anti-SSRF).
-4. Verificación: `python -m src.lab.demo_nova` (ensayo de demo, 9 hitos, sin red ni IA) y `python ejecutar_pruebas.py`.
+4. Verificación: `python -m src.lab.demo_nova` (ensayo de demo, 10 hitos, sin red ni IA) y `python ejecutar_pruebas.py`.
 5. No verificado: acceso desde otro equipo de la red local y modelos en dos PCs distintas.
 
 Guion de demo paso a paso: `docs/GUION_DEMO.md` (sección Nova).

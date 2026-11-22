@@ -45,3 +45,6 @@ Ninguno: no se modificó la aserción de ninguna prueba anterior. Las 5 suites q
 | D-28 | Las credenciales del modo automático (3 válidas, 3 inválidas, 2 señuelo) son **fijas y ficticias**; el Rojo no ve la validez | Sin generación ni descubrimiento autónomo de credenciales. | `ESCENARIO`, tests de visibilidad |
 | D-29 | Modelos 8B **re-descargados** al iniciar Caminos: `~/.ollama` estaba vacío | Autorizado por `MISION_23H/05` (hasta 3 modelos, ≥ 30 GB libres; había 44 GB). Se descargaron `qwen3:8b` y `llama3.1:8b`. | `BLOQUEOS.md` |
 | D-30 | La campaña no cambia prompts a mitad (versión `c1`) y los resultados de los 8B se reportan como salen | Regla 02. | `VERSION_PROMPTS_CAMINOS` |
+
+## D-31 · Prompts de IA controlados por directiva y oportunidades (Nova)
+Decidido con el usuario: la IA nunca lanza prompts por sí sola; el jugador elige partes de catálogo (combos) y cada lanzamiento gasta una de 10 oportunidades por equipo (configurable). La credencial obtenida se desbloquea en el combo; la aleatoria se pide con estructura. Un intento casi correcto genera una solicitud sospechosa al Azul (aceptar/denegar). Por equipo, no por jugador. Modo `libre` se conserva solo para experimentos.

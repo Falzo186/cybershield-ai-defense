@@ -26,6 +26,7 @@ def lanza(fn, motivo=None):
 
 
 def nueva(**cfg):
+    cfg.setdefault("ai_prompt_mode", "libre")
     m = NovaPartida(config=cfg, secretos=SEC)
     m.abrir_sala()
     m.unirse("Rojo1", "RED")
