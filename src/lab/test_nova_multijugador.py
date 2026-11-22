@@ -175,6 +175,21 @@ def main():
     ap = suspechosa(m, "EMP-04")
     r = m.ejecutar({"action_type": "reject_request", "actor": {"kind": "ai", "team": "BLUE", "user": "IA BLUE"}, "params": {"approval_id": ap["id"]}})
     chk("la IA Azul en modo auto y el administrador no esperan votación (decisión inmediata)", r["ok"] and ap["estado"] == "RECHAZADA")
+    # ── presencia automática por latido ─────────────────────────────────────────────────────────────────────
+    m = nueva()
+    base = 1000.0
+    for n in ROJOS + AZULES:
+        m.latido(n, base)
+    chk("con latidos recientes todos figuran conectados y nadie se marca caído", m.barrer_presencia(base + 10) == [] and all(p["conectado"] for p in m.participantes.values()))
+    for n in ROJOS + AZULES:
+        if n not in ("Rojo3", "Azul2"):
+            m.latido(n, base + 15)
+    caidos = m.barrer_presencia(base + 30)
+    chk("quien deja de enviar latido más de 20 s se marca desconectado solo (Rojo3 y Azul2) y queda en el registro", sorted(caidos) == ["Azul2", "Rojo3"] and not m.participantes["Rojo3"]["conectado"]
+        and any(e["type"] == "presence.disconnected" for e in m.eventos("ADMIN")))
+    chk("un Azul desconectado hace que su empleado vuelva al clic guionizado (no queda sin respuesta)", m._jugador_de(m.participantes["Azul2"]["identidad"]) is None)
+    m.latido("Azul2", base + 31)
+    chk("al volver el latido se reconecta", m.participantes["Azul2"]["conectado"] and lanza(lambda: m.latido("Fantasma"), "UNKNOWN_TARGET"))
     print(f"Total {sum(R)}/{len(R)}")
     return all(R)
 

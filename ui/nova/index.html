@@ -89,6 +89,7 @@
           <button class="boton" id="b-ia">Aplicar IA</button>
         </div>
         <p class="nota-tarjeta" id="ia-estado"></p>
+        <div id="ia-detalle" aria-live="polite"></div>
       </div>
     </section>
 
@@ -119,7 +120,7 @@
           <button class="boton boton-primario" type="submit">Ejecutar operación</button>
         </form>
         <p class="nota-tarjeta" id="op-resultado" role="status"></p>
-        <div id="ia-rojo" hidden><div class="sub-titulo">Armar prompt para la IA (Rojo) <span class="insignia" id="op-restantes-rojo"></span></div>
+        <div id="ia-rojo" hidden><p class="nota-tarjeta" id="ia-linea-rojo"></p><div class="sub-titulo">Armar prompt para la IA (Rojo) <span class="insignia" id="op-restantes-rojo"></span></div>
           <form class="form-sol" id="form-dir-rojo">
             <label class="campo"><span>Acción</span><select id="d-accion"></select></label>
             <label class="campo"><span>Objetivo</span><select id="d-obj"></select></label>
@@ -151,7 +152,7 @@
     <section class="tarjeta" id="p-azul-alertas" hidden>
       <div class="tarjeta-cab"><h3>Alertas, incidentes y acciones defensivas</h3></div>
       <div class="tarjeta-cuerpo"><div id="az-alertas"></div><div id="az-inc"></div><div class="sub-titulo">Acciones sobre identidades</div><div id="az-ident-acc" class="acciones-form"></div>
-        <div id="ia-azul" hidden><div class="sub-titulo">Armar prompt para la IA (Azul) <span class="insignia" id="op-restantes-azul"></span></div>
+        <div id="ia-azul" hidden><p class="nota-tarjeta" id="ia-linea-azul"></p><div class="sub-titulo">Armar prompt para la IA (Azul) <span class="insignia" id="op-restantes-azul"></span></div>
           <form class="form-sol" id="form-dir-azul">
             <label class="campo"><span>Foco</span><select id="e-foco"></select></label>
             <label class="campo"><span>Sujeto (alerta, solicitud, identidad o correo)</span><select id="e-suj"></select></label>

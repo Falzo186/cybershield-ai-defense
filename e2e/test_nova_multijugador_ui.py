@@ -45,6 +45,7 @@ def main(ver=False):
         esperar_texto(pr[1], "#jug-azul", "AzulCuatro")
         chk("el panel de jugadores lista solo nombres por equipo: el Rojo 2 ve a los 2 Rojos y a los 4 Azules, sin identidades", "RojoUno" in txt(pr[1], "#jug-rojo") and "RojoDos" in txt(pr[1], "#jug-rojo")
             and all(n in txt(pr[1], "#jug-azul") for n in AZULES) and "EMP-" not in txt(pr[1], "#panel-jug") and "2" in txt(pr[1], "#jug-n-rojo") and "4" in txt(pr[1], "#jug-n-azul"))
+        chk("el panel marca con un punto verde a los 6 jugadores conectados", pr[1].locator("#panel-jug .punto.on").count() == 6)
         pz[0].click("#b-jug")
         chk("el Azul también ve la lista de ambos equipos y puede cerrarla", "RojoDos" in txt(pz[0], "#jug-rojo") and pz[0].is_visible("#panel-jug"))
         pz[0].click("#b-jug-cerrar")

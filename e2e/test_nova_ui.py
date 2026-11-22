@@ -193,6 +193,8 @@ def main(ver=False, capturas=True):
         pa.click("#b-reanudar")
         esperar_texto(pr, "#chip-estado", "EN CURSO")
         pr.wait_for_selector("#ia-rojo:not([hidden])")
+        chk("la interfaz identifica el estado real de la IA del equipo: modo, proveedor etiquetado SIMULADO y que no hay modelo real conectado", all(k in txt(pr, "#ia-linea-rojo") for k in ("IA Roja", "modo assist", "SIMULADO", "no hay modelo real")))
+        chk("el administrador ve el estado de la IA de los dos equipos", "IA Azul" in txt(pa, "#ia-detalle") and "modo off" in txt(pa, "#ia-detalle"))
         pr.fill("#m-texto", "Probemos primero el reconocimiento"); pr.press("#m-texto", "Enter")
         esperar_texto(pr, "#msgs", "reconocimiento")
         p1.fill("#t-titulo", "Revisar la bandeja"); p1.click("#form-tarea button")

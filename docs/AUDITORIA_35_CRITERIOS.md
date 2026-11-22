@@ -6,7 +6,7 @@ Estados: **APROBADO** (operación real + prueba sobre estado + ruta), **PARCIAL*
 |---|---|---|---|
 | 1 | Admin crea partida | APROBADO | `server/test_nova.py`, `e2e/test_nova_ui.py` |
 | 2 | Jugadores entran | APROBADO | `server/test_nova.py`, e2e 5 navegadores |
-| 3 | Aparecen conectados | PARCIAL | Lista de jugadores con punto de conexión (panel lateral y sala); la presencia sigue siendo la de unirse/desconectar, sin latido automático |
+| 3 | Aparecen conectados | APROBADO | Latido automático cada 5 s desde el navegador; sin latido 20 s = desconectado (`src/lab/test_nova_multijugador.py`, `server/test_nova.py`, `e2e/test_nova_multijugador_ui.py`: 6 puntos verdes) |
 | 4 | Se ve el equipo de cada jugador | APROBADO | `src/lab/test_nova.py`, `e2e/test_nova_ui.py` |
 | 5 | Roles respetados en backend | APROBADO | `WRONG_TEAM`/403 en `server/test_nova.py`, `src/lab/test_nova.py` |
 | 6 | Sala de espera | APROBADO | estados CONFIGURACION→SALA_DE_ESPERA→LISTA en `test_nova.py` |
@@ -18,7 +18,7 @@ Estados: **APROBADO** (operación real + prueba sobre estado + ruta), **PARCIAL*
 | 12 | Sin ejecuciones ocultas tras detener | APROBADO | `cancelar_todo` de IA + respuestas tardías ignoradas, `test_nova_ia.py` |
 | 13 | Red/Blue con Ollama configurables | APROBADO | `ia.py` `configurar`; medido con modelos reales en `docs/evaluacion/NOVA_OLLAMA_REAL_v2.md` |
 | 14 | Modelos en computadoras distintas | NO VERIFICADO | Endpoint configurable (anti-SSRF lo restringe); nunca probado con dos PCs reales |
-| 15 | UI identifica endpoints y estados reales | PARCIAL | Estados y proveedor etiquetado visibles; endpoints por equipo no mostrados por completo |
+| 15 | UI identifica endpoints y estados reales | PARCIAL | Línea por equipo con modo, proveedor etiquetado, endpoint, modelo y conexión real de Ollama (`e2e/test_nova_ui.py` prueba la rama SIMULADO; la rama Ollama en pantalla no tiene prueba e2e) |
 | 16 | Rojo coordina operaciones | APROBADO | mensajería/tareas/misiones, `test_nova.py`, e2e |
 | 17 | Azul coordina defensas | APROBADO | idem |
 | 18 | Credenciales ficticias funcionales | APROBADO | `^[0-9]{5}[A-Z]$`, adivinación limitada, `test_nova.py` |
@@ -40,4 +40,4 @@ Estados: **APROBADO** (operación real + prueba sobre estado + ruta), **PARCIAL*
 | 34 | Procedimiento de instalación | APROBADO | `docs/GUIA_INSTALACION.md` (sección Nova); la red local sigue sin verificar (33) |
 | 35 | Ensayo de demo reproducible | APROBADO | `src/lab/demo_nova.py` (9 hitos, determinista, en la batería) + `docs/GUION_DEMO.md` |
 
-Resumen: 30 APROBADO, 3 PARCIAL (3, 15, 32), 2 NO VERIFICADO (14, 33). Multijugador 4 vs 4 y votación: probados en motor y 7 navegadores; 8 personas reales en red local NO VERIFICADO.
+Resumen: 31 APROBADO, 2 PARCIAL (15, 32), 2 NO VERIFICADO (14, 33). 8 personas reales en red local: NO VERIFICADO.

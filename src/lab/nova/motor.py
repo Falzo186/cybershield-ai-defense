@@ -204,6 +204,7 @@ class NovaPartida:
                 raise ErrorNova(409, "La partida aún no abrió su sala de espera" if self.estado == "CONFIGURACION" else "La partida ya terminó")
             if nombre in self.participantes:
                 self.participantes[nombre]["conectado"] = True
+                self.participantes[nombre]["ultimo_latido"] = time.monotonic()
                 return self.participantes[nombre]
             if equipo == "BLUE":
                 ocupadas = {p["identidad"] for p in self.participantes.values() if p["equipo"] == "BLUE"}
@@ -215,12 +216,30 @@ class NovaPartida:
                 identidad = iid
             if equipo == "RED" and sum(p["equipo"] == "RED" for p in self.participantes.values()) >= E.MAX_ROJO:
                 raise ErrorNova(409, f"El equipo Rojo está completo (máximo {E.MAX_ROJO})", "TEAM_FULL")
-            p = {"nombre": nombre, "equipo": equipo, "identidad": identidad if equipo == "BLUE" else None, "listo": False, "conectado": True, "unido": _utc()}
+            p = {"nombre": nombre, "equipo": equipo, "identidad": identidad if equipo == "BLUE" else None, "listo": False, "conectado": True, "unido": _utc(), "ultimo_latido": time.monotonic()}
             self.participantes[nombre] = p
             self._ev("presence.connected", {"kind": "human", "team": equipo, "label": nombre}, data={"equipo": equipo})
             if identidad:
                 self._ev("identity.assigned", {"kind": "system", "team": "SYSTEM"}, {"kind": "identity", "id": identidad}, data={"jugador": nombre, "identidad": identidad})
             return p
+
+    def latido(self, nombre, ahora=None):
+        """Presencia automática: el navegador del jugador avisa cada pocos segundos. Si estaba marcado desconectado, vuelve a conectado."""
+        p = self.participantes.get(nombre)
+        if not p:
+            raise ErrorNova(404, "Jugador desconocido", "UNKNOWN_TARGET")
+        p["ultimo_latido"] = time.monotonic() if ahora is None else ahora
+        if not p["conectado"]:
+            p["conectado"] = True
+            self._ev("presence.connected", {"kind": "human", "team": p["equipo"], "label": nombre}, data={"equipo": p["equipo"], "reconectado": True})
+
+    def barrer_presencia(self, ahora=None, tolerancia_s=20.0):
+        """Marca como desconectados a quienes llevan más de `tolerancia_s` sin latido (reloj REAL). Devuelve los nombres que cambió."""
+        ahora = time.monotonic() if ahora is None else ahora
+        caidos = [n for n, p in self.participantes.items() if p["conectado"] and p.get("ultimo_latido") is not None and ahora - p["ultimo_latido"] > tolerancia_s]
+        for n in caidos:
+            self.desconectar(n)
+        return caidos
 
     def desconectar(self, nombre):
         if nombre in self.participantes:

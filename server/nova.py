@@ -46,6 +46,8 @@ def _emitir(tipo, datos):
 
 def _estado_publico(p, rol, nombre):
     """Lo que ve cada rol. La visibilidad se filtra AQUÍ: el Rojo no ve el catálogo, el Azul no ve el inventario del Rojo."""
+    if p.barrer_presencia():
+        _emitir("nova_evento", {"seq": p.seq, "estado": p.estado})
     base = {"id": p.id, "estado": p.estado, "t_s": round(p.t_s(), 1), "duracion_s": p.config["duration_s"], "ronda": p.ronda(), "modalidad": p.config["modalidad"], "ai_mode": p.config["ai_mode"],
             "participantes": [{"nombre": n, "equipo": q["equipo"], "identidad": q["identidad"] if rol in ("ADMIN", "BLUE") or q["equipo"] != "BLUE" else None, "listo": q["listo"], "conectado": q["conectado"]}
                               for n, q in p.participantes.items()],
@@ -178,6 +180,21 @@ def registrar(app, ms=None):
         if rol == "ADMIN" or not _nombre(request):
             return _err("El administrador no se une como jugador; los jugadores necesitan una sesión", 400)
         return _ejecuta(request, p.unirse, _nombre(request), rol, cuerpo.get("identidad") if rol == "BLUE" else None)
+
+    @app.post("/api/nova/latido")
+    async def nova_latido(request: Request):
+        """Presencia automática: cada navegador de jugador avisa que sigue ahí; sin avisos durante 20 s se le marca desconectado."""
+        try:
+            p = _p()
+        except ErrorNova as e:
+            return _err(e.mensaje, e.status, e.motivo)
+        if _rol(request) not in ("RED", "BLUE") or not _nombre(request):
+            return JSONResponse({"ok": True, "ignorado": True})
+        try:
+            p.latido(_nombre(request))
+        except ErrorNova as e:
+            return _err(e.mensaje, e.status, e.motivo)
+        return JSONResponse({"ok": True})
 
     @app.post("/api/nova/listo")
     async def nova_listo(request: Request, cuerpo: dict):

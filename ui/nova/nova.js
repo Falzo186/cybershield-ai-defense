@@ -61,6 +61,7 @@
     if (e.rojo) pintarRojo(e);
     pintarConstructor(e);
     pintarJugadores(e);
+    pintarEstadoIA(e);
     const az = S.rol === "BLUE" && e.azul; for (const id of ["#p-azul-id", "#p-azul-bandeja", "#p-azul-aprob", "#p-azul-alertas"]) visible(id, !!az);
     if (az) pintarAzul(e); else if (S.rol === "ADMIN" && e.azul_todos) pintarAdminAzul(e);
     pintarPub(e);
@@ -209,6 +210,27 @@
     dialogoSolicitudes(a);
   }
   function pintarAdminAzul(e) { /* el administrador ve el panel Rojo y el estado general en «Marcador y estado público» */ }
+
+  // ── Estado REAL de la IA por equipo: proveedor etiquetado, endpoint, modelo y si Ollama responde de verdad ───────────
+  const SONDEO = {};
+  function sondearOllama(endpoint) {
+    const s = SONDEO[endpoint] || (SONDEO[endpoint] = { t: 0, r: null, vivo: false }); if (Date.now() - s.t < 8000 || s.vivo) return s; s.t = Date.now(); s.vivo = true;
+    api("GET", "/api/nova/ollama/estado?endpoint=" + encodeURIComponent(endpoint)).then((r) => { s.r = r; }).catch((er) => { s.r = { conectado: false, error: er.message, modelos: [] }; }).finally(() => { s.vivo = false; }); return s;
+  }
+  function lineaIA(eq, e) {
+    const pr = e.ia.proveedores[eq]; if (!pr) return null; const nombre = eq === "RED" ? "IA Roja" : "IA Azul"; const modo = e.ia.modos[eq];
+    if (pr.kind === "ollama") { const s = sondearOllama(pr.endpoint); const r = s.r; const est = !r ? "comprobando…" : r.conectado ? (r.modelos.includes(pr.modelo) ? "CONECTADO · modelo disponible" : "CONECTADO · el modelo NO está instalado") : "SIN CONEXIÓN (" + (r.error || "no responde") + ")";
+      return `${nombre} · modo ${modo} · Ollama · ${pr.endpoint} · ${pr.modelo} · ${est}`; }
+    return `${nombre} · modo ${modo} · ${pr.etiqueta}${pr.kind === "offline" ? "" : " (no hay modelo real conectado)"}`;
+  }
+  function pintarEstadoIA(e) {
+    if (!e.ia) return; const r = lineaIA("RED", e), b = lineaIA("BLUE", e);
+    if (S.rol === "ADMIN" || S.rol === "SPECTATOR") { const c = $("#ia-detalle"); if (c) { c.textContent = ""; [r, b].forEach((x) => { if (x) c.append(el("div", "ia-linea", x)); }); } }
+    if ($("#ia-linea-rojo") && r) $("#ia-linea-rojo").textContent = r; if ($("#ia-linea-azul") && b) $("#ia-linea-azul").textContent = b;
+  }
+
+  // ── Presencia automática: latido cada 5 s mientras la pestaña esté abierta ─────────────────────────────────────
+  setInterval(() => { if (S.token && (S.rol === "RED" || S.rol === "BLUE")) fetch("/api/nova/latido", { method: "POST", headers: { "X-Equipo-Token": S.token } }).catch(() => {}); }, 5000);
 
   // ── Lista de jugadores (panel lateral, solo nombres) ────────────────────────────────────────────
   function pintarJugadores(e) {

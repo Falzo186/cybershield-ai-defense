@@ -177,6 +177,8 @@ def main():
         vot = next(x for x in a1.get("/api/nova/estado")["azul"]["aprobaciones"] if x["id"] == ap1["id"])
         chk("la API de votos registra la opinión de un Azul con su comentario y fija el decisor", vv.status == 200 and vv["data"].get("cerrada_por") == "votos" and list(vot["votos"].values())[0]["comentario"] == "no es de aquí" and vot["decisor"] in vot["votos"])
         chk("con un solo Azul su voto es mayoría absoluta: cierra la solicitud y la identidad queda bloqueada para el Rojo", acc(rojo, "guess_credential", identidad_id="EMP-01", candidate_value="11111A")["reject_reason"] == "IDENTITY_LOCKED")
+        lt = a1.post("/api/nova/latido", {})
+        chk("el latido de presencia lo acepta un jugador, y el espectador o el admin lo ignoran sin error", lt.status == 200 and "ignorado" not in lt and esp.post("/api/nova/latido", {}).status in (200, 403))
         adm.post("/api/nova/detener", {})
         salud = Cliente(E.base).get("/api/ia/estado")
         chk("la API sigue sana tras todo el flujo", salud.status == 200)
