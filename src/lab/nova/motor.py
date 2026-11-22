@@ -122,7 +122,9 @@ def _utc():
 class NovaPartida:
     def __init__(self, id=None, config=None, reloj=None, secretos=None, db=":memory:"):
         self.id = id or "nova-" + uuid.uuid4().hex[:8]
-        self.config = {**CONFIG_DEFECTO, **(config or {})}
+        explicito = dict(config or {})
+        self.config = {**CONFIG_DEFECTO, **E.MODALIDADES.get(explicito.get("modalidad", "BALANCED"), {}), **explicito}   # lo explícito del administrador gana sobre la modalidad
+        self.config["modalidad_params"] = dict(E.MODALIDADES.get(self.config["modalidad"], {}))
         self.reloj = reloj or Reloj(virtual=True)
         self.secretos = secretos or Secretos()
         self.rng = random.Random(f"nova|{self.config['seed']}")
@@ -256,7 +258,8 @@ class NovaPartida:
                 return self._idem[idempotency_key]
             self._a("EN_CURSO")
             self.reloj.iniciar()
-            self._ev("match.clock_started", data={"duration_s": self.config["duration_s"]})
+            self.config_congelada = json.dumps(self.config, sort_keys=True, default=str)       # modalidad y parámetros quedan CONGELADOS desde el inicio
+            self._ev("match.clock_started", data={"duration_s": self.config["duration_s"], "modalidad": self.config["modalidad"], "parametros": self.config["modalidad_params"]})
             r = {"estado": self.estado}
             self._idem[idempotency_key] = r
             return r
@@ -413,6 +416,9 @@ class NovaPartida:
         for i in nuevos:
             self.rojo_estado[i] = "IDENTIFICADA"
             self.rojo_origen[i] = "reconocimiento del directorio"
+            if self.config.get("revela_permisos_al_identificar"):
+                self.rojo_permisos = getattr(self, "rojo_permisos", {})
+                self.rojo_permisos[i] = self.identidades[i]["permiso"]
         self.puntos["RED"] += 2 * len(nuevos)
         self._ev("resource.queried", {"kind": "human", "team": "RED"}, {"kind": "resource", "id": "directorio"}, vis=["ADMIN", "RED"], data={"identificadas": nuevos})
         return {"identificadas": nuevos}
@@ -584,6 +590,8 @@ class NovaPartida:
     def _alerta(self, titulo, iid, severidad, origen_evento):
         aid = "AL-" + str(len(self.alertas) + 1).zfill(3)
         self.alertas[aid] = {"id": aid, "titulo": titulo, "identidad": iid, "severidad": severidad, "estado": "NUEVA", "ts_s": self.t_s(), "origen": origen_evento}
+        if self.config.get("alertas_con_detalle"):
+            self.alertas[aid]["detalle"] = f"origen {origen_evento} · identidad {iid or '—'} · t={self.t_s():.0f}s · ronda {self.ronda()}"
         self._ev("alert.created", {"kind": "system", "team": "SYSTEM"}, {"kind": "alert", "id": aid}, vis=["ADMIN", "BLUE"], data={"titulo": titulo, "severidad": severidad, "identidad": iid})
         return aid
 
@@ -866,6 +874,8 @@ class NovaPartida:
             d = {"id": iid, "estado": est}
             if est != "DESCONOCIDA":
                 d.update(nombre=i["nombre"], depto=i["depto"], origen=self.rojo_origen.get(iid))
+                if iid in getattr(self, "rojo_permisos", {}):
+                    d["permiso"] = self.rojo_permisos[iid]
             if iid in self.rojo_conoce:
                 d["credencial"] = self.secretos.enmascarar(self.rojo_conoce[iid])
             out.append(d)

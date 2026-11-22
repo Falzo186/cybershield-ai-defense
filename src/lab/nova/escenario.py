@@ -98,3 +98,13 @@ CORREOS_PROGRAMADOS = [
     {"id": "SC-05", "at_s": 150, "de": "ventas@" + DOMINIO, "asunto": "Solicitud: consulta del reporte de ventas", "cuerpo": "Un compañero pide autorización para consultar el reporte de ventas.", "legitimo": True, "requiere_aprobacion": True},
     {"id": "SC-06", "at_s": 200, "de": "compras@" + DOMINIO, "asunto": "Solicitud: consulta de inventario", "cuerpo": "Compras pide autorización para consultar el inventario.", "legitimo": True, "requiere_aprobacion": True},
 ]
+
+
+# Modalidades (D13): cada una MODIFICA parámetros reales del motor, se cuantifica y se congela al iniciar la partida.
+MODALIDADES = {
+    "BALANCED": {},
+    "RED_ADVANTAGE": {"guess_attempts_per_round": 5, "guess_cooldown_s": 10, "guess_lockout_after_fails": 4, "detect_prob_fail": 0.3, "click_delay_s": 12, "scans_per_round": 3, "approval_ttl_s": 60,
+                      "revela_permisos_al_identificar": True},
+    "BLUE_ADVANTAGE": {"guess_attempts_per_round": 2, "guess_cooldown_s": 30, "guess_lockout_after_fails": 2, "detect_prob_fail": 0.9, "click_delay_s": 45, "scans_per_round": 1, "approval_ttl_s": 150,
+                       "alertas_con_detalle": True},
+}

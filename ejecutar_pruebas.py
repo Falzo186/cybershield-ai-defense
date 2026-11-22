@@ -27,7 +27,7 @@ INTEGRACION = ["e2e/test_reinicio.py", "integraciones/wazuh/test_reglas.py", "se
                "CyberShield_Repair_Library/tests/unit/test_solicitudes.py", "CyberShield_Repair_Library/tests/unit/test_chat.py",
                "CyberShield_Repair_Library/tests/regression/test_regresion_presentacion.py", "CyberShield_Repair_Library/tests/regression/test_ollama_controles.py",
                "CyberShield_Repair_Library/tests/demo/demo_academica.py"]
-NAVEGADOR = ["e2e/demo_partida.py", "e2e/test_combate_ui.py", "e2e/test_combate_extra.py", "e2e/test_simulacion_ui.py", "CyberShield_Repair_Library/tests/e2e_sala_equipo.py"]
+NAVEGADOR = ["e2e/demo_partida.py", "e2e/test_combate_ui.py", "e2e/test_combate_extra.py", "e2e/test_simulacion_ui.py", "e2e/test_nova_ui.py", "CyberShield_Repair_Library/tests/e2e_sala_equipo.py"]
 TOTAL = re.compile(r"(\d+)/(\d+)")
 
 

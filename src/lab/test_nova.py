@@ -1,4 +1,6 @@
 """Pruebas del motor Nova (paquete del profesor). Lógica pura con reloj VIRTUAL (sin sleep). python -m src.lab.test_nova"""
+import json
+
 from cryptography.fernet import Fernet
 
 from .nova import escenario as E
@@ -298,6 +300,20 @@ def main():
     chk("determinismo: la misma semilla y las mismas acciones dan los mismos eventos, puntos y resultado", corrida() == corrida())
     chk("acciones mal formadas o de otro equipo se rechazan con motivo tipificado", m.ejecutar({"action_type": "extract_table"})["reject_reason"] == "INVALID_SCHEMA"
         and rojo(nueva(), "approve_request", approval_id="AP-001")["reject_reason"] == "WRONG_TEAM" and azul(nueva(), "guess_credential", identidad_id="EMP-01", candidate_value="12345A")["reject_reason"] == "WRONG_TEAM")
+    # ── modalidades (D13): modifican parámetros reales y quedan congeladas ───────────────────────────
+    mr, mb, mn = nueva(modalidad="RED_ADVANTAGE"), nueva(modalidad="BLUE_ADVANTAGE"), nueva()
+    chk("las modalidades cuantifican parámetros reales distintos (intentos, cooldown, detección, retardo del clic)", (mr.config["guess_attempts_per_round"], mb.config["guess_attempts_per_round"], mn.config["guess_attempts_per_round"]) == (5, 2, 3)
+        and mr.config["detect_prob_fail"] < mn.config["detect_prob_fail"] < mb.config["detect_prob_fail"] and mr.config["click_delay_s"] < mb.config["click_delay_s"])
+    rr = [rojo(mr, "guess_credential", identidad_id="EMP-01", candidate_value="77777H")["reject_reason"] for _ in range(1)]
+    mr.avanzar(11)
+    n_ok = sum(1 for k in range(4) if (mr.avanzar(11) or True) and rojo(mr, "guess_credential", identidad_id="EMP-02", candidate_value=f"8888{k}J")["ok"])
+    chk("RED_ADVANTAGE: más intentos por ronda y cooldown corto permiten más adivinación que BLUE_ADVANTAGE (2 por ronda, cooldown 30)", n_ok >= 3 and rojo(mb, "guess_credential", identidad_id="EMP-01", candidate_value="11111A")["ok"]
+        and rojo(mb, "guess_credential", identidad_id="EMP-01", candidate_value="11112A")["reject_reason"] == "COOLDOWN")
+    rojo(mr, "scan_directory")
+    chk("RED_ADVANTAGE cambia la visibilidad: al identificar, el Rojo ve el permiso de la identidad (BALANCED no)", any("permiso" in v for v in mr.vista_rojo()) and not any("permiso" in v for v in (rojo(mn, "scan_directory"), mn.vista_rojo())[1]))
+    exponer(mb, "EMP-05")
+    chk("BLUE_ADVANTAGE: las alertas llegan con detalle y el empleado tarda más en caer (45 s de retardo)", any("detalle" in a for a in mb.alertas.values()) and mb.config["click_delay_s"] == 45)
+    chk("la modalidad queda CONGELADA al iniciar: los parámetros cuantificados guardados al inicio coinciden con los vigentes", json.loads(mb.config_congelada)["modalidad_params"] == mb.config["modalidad_params"] and json.loads(mb.config_congelada)["guess_attempts_per_round"] == mb.config["guess_attempts_per_round"] == 2)
     print(f"Total {sum(R)}/{len(R)}")
     return all(R)
 

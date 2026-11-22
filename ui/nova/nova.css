@@ -1,0 +1,23 @@
+/* Nova · interfaz de la partida del paquete del profesor. Reutiliza tokens.css, panel.css, combate.css. Rojo #d64550, Azul #3b82f6, fondo #0b1020. */
+body { background: #0b1020; color: #e6ebf5; font-family: var(--p-sans); margin: 0; font-size: 14px; }
+[hidden] { display: none !important; }
+.barra { display: flex; flex-wrap: wrap; align-items: center; gap: var(--p-e4); padding: var(--p-e3) var(--p-e5); border-bottom: 1px solid var(--p-borde); background: #121a2e; position: sticky; top: 0; z-index: 10; }
+.barra-marca { font-size: var(--p-t-lg); } .barra-estados { display: flex; gap: var(--p-e2); flex-wrap: wrap; } .barra-enlaces { margin-left: auto; font-size: var(--p-t-sm); color: #7c8db5; } .barra-enlaces a { color: #7aa9ff; }
+main { padding: var(--p-e5); } .entrar { max-width: 520px; margin: var(--p-e8) auto; } .form-entrar-eq, .form-sol { display: grid; gap: var(--p-e3); }
+.form-sol { margin-bottom: var(--p-e3); } .rejilla-nova { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: var(--p-e4); align-items: start; } .rejilla-nova .ancho { grid-column: 1 / -1; }
+.banner-estado { border: 1px solid var(--p-borde); border-radius: var(--p-r-lg); padding: var(--p-e3) var(--p-e5); margin-bottom: var(--p-e4); background: #18223b; font-size: var(--p-t-md); }
+.banner-estado.en-curso { border-color: #2e8b57; } .banner-estado.pausada { border-color: var(--p-aviso); color: var(--p-aviso); font-weight: 700; } .banner-estado.fin { border-color: #7c8db5; }
+.victoria { margin-bottom: var(--p-e4); border-width: 2px; } .victoria.roja { border-color: #d64550; background: rgba(214, 69, 80, .12); } .victoria.azul { border-color: #3b82f6; background: rgba(59, 130, 246, .12); } .victoria.empate { border-color: #7c8db5; }
+.part { display: flex; align-items: center; gap: var(--p-e3); padding: 6px 0; border-bottom: 1px solid var(--p-borde-suave); } .part.rojo b { color: #d64550; } .part.azul b { color: #3b82f6; } .part small { margin-left: auto; color: #7c8db5; }
+.creds { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--p-e3); }
+.cred { border: 1px solid var(--p-borde); border-radius: var(--p-r-md); padding: var(--p-e3); background: #121a2e; display: grid; gap: 4px; font-size: var(--p-t-sm); }
+.cred h4 { margin: 0; font-size: var(--p-t-md); } .cred small { color: #7c8db5; }
+.cred.DESCONOCIDA { border-color: #3a4766; opacity: .7; } .cred.IDENTIFICADA { border-color: #3b82f6; } .cred.CANDIDATA { border-color: #e0b341; } .cred.VALIDA_DESCUBIERTA { border-color: #2e8b57; background: rgba(46, 139, 87, .12); } .cred.COMPROMETIDA { border-color: #d64550; } .cred.BLOQUEADA { border-color: #111; background: #05070d; color: #7c8db5; }
+.corr { padding: 10px var(--p-e4); border-bottom: 1px solid var(--p-borde-suave); display: grid; gap: 4px; } .corr.nuevo b { color: #fff; } .corr small { color: #7c8db5; } .corr .acciones-form { margin-top: 4px; }
+.ap, .al { border: 1px solid var(--p-borde); border-radius: var(--p-r-md); padding: var(--p-e3); margin-bottom: var(--p-e3); background: #121a2e; display: grid; gap: 4px; }
+.prop { border: 1px dashed #7c8db5; border-radius: var(--p-r-md); padding: var(--p-e3); margin-top: var(--p-e3); font-size: var(--p-t-sm); display: grid; gap: 4px; }
+.log { display: grid; grid-template-columns: 66px 150px 1fr; gap: var(--p-e3); padding: 5px var(--p-e4); border-bottom: 1px solid var(--p-borde-suave); font-size: var(--p-t-sm); } .log .t { color: #7c8db5; font-variant-numeric: tabular-nums; }
+.vacio-eq { color: #7c8db5; padding: var(--p-e3) 0; } .datos { display: flex; flex-wrap: wrap; gap: var(--p-e2); }
+.campo input, .campo select { background: #18223b; color: #e6ebf5; border: 1px solid var(--p-borde); border-radius: var(--p-r-sm); padding: 7px 10px; font: inherit; width: 100%; box-sizing: border-box; }
+.campo > span { display: block; margin-bottom: 4px; font-size: var(--p-t-xs); letter-spacing: .05em; text-transform: uppercase; color: #7c8db5; }
+.cat { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px var(--p-e3); font-size: var(--p-t-sm); padding: 6px 0; border-bottom: 1px solid var(--p-borde-suave); }
