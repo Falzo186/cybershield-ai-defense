@@ -53,8 +53,53 @@ def grabar_guion(id_, hoja, titulo, dificultad):
     return doc
 
 
+def grabar_desde_campana(campana, maximo=4):
+    """Añade al catálogo las victorias Rojas CAMINOS_IA YA REGISTRADAS por la campaña (no se vuelven a jugar ni se editan): copia la partida,
+    sus eventos con hash y el grafo. Las alertas Wazuh simuladas no se persistieron en la campaña: las que ve la reproducción salen de los
+    eventos `caminos.alerta` del propio registro."""
+    d = RAIZ / "data" / "campanas" / campana
+    obs = {}
+    for f in sorted(d.glob("observaciones*.jsonl")):
+        for l in f.read_text(encoding="utf-8").splitlines():
+            try:
+                o = json.loads(l)
+                obs[o["id"]] = o
+            except (ValueError, KeyError):
+                continue
+    elegidas, vistos = [], set()
+    for o in sorted(obs.values(), key=lambda x: (x["modo"] != "grafo", x["fase"] != "cruzada", x["id"])):
+        clave = (o["modo"], o["rojo"], o["azul"], o.get("hoja"))
+        if o["tipo"] == "CAMINOS_IA" and o["resultado"] == "VICTORIA_ROJA" and o["rojo"] in ("qwen3:8b", "llama3.1:8b") and o["azul"] in ("qwen3:8b", "llama3.1:8b") and clave not in vistos:
+            vistos.add(clave)
+            elegidas.append(o)
+    almacenes = [Almacen(f) for f in sorted(d.glob("partidas*.db"))]
+    hechas = []
+    for o in elegidas[:maximo]:
+        pid = o["partida_id"]
+        alm = next((a for a in almacenes if a.partida(pid)), None)
+        if alm is None:
+            continue
+        part, ev = alm.partida(pid), alm.eventos(pid)
+        ok, msg = alm.verificar_cadena(pid)
+        assert ok, msg
+        auto = o["modo"] == "auto"
+        id_ = f"sim-ia-roja-{o['modo']}-{o['rojo'][:5]}-{o['azul'][:5]}-{o['rep']:02d}".replace(":", "").replace(".", "")
+        doc = {"id_simulacion": id_, "titulo": f"Victoria Roja REAL de un 8B ({'modo automático' if auto else 'grafo'}): {o['rojo']} contra {o['azul']}", "tipo": "CAMINOS_IA",
+               "procedencia": "CAMINOS_IA: un modelo de lenguaje eligió las opciones; el motor declaró el resultado. Victoria real solo en este modo, no en el combate libre.",
+               "modelos": {"rojo": o["rojo"], "azul": o["azul"]}, "semilla": o["semilla"], "dificultad": o.get("dificultad") or "auto", "hash_grafo": part["hash_escenario"], "hoja": o.get("hoja"),
+               "grafo": None if auto else G.cargar(f"caminos-{o['dificultad']}"), "modo": "auto" if auto else "grafo", "partida": part, "eventos": ev, "alertas_wazuh_simuladas": [],
+               "cadena_integra_al_exportar": ok, "origen": f"campaña {campana}, observación {o['id']}"}
+        (SALIDA / f"{id_}.json").write_text(json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8")
+        hechas.append(id_)
+        print(id_, o["hoja"], len(ev), "eventos")
+    return hechas
+
+
 def main():
     SALIDA.mkdir(parents=True, exist_ok=True)
+    if "--desde-campana" in sys.argv:
+        grabar_desde_campana(sys.argv[sys.argv.index("--desde-campana") + 1])
+        return
     for id_, hoja, titulo, dif in CATALOGO:
         d = grabar_guion(id_, hoja, titulo, dif)
         print(id_, d["partida"]["resultado"]["resultado"], hoja, len(d["eventos"]), "eventos", len(d["alertas_wazuh_simuladas"]), "alertas")

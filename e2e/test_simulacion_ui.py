@@ -58,7 +58,7 @@ def main(ver=False, capturas=True):
             p.on("response", lambda r: RED.append((r.status, r.url)) if r.status >= 400 else None)
             p.goto(base + "/simulacion/")
             p.wait_for_selector(".sim-card", state="attached")
-            chk("el catálogo muestra las tarjetas con insignia de procedencia visible", p.locator(".sim-card").count() == len(cat) and p.locator(".sim-card .insignia").count() == len(cat) and "GUION" in p.inner_text(".sim-card .insignia"))
+            chk("el catálogo muestra las tarjetas con insignia de procedencia visible", p.locator(".sim-card").count() == len(cat) and p.locator(".sim-card .insignia").count() == len(cat) and "GUION" in p.inner_text("#catalogo") and (("IA 8B" in p.inner_text("#catalogo")) == any(x["tipo"] == "CAMINOS_IA" for x in cat)))
             chk("el catálogo explica que un guion NO es «la IA venció»", "no es" in p.inner_text("#vista-catalogo").lower() and "ejecutadas de verdad" in p.inner_text("#vista-catalogo").lower())
             if capturas:
                 p.screenshot(path=str(SALIDA / "01_catalogo_1366x768.png"))
