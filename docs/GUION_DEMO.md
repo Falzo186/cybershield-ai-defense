@@ -130,3 +130,10 @@ Reproducible sin IA: `python -m src.lab.demo_nova` verifica los 10 hitos; en UI,
    (Prompts de IA: el jugador arma el prompt con los combos y lo lanza; muestra el contador «Oportunidades: N de 10», la credencial obtenida desbloqueada en el combo y la opción de credencial aleatoria.)
 6. Rojo extrae `reportes_financieros`: el **motor** declara VICTORIA_ROJA; el espectador lo ve y se descarga solo lo extraído.
 7. Mostrar historial de partidas. Aclarar: todo ficticio y local; lo simulado va etiquetado; Wazuh real NO_CONFIGURADO.
+
+## Multijugador 4 vs 4 con votación (≈ 6 min)
+1. El administrador crea la partida con «Autorizaciones del Azul: votación»; entran hasta 4 Rojos y 4 Azules. Abrir el botón **Jugadores**: lista de ambos equipos con su punto verde de conexión.
+2. Un Rojo que **no** es el primero envía un correo y otro Rojo usa lo que consiguió: cualquier Rojo dirige ataques.
+3. Un Rojo prueba una credencial parecida: a **los 4 Azules** les aparece el cuadro de solicitud misteriosa. Uno responde (queda como decisor), los demás opinan con comentario; con 3 de 4 se cierra y la identidad queda bloqueada.
+4. Un Azul arma un prompt con la casilla «Que la IA pida autorización humana»: el cuadro muestra qué pide la IA, el prompt usado, la corrida y la hora. Aprueban 3 de 4 y el motor ejecuta solo esa acción.
+Probado en `e2e/test_nova_multijugador_ui.py` (7 navegadores) y `src/lab/test_nova_multijugador.py`.

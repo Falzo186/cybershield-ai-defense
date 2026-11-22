@@ -119,6 +119,9 @@ class ScriptedProvider:
             clave = {"approve_request": "approval_id", "reject_request": "approval_id", "request_more_info": "approval_id", "escalate": "approval_id", "revoke_credential": "identidad_id",
                      "suspend_identity": "identidad_id", "block_link": "link_id", "report_email": "email_id", "classify_email": "email_id", "open_email": "email_id", "contain_incident": "incident_id",
                      "set_alert_status": "alert_id"}.get(d["accion_preferida"])
+            if d.get("pedir_autorizacion"):
+                return {"verdict": "SOLICITAR_AUTORIZACION", "classification": "REQUIERE_AUTORIZACION", "confidence": 0.6, "subject": {"kind": d["foco"], "id": s}, "reasoning": "veo algo sospechoso y pido autorización humana",
+                        "evidence": [], "recommended_action": {"action_type": d["accion_preferida"], "target": s, "params": {clave: s} if clave and s != "-" else {}}}
             return {"verdict": "RECHAZAR" if d["accion_preferida"] == "reject_request" else "CONTENER" if d["accion_preferida"] in ("revoke_credential", "suspend_identity") else "INVESTIGAR",
                     "classification": "SOSPECHOSA", "confidence": 0.7, "subject": {"kind": d["foco"], "id": s}, "reasoning": "directiva del jugador Azul", "evidence": [],
                     "recommended_action": {"action_type": d["accion_preferida"], "target": s, "params": {clave: s} if clave and s != "-" else {}}}
@@ -257,7 +260,9 @@ def validar_directiva_rojo(d, m):
 def validar_directiva_azul(d, m):
     if not isinstance(d, dict):
         raise ErrorNova(400, "Falta la directiva del prompt (elige las partes en los desplegables)", "DIRECTIVA_REQUIRED")
-    out = {"foco": d.get("foco") or "general", "sujeto_id": d.get("sujeto_id") or None, "accion_preferida": d.get("accion_preferida") or None}
+    out = {"foco": d.get("foco") or "general", "sujeto_id": d.get("sujeto_id") or None, "accion_preferida": d.get("accion_preferida") or None, "pedir_autorizacion": bool(d.get("pedir_autorizacion"))}
+    if out["pedir_autorizacion"] and out["accion_preferida"] not in m.AUTORIZABLES:
+        raise ErrorNova(400, "Para pedir autorización humana elige una acción autorizable (revocar, suspender, bloquear enlace, contener, estado de alerta, reportar correo)", "INVALID_SCHEMA")
     if out["foco"] not in FOCOS_AZUL:
         raise ErrorNova(400, "Foco fuera del catálogo", "INVALID_SCHEMA")
     if out["accion_preferida"] and out["accion_preferida"] not in ACCIONES_AZUL:
@@ -401,6 +406,8 @@ class ControlIA:
         if esperada and pa["action_type"] != esperada:
             raise ErrorNova(400, f"la directiva exige action_type = {esperada}", "INVALID_SCHEMA")
         params = pa.setdefault("params", {})
+        if equipo == "BLUE" and d.get("pedir_autorizacion") and obj.get("verdict") != "SOLICITAR_AUTORIZACION":
+            raise ErrorNova(400, "la directiva exige verdict = SOLICITAR_AUTORIZACION", "INVALID_SCHEMA")
         if equipo == "RED":
             if d["identidad_id"] and pa["action_type"] not in ("scan_directory", "request_elevation", "export_database", "message_team", "respond_info"):
                 params["identidad_id"] = d["identidad_id"]

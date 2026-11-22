@@ -81,6 +81,23 @@ def main(ver=False):
         chk("con 3 de 4 en contra se cierra para todos y se cierran los cuadros", all(p.is_hidden("#dlg-sol") for p in pz))
         bl = rojos[1].post("/api/nova/accion", {"action_type": "guess_credential", "params": {"identidad_id": "EMP-03", "candidate_value": "11111A"}})
         chk("la decisión cambia el estado del escenario: la identidad atacada queda bloqueada para el Rojo", bl["reject_reason"] == "IDENTITY_LOCKED")
+        # la IA Azul (simulada) pide autorización humana desde el constructor de prompts
+        adm.post("/api/nova/ia/config", {"BLUE": {"modo": "assist", "proveedor": {"tipo": "scripted"}}})
+        pz[0].wait_for_selector("#ia-azul:not([hidden])", timeout=20000)
+        pz[0].select_option("#e-foco", "identidad"); pz[0].select_option("#e-suj", "EMP-04"); pz[0].select_option("#e-acc", "revoke_credential"); pz[0].check("#e-pedir")
+        pz[0].click("#b-prop-azul")
+        esperar_texto(pz[0], "#prop-azul", "Confirmar y ejecutar")
+        pz[0].click("#prop-azul button:has-text('Confirmar y ejecutar')")
+        for p in pz:
+            p.wait_for_selector("#dlg-sol[open]", timeout=20000)
+        chk("la IA Azul pide autorización: a los 4 Azules les sale el cuadro con qué pide, la corrida SIMULADA y el prompt (directiva) usado",
+            all("AUTORIZACIÓN" in txt(p, "#dlg-titulo").upper() and "SIMULADO" in txt(p, "#dlg-detalle").upper() and "PROMPT" in txt(p, "#dlg-detalle").upper() and "REVOKE_CREDENTIAL" in txt(p, "#dlg-detalle").upper() for p in pz))
+        chk("pedirla no ejecuta nada: la credencial de EMP-04 sigue protegida mientras votan", next(x["estado"] for x in adm.get("/api/nova/estado")["catalogo"] if x["id"] == "EMP-04") == "PROTEGIDA")
+        for p in pz[:3]:
+            p.click("#dlg-ok")
+        for p in pz:
+            p.wait_for_function("() => !document.querySelector('#dlg-sol').open", timeout=20000)
+        chk("3 de 4 aprueban: se cierra para todos y el motor ejecuta SOLO la acción autorizada (EMP-04 revocada)", next(x["estado"] for x in adm.get("/api/nova/estado")["catalogo"] if x["id"] == "EMP-04") in ("REVOCADA", "SUSPENDIDA"))
         T.MANUAL["on"] = False
         chk("consola del navegador sin errores", not [c for c in T.CONSOLA if "favicon" not in c], str(T.CONSOLA[:3]))
         for c in ctxs:

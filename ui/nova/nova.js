@@ -182,7 +182,7 @@
   $("#form-dir-rojo").addEventListener("submit", (ev) => { ev.preventDefault(); const cr = $("#d-cred").value; const credencial = cr.startsWith("conocida:") ? { modo: "conocida" } : cr === "aleatoria" ? { modo: "aleatoria", digitos_iniciales: $("#d-dig").value.trim(), letra: $("#d-letra").value.trim().toUpperCase() } : { modo: "ninguna" };
     const ident = cr.startsWith("conocida:") ? cr.split(":")[1] : $("#d-ident").value;
     propuesta("RED", "#prop-rojo", { accion: $("#d-accion").value, objetivo: $("#d-obj").value, estrategia: $("#d-estr").value, identidad_id: ident, tabla: $("#d-tabla").value, plantilla: $("#d-plant").value, credencial }); });
-  $("#form-dir-azul").addEventListener("submit", (ev) => { ev.preventDefault(); propuesta("BLUE", "#prop-azul", { foco: $("#e-foco").value, sujeto_id: $("#e-suj").value, accion_preferida: $("#e-acc").value }); });
+  $("#form-dir-azul").addEventListener("submit", (ev) => { ev.preventDefault(); propuesta("BLUE", "#prop-azul", { foco: $("#e-foco").value, sujeto_id: $("#e-suj").value, accion_preferida: $("#e-acc").value, pedir_autorizacion: $("#e-pedir").checked }); });
 
   // ── Azul ────────────────────────────────────────────────────────────────────────────────────────
   const acc = (tipo, p, ok) => intentar(async () => { const r = await api("POST", "/api/nova/accion", { action_type: tipo, params: p, idempotency_key: "az-" + Date.now() + Math.random().toString(36).slice(2) }, true); const d = await r.json(); if (!r.ok) throw new Error(d.mensaje); return d; }, ok);

@@ -106,6 +106,16 @@ def main():
     chk("Azul: la directiva fija la acción recomendada sobre el sujeto elegido", r["propuesta"]["estado"] == "PROPUESTA" and r["salida_estructurada"]["recommended_action"]["action_type"] == "revoke_credential"
         and r["salida_estructurada"]["recommended_action"]["params"] == {"identidad_id": "EMP-05"} and ia.usadas["BLUE"] == 1)
 
+    # ── la IA Azul pide autorización humana por directiva ───────────────────────────────────────────────
+    m, ia = nueva()
+    ia.configurar("BLUE", "auto")
+    chk("pedir autorización con una acción que no es autorizable se rechaza", lanza(lambda: ia.proponer("BLUE", {"foco": "identidad", "sujeto_id": "EMP-05", "accion_preferida": "approve_request", "pedir_autorizacion": True}), "INVALID_SCHEMA")
+        and lanza(lambda: ia.proponer("BLUE", {"foco": "identidad", "sujeto_id": "EMP-05", "pedir_autorizacion": True}), "INVALID_SCHEMA"))
+    r = ia.proponer("BLUE", {"foco": "identidad", "sujeto_id": "EMP-05", "accion_preferida": "revoke_credential", "pedir_autorizacion": True})
+    ap = next(a for a in m.aprobaciones.values() if a["operacion"] == "autorizacion_ia")
+    chk("con la directiva, la IA Azul crea una SOLICITUD (no actúa sola) con la directiva y la corrida en el detalle, y la credencial sigue sin revocarse",
+        r["propuesta"]["estado"] == "EJECUTADA" and ap["estado"] == "PENDIENTE" and ap["detalle"]["ia"]["directiva"]["pedir_autorizacion"] is True and ap["accion_propuesta"]["action_type"] == "revoke_credential"
+        and ap["detalle"]["sujeto"] == "EMP-05" and m.creds["EMP-05"]["estado"] == "PROTEGIDA")
     # ── modo libre sigue disponible (solo ensayos) ───────────────────────────────────────────────────────
     m, ia = nueva(ai_prompt_mode="libre")
     ia.configurar("RED", "assist")
