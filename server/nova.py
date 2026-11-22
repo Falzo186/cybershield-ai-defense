@@ -10,10 +10,12 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
 from src.lab.nova import escenario as E
+from src.lab import cliente_ollama
+from src.lab.nova import ia as IA
 from src.lab.nova.motor import ErrorNova, NovaPartida, Reloj, Secretos
 
 ROL = {"general": "ADMIN", "rojo": "RED", "azul": "BLUE", "espectador": "SPECTATOR"}
-_E = {"p": None, "tarea": None, "ms": None}
+_E = {"p": None, "tarea": None, "ms": None, "ia": None}
 RAIZ = Path(__file__).resolve().parents[1]
 
 
@@ -59,6 +61,11 @@ def _estado_publico(p, rol, nombre):
         base["azul_todos"] = {"alertas": list(p.alertas.values()), "incidentes": list(p.incidentes.values()), "aprobaciones": list(p.aprobaciones.values()), "emails": list(p.emails.values())}
         base["catalogo"] = p.catalogo_admin()
         base["metricas"] = p.metricas()
+    ctl = _E["ia"]
+    if ctl is not None:
+        base["ia"] = {"modos": p.config["ai_mode"], "proveedores": {eq: {"kind": pr.kind, "etiqueta": pr.etiqueta, "endpoint": pr.endpoint, "modelo": pr.modelo} for eq, pr in ctl.proveedores.items()
+                                                                  if rol in ("ADMIN", "SPECTATOR") or eq == {"RED": "RED", "BLUE": "BLUE"}.get(rol)},
+                      "corridas": len(ctl.runs)}
     if rol == "SPECTATOR":
         base["publico"] = {"extraido": {t: len(f) for t, f in p.extraido.items()}, "alertas": len(p.alertas), "incidentes": len(p.incidentes)}
     return base
@@ -127,6 +134,7 @@ def registrar(app, ms=None):
         except (TypeError, ValueError):
             return _err("time_scale debe ser un número")
         _E["p"] = NovaPartida(config=cfg, reloj=Reloj(virtual=False, escala=escala), secretos=Secretos(), db=_db())
+        _E["ia"] = IA.ControlIA(_E["p"])
         return JSONResponse(_estado_publico(_E["p"], "ADMIN", None))
 
     def _ejecuta(request, fn, *a, **kw):
@@ -224,7 +232,91 @@ def registrar(app, ms=None):
         if t is not None and not t.done():
             t.cancel()          # stop no deja tareas vivas
         _E["tarea"] = None
+        if _E["ia"] is not None:
+            _E["ia"].cancelar_todo()
         return r
+
+    # ── IA: configuración, propuestas, confirmación (assist) y registro de corridas ─────────────────────
+    def _proveedor(equipo, spec):
+        tipo = (spec or {}).get("tipo", "scripted")
+        if tipo == "scripted":
+            return IA.ScriptedProvider(equipo, (spec or {}).get("politica", "heuristica"))
+        if tipo == "offline":
+            return IA.OfflineProvider()
+        if tipo == "ollama":
+            return IA.OllamaProvider(spec.get("endpoint"), str(spec.get("modelo") or "")[:100] or "qwen3:8b", semilla=int(spec.get("semilla", 0)))
+        raise ErrorNova(400, "tipo de proveedor no válido (scripted, ollama u offline)")
+
+    @app.post("/api/nova/ia/config")
+    async def nova_ia_config(request: Request, cuerpo: dict):
+        """Solo el administrador: modo por equipo (off/assist/auto) y proveedor (scripted etiquetado, Ollama con anti-SSRF, offline)."""
+        try:
+            p = _p()
+        except ErrorNova as e:
+            return _err(e.mensaje, e.status, e.motivo)
+        if _rol(request) != "ADMIN":
+            return _err("Solo el administrador configura la IA", 403, "FORBIDDEN")
+        ctl = _E["ia"]
+        try:
+            for eq in ("RED", "BLUE"):
+                c = cuerpo.get(eq)
+                if not isinstance(c, dict):
+                    continue
+                ctl.configurar(eq, c.get("modo"), _proveedor(eq, c["proveedor"]) if c.get("proveedor") else None)
+        except ErrorNova as e:
+            return _err(e.mensaje, e.status, e.motivo)
+        _emitir("nova_estado", {"estado": p.estado})
+        return JSONResponse(_estado_publico(p, "ADMIN", None))
+
+    @app.get("/api/nova/ollama/estado")
+    async def nova_ollama(request: Request, endpoint: str = "http://127.0.0.1:11434"):
+        """Estado real del endpoint (nada simulado): conexión, modelos y por qué falla. Endpoint validado contra SSRF."""
+        try:
+            url = IA.validar_endpoint(endpoint)
+        except ErrorNova as e:
+            return _err(e.mensaje, e.status, e.motivo)
+        loop = asyncio.get_running_loop()
+        disp = await loop.run_in_executor(None, cliente_ollama.ollama_disponible, url)
+        modelos = await loop.run_in_executor(None, cliente_ollama.listar_modelos, url) if disp else []
+        return JSONResponse({"endpoint": url, "conectado": disp, "modelos": modelos, "error": None if disp else "Ollama no responde en ese endpoint"})
+
+    @app.post("/api/nova/ia/proponer")
+    async def nova_ia_proponer(request: Request, cuerpo: dict):
+        """Pide UNA propuesta a la IA de TU equipo (Rojo→RED, Azul→BLUE; el administrador, cualquiera). Corre fuera del bucle de eventos."""
+        try:
+            p = _p()
+        except ErrorNova as e:
+            return _err(e.mensaje, e.status, e.motivo)
+        rol, eq = _rol(request), cuerpo.get("equipo")
+        if rol not in ("ADMIN", "RED", "BLUE") or (rol != "ADMIN" and eq != rol):
+            return _err("Solo puedes pedir propuestas a la IA de tu propio equipo", 403, "WRONG_TEAM")
+        try:
+            run = await asyncio.get_running_loop().run_in_executor(None, _E["ia"].proponer, eq)
+        except ErrorNova as e:
+            return _err(e.mensaje, e.status, e.motivo)
+        _emitir("nova_evento", {"seq": p.seq, "estado": p.estado})
+        return JSONResponse({k: v for k, v in run.items() if k not in ("entrada", "salida_cruda")})
+
+    @app.post("/api/nova/ia/confirmar")
+    async def nova_ia_confirmar(request: Request, cuerpo: dict):
+        try:
+            p = _p()
+            rol = _rol(request)
+            run = _E["ia"].propuestas.get(cuerpo.get("run_id"))
+            if rol not in ("ADMIN", "RED", "BLUE") or (run and rol != "ADMIN" and run["team"] != rol):
+                return _err("Solo un humano del mismo equipo confirma una propuesta de su IA", 403, "WRONG_TEAM")
+            res = _E["ia"].descartar(cuerpo.get("run_id")) if cuerpo.get("descartar") else _E["ia"].confirmar(cuerpo.get("run_id"), _nombre(request) or "admin")
+        except ErrorNova as e:
+            return _err(e.mensaje, e.status, e.motivo)
+        _emitir("nova_evento", {"seq": p.seq, "estado": p.estado})
+        return JSONResponse(res or {"estado": "DESCARTADA"})
+
+    @app.get("/api/nova/ia/runs")
+    async def nova_ia_runs(request: Request):
+        if _E["ia"] is None:
+            return JSONResponse({"corridas": []})
+        rol = _rol(request)
+        return JSONResponse({"corridas": _E["ia"].publico(None if rol in ("ADMIN", "SPECTATOR") else rol if rol in ("RED", "BLUE") else "-")})
 
     @app.post("/api/nova/accion")
     async def nova_accion(request: Request, cuerpo: dict):
