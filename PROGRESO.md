@@ -440,3 +440,9 @@ siguen siendo 21. El cálculo vive ahora en `experimentos/avance.py`, verificabl
 - F20 con Ollama real: v1 sin esquema 0 válidas; v2 con JSON Schema 100 % válidas (`docs/evaluacion/NOVA_OLLAMA_REAL_v2.md`).
 - Batería: 51/52 suites, 2248/2249 comprobaciones; única falla = umbral de tiempo en `e2e/test_combate_ui.py` (6,1 s vs 4 s), no relacionado con Nova.
 - Pendiente: demo/guion Nova dedicado, sección de instalación Nova, red local y dos PCs sin verificar. Ollama apagado.
+
+## Fase multijugador (2026-11-22)
+- Panel de jugadores, 4 vs 4 en motor y navegadores, solicitudes del Azul por votación con decisor, cuadro emergente para todos, la IA Azul pide autorización con detalle completo (directiva, corrida, hora), presencia automática por latido y estado real de la IA por equipo en pantalla. Ver `docs/NOVA.md` y `docs/PLAN_MISION_MULTIJUGADOR.md`.
+- Pruebas nuevas: `src/lab/test_nova_multijugador.py` (40), `e2e/test_nova_multijugador_ui.py` (17), ampliaciones en `server/test_nova.py` (54), `test_nova_prompts.py` (30), `e2e/test_nova_ui.py` (40).
+- Fallos conocidos: `e2e/test_combate_ui.py` (umbral de tiempo de la cronología, anterior a esta fase) y `server/test_partida.py` «cada partida tiene su propio id» (intermitente: pasa solo).
+- Pendiente: prueba real con un compañero en red local (`docs/PRUEBA_RED_LOCAL.md`), modelos en dos PCs, IA vs IA con Ollama (`docs/evaluacion/NOVA_OLLAMA_IA_VS_IA.md`).

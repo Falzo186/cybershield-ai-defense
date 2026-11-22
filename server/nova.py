@@ -55,7 +55,7 @@ def _estado_publico(p, rol, nombre):
             "rol": rol, "win": p.config["win"] if rol == "ADMIN" else None, "config": {k: v for k, v in p.config.items() if k not in ("win",)} if rol == "ADMIN" else None}
     if rol == "RED" or rol == "ADMIN":
         base["rojo"] = {"credenciales": p.vista_rojo(), "plantillas": list(E.PLANTILLAS_ROJO), "tablas": E.TABLAS, "patron": E.PATRON_CREDENCIAL,
-                        "aprobaciones": [{k: v for k, v in a.items() if k != "recomendacion"} for a in p.aprobaciones.values() if a["equipo_solicitante"] == "RED"],
+                        "aprobaciones": [{k: v for k, v in a.items() if k not in ("recomendacion", "votos", "decisor", "cierra_s", "detalle", "accion_propuesta")} for a in p.aprobaciones.values() if a["equipo_solicitante"] == "RED"],
                         "extraido": {t: len(f) for t, f in p.extraido.items()}, "misiones": p.misiones("RED"), "mensajes": [x for x in p.mensajes if x["equipo"] == "RED"][-30:]}
     if rol == "BLUE" and nombre:
         base["azul"] = p.vista_azul(nombre)
