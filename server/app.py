@@ -29,6 +29,7 @@ import mock_server as ms  # noqa: E402
 import panel as pn  # noqa: E402
 import combate as cb  # noqa: E402
 import simulacion as sim  # noqa: E402
+import nova as nv  # noqa: E402
 import partida as pt  # noqa: E402
 from CyberShield_Repair_Library.components.game_session.idempotencia import AlmacenIdempotencia  # noqa: E402
 from CyberShield_Repair_Library.components.notifications import notificaciones as notif  # noqa: E402
@@ -74,7 +75,7 @@ RUTA_SALIR = "/api/sesion/salir"   # cerrar la propia sesión: permitido a cualq
 # El panel de análisis (/api/panel/...) es una vista de solo lectura del laboratorio: no toca la partida, no
 # expone secretos y se consulta sin unirse a ningún equipo. Sus POST (lanzar o cancelar una campaña) sí
 # exigen sesión, como cualquier otra acción.
-PREFIJOS_PUBLICOS = ("/api/panel/", "/api/combate/", "/api/simulacion/", "/api/caminos/")   # el combate: GET públicos de solo lectura; los POST los valida combate.py (árbitro)
+PREFIJOS_PUBLICOS = ("/api/panel/", "/api/combate/", "/api/simulacion/", "/api/caminos/", "/api/nova/")   # el combate: GET públicos de solo lectura; los POST los valida combate.py (árbitro)
 # Rutas reservadas a UN equipo (además de exigir sesión). Detener, iniciar y cerrar la partida es cosa del árbitro;
 # Rojo envía correos de entrenamiento y Azul los lee en su buzón.
 SOLO_EQUIPO = {"/api/detener": "general", "/api/correo": "rojo", "/api/buzon": "azul", "/api/misiones": "azul",
@@ -2319,6 +2320,7 @@ async def manual_real(body: ManualRealIn):
 pn.registrar(app, HOST, repositorio.por_defecto)
 cb.registrar(app, HOST)
 sim.registrar(app, HOST)
+nv.registrar(app, ms)
 ms.montar_ui(app)
 
 if __name__ == "__main__":

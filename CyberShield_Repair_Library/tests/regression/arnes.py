@@ -35,6 +35,9 @@ class Respuesta:
     def __getitem__(self, k):
         return (self.datos or {})[k]
 
+    def __contains__(self, k):
+        return isinstance(self.datos, dict) and k in self.datos
+
     def get(self, k, d=None):
         return (self.datos or {}).get(k, d) if isinstance(self.datos, dict) else d
 
@@ -56,7 +59,10 @@ class Cliente:
         try:
             with urllib.request.urlopen(rq, timeout=20) as r:
                 raw = r.read().decode("utf-8")
-                return Respuesta(r.status, json.loads(raw) if raw else None)
+                try:
+                    return Respuesta(r.status, json.loads(raw) if raw else None)
+                except ValueError:
+                    return Respuesta(r.status, {"raw": raw})      # cuerpos no JSON (descargas CSV/SQL)
         except urllib.error.HTTPError as e:
             raw = e.read().decode("utf-8", "replace")
             try:
@@ -117,8 +123,9 @@ class Sse:
 class Entorno:
     """Servidor real + Ollama falso con contador. Uso: `with Entorno() as e: ...`."""
 
-    def __init__(self, retardo_ollama=0.0):
+    def __init__(self, retardo_ollama=0.0, env_extra=None):
         self.retardo = retardo_ollama
+        self.env_extra = env_extra or {}
 
     def __enter__(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -136,7 +143,7 @@ class Entorno:
         self.puerto = puerto_libre()
         self.base = f"http://127.0.0.1:{self.puerto}"
         env = {**os.environ, "PUERTO": str(self.puerto), "CS_LAB_DB": str(self.tmp / "lab.db"), "PYTHONIOENCODING": "utf-8",
-               "CS_CODIGO_ARBITRO": CODIGO, "OLLAMA_HOST": self.url_ollama}
+               "CS_CODIGO_ARBITRO": CODIGO, "OLLAMA_HOST": self.url_ollama, "CS_NOVA_DB": str(self.tmp / "nova.db"), "CS_NOVA_CLAVES": str(self.tmp / "claves.json"), **self.env_extra}
         self.proc = subprocess.Popen([sys.executable, "server/app.py"], cwd=RAIZ, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for _ in range(80):
             try:
