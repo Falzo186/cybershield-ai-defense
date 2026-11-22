@@ -434,3 +434,9 @@ siguen siendo 21. El cálculo vive ahora en `experimentos/avance.py`, verificabl
 - Batería: 42/42 suites · 1 953/1 953.
 - Avance (fórmula histórica, pesos sin tocar): sin cambios; no mide el sistema.
 - Pendiente: P-19 (fase cruzada incompleta), P-20, P-21 (alinear con el paquete del profesor o retomar `Rebuilt`).
+
+## Fase Nova (profesor/cobertura)
+- Cobertura funcional del paquete del profesor sobre el stack actual: escenario, motor, IA con modos, UI por rol, historial. Ver `docs/NOVA.md` y `docs/AUDITORIA_35_CRITERIOS.md` (28 aprobados, 5 parciales, 2 no verificados).
+- F20 con Ollama real: v1 sin esquema 0 válidas; v2 con JSON Schema 100 % válidas (`docs/evaluacion/NOVA_OLLAMA_REAL_v2.md`).
+- Batería: 51/52 suites, 2248/2249 comprobaciones; única falla = umbral de tiempo en `e2e/test_combate_ui.py` (6,1 s vs 4 s), no relacionado con Nova.
+- Pendiente: demo/guion Nova dedicado, sección de instalación Nova, red local y dos PCs sin verificar. Ollama apagado.
