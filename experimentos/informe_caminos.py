@@ -88,7 +88,7 @@ def main():
         L.append(f"- {p['contraste']} — {p['metrica']}: {p['a']['exitos']}/{p['a']['n']} frente a {p['b']['exitos']}/{p['b']['n']} (p Holm = {p['p_holm']:.4f}).")
     n_cru = sum(1 for o in ia if o["fase"] == "cruzada")
     L += ["\n## 9. Limitaciones (fijas)",
-          f"- **La fase cruzada quedó incompleta ({n_cru} partidas)**: la GPU se cedió al usuario; los ids son deterministas y la campaña se puede reanudar. Las filas «cruzada» son exploratorias (n < 30).",
+          f"- **La fase cruzada quedó incompleta ({n_cru} de 204 planificadas)**: la GPU se cedió al usuario; los ids son deterministas y la campaña se puede reanudar. En el grafo hay 44 y 42 partidas por sentido (suficientes para un IC estrecho); **el modo automático cruzado casi no se jugó** (sin conclusiones).",
           "- Las líneas base son deterministas: sus resultados no varían entre dificultades ni semillas; sirven de referencia, no de muestra.",
           "- Los prompts de los 8B (`c1`) se escribieron una vez y no se calibraron para este modo; otros prompts u otros modelos podrían dar otras tasas.",
           "- En el modo automático el Rojo 8B tiende a probar primero la credencial del administrador de respaldos (un señuelo): es una observación del modelo, no un ajuste del modo.",

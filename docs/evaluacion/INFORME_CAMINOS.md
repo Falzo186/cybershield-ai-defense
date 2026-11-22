@@ -104,7 +104,7 @@ Significativos al 0,05 tras Holm: **7**. Los más relevantes:
 - [auto] Rojo qwen3:8b vs Rojo aleatorio · Azul aprobar — victoria_roja: 0/13 frente a 13/20 (p Holm = 0.0044).
 
 ## 9. Limitaciones (fijas)
-- **La fase cruzada quedó incompleta (86 partidas)**: la GPU se cedió al usuario; los ids son deterministas y la campaña se puede reanudar. Las filas «cruzada» son exploratorias (n < 30).
+- **La fase cruzada quedó incompleta (86 de 204 planificadas)**: la GPU se cedió al usuario; los ids son deterministas y la campaña se puede reanudar. En el grafo hay 44 y 42 partidas por sentido (suficientes para un IC estrecho); **el modo automático cruzado casi no se jugó** (sin conclusiones).
 - Las líneas base son deterministas: sus resultados no varían entre dificultades ni semillas; sirven de referencia, no de muestra.
 - Los prompts de los 8B (`c1`) se escribieron una vez y no se calibraron para este modo; otros prompts u otros modelos podrían dar otras tasas.
 - En el modo automático el Rojo 8B tiende a probar primero la credencial del administrador de respaldos (un señuelo): es una observación del modelo, no un ajuste del modo.
