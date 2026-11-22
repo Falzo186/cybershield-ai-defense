@@ -119,3 +119,13 @@ Reemplaza al guion de la misión de 23 h para exposiciones: incluye una partida 
 
 **Cómo explicar con honestidad `LIBRE_IA` vs `CAMINOS_*`:** el combate libre mide si un modelo logra engañar con **solo texto** a un defensor que verifica el registro (no lo logró). Caminos **cambia las reglas del juego**: da al Rojo opciones y un camino real a la victoria y mide qué hace cada 8B con ellas. Una victoria Roja de **guion** prueba que el diseño la permite; una de **8B** (`CAMINOS_IA`) es real pero **solo en este modo**; ninguna debe presentarse como «la IA hackeó a la IA» en general.
 **Plan B sin Ollama:** reproduce las 6 grabaciones (no necesitan GPU) y lanza partidas con los modelos simples (rotuladas GUION).
+
+## Nova (≈ 8 min)
+Reproducible sin IA: `python -m src.lab.demo_nova` verifica los 9 hitos; en UI, `e2e/test_nova_ui.py` recorre lo mismo con 5 navegadores.
+1. Admin crea la partida en `/nova/`; entran Rojo, Azul y un espectador. Mostrar la sala de espera: **no inicia sola**.
+2. Admin pulsa Iniciar (con confirmación). Estado EN_CURSO.
+3. Rojo envía un correo con enlace `lab://` a EMP-05 (no conectada). Pasado el retardo, el empleado guionizado pulsa y la credencial queda COMPROMETIDA.
+4. Rojo consulta el recurso protegido: aparece una alerta en el panel Azul.
+5. Azul pide autorización humana (tarea) y un humano aprueba o rechaza; mostrar que cambia el estado.
+6. Rojo extrae `reportes_financieros`: el **motor** declara VICTORIA_ROJA; el espectador lo ve y se descarga solo lo extraído.
+7. Mostrar historial de partidas. Aclarar: todo ficticio y local; lo simulado va etiquetado; Wazuh real NO_CONFIGURADO.

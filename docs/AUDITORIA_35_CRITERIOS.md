@@ -37,7 +37,7 @@ Estados: **APROBADO** (operación real + prueba sobre estado + ruta), **PARCIAL*
 | 31 | Historial consultable | APROBADO | idem |
 | 32 | E2E pasan | PARCIAL | Batería completa: 51/52 suites, 2248/2249; `e2e/test_nova_ui.py` 33/33. Falla solo un umbral de tiempo de `e2e/test_combate_ui.py` (cronología de 441 mensajes en 6,1 s frente a 4 s), del combate previo, no de Nova |
 | 33 | Red local | NO VERIFICADO | Solo localhost; no probado entre equipos |
-| 34 | Procedimiento de instalación | PARCIAL | `docs/GUIA_INSTALACION.md` general; falta sección específica de Nova |
-| 35 | Ensayo de demo reproducible | PARCIAL | `e2e/test_nova_ui.py` es reproducible; falta guion/script de demo dedicado a Nova |
+| 34 | Procedimiento de instalación | APROBADO | `docs/GUIA_INSTALACION.md` (sección Nova); la red local sigue sin verificar (33) |
+| 35 | Ensayo de demo reproducible | APROBADO | `src/lab/demo_nova.py` (9 hitos, determinista, en la batería) + `docs/GUION_DEMO.md` |
 
-Resumen: 28 APROBADO, 5 PARCIAL (3, 15, 32, 34, 35), 2 NO VERIFICADO (14, 33).
+Resumen: 30 APROBADO, 3 PARCIAL (3, 15, 32), 2 NO VERIFICADO (14, 33).
