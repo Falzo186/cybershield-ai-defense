@@ -60,6 +60,7 @@
     visible("#p-rojo-cred", ["RED", "ADMIN"].includes(S.rol) && !!e.rojo); visible("#p-rojo-op", S.rol === "RED" && !!e.rojo);
     if (e.rojo) pintarRojo(e);
     pintarConstructor(e);
+    pintarJugadores(e);
     const az = S.rol === "BLUE" && e.azul; for (const id of ["#p-azul-id", "#p-azul-bandeja", "#p-azul-aprob", "#p-azul-alertas"]) visible(id, !!az);
     if (az) pintarAzul(e); else if (S.rol === "ADMIN" && e.azul_todos) pintarAdminAzul(e);
     pintarPub(e);
@@ -74,7 +75,7 @@
     if (e.ia) { $("#ia-estado").textContent = `IA Roja: ${e.ia.modos.RED} · ${e.ia.proveedores.RED.etiqueta} — IA Azul: ${e.ia.modos.BLUE} · ${e.ia.proveedores.BLUE.etiqueta} — corridas registradas: ${e.ia.corridas}`; }
   }
   $("#form-crear").addEventListener("submit", (ev) => { ev.preventDefault();
-    intentar(() => api("POST", "/api/nova/partida", { duration_s: parseInt($("#c-dur").value, 10), time_scale: parseFloat($("#c-esc").value), modalidad: $("#c-mod").value, ai_prompt_mode: $("#c-pmodo").value, ai_prompt_budget: parseInt($("#c-pres").value, 10) || 10, win: { reglas: $("#c-win").value.split(",") } }), "Partida creada (en configuración)"); });
+    intentar(() => api("POST", "/api/nova/partida", { duration_s: parseInt($("#c-dur").value, 10), time_scale: parseFloat($("#c-esc").value), modalidad: $("#c-mod").value, ai_prompt_mode: $("#c-pmodo").value, approval_mode: $("#c-amodo").value, ai_prompt_budget: parseInt($("#c-pres").value, 10) || 10, win: { reglas: $("#c-win").value.split(",") } }), "Partida creada (en configuración)"); });
   $("#b-sala").addEventListener("click", () => intentar(() => api("POST", "/api/nova/sala"), "Sala de espera abierta"));
   $("#b-lista").addEventListener("click", () => intentar(() => api("POST", "/api/nova/lista"), "Partida marcada LISTA"));
   $("#b-iniciar").addEventListener("click", () => { if (window.confirm("¿Iniciar la partida? Esta acción la inicia de verdad.")) intentar(() => api("POST", "/api/nova/iniciar", { confirm: true, idempotency_key: "ui-" + Date.now() + "-" + Math.random().toString(36).slice(2) }), "Partida iniciada"); });
@@ -196,7 +197,7 @@
       B("Reportar", () => acc("report_email", { email_id: m.id }, "Correo reportado")); f.append(bt); bz.append(f); });
     const ap = $("#az-aprob"); ap.textContent = ""; const pend = a.aprobaciones.filter((x) => ["PENDIENTE", "INFO_SOLICITADA", "ESCALADA"].includes(x.estado)); $("#n-aprob").hidden = !pend.length; $("#n-aprob").textContent = pend.length + " pendiente(s)";
     if (!a.aprobaciones.length) ap.append(el("div", "vacio-eq", "No hay solicitudes."));
-    a.aprobaciones.forEach((x) => { const d = el("div", "ap"); d.append(el("b", "", `${x.id} · ${x.operacion} → ${x.recurso} · ${x.estado}`), el("small", "", `Solicitante: ${x.solicitante} · riesgo ${x.riesgo} · ${x.motivo}`), ...(x.detalle ? [el("b", "", `⚠ SOLICITUD MISTERIOSA: alguien presentó una credencial parecida (${x.detalle.candidato}, ${x.detalle.coincidencias} de ${x.detalle.de} posiciones) para ${x.detalle.identidad} · ${x.detalle.nombre}. Posible jugador: ${x.detalle.jugador_posible || "sin asignar"}. ¿Fue él?`)] : []), el("small", "", `Recomendación (${x.recomendacion.origen === "ia" ? "IA" : "reglas, no IA"}): ${x.recomendacion.decision} — ${x.recomendacion.motivo}`));
+    a.aprobaciones.forEach((x) => { const d = el("div", "ap"); d.append(el("b", "", `${x.id} · ${x.operacion} → ${x.recurso} · ${x.estado}`), el("small", "", `Solicitante: ${x.solicitante} · riesgo ${x.riesgo} · ${x.motivo}`), ...(x.detalle ? [el("b", "", `⚠ SOLICITUD MISTERIOSA: alguien presentó una credencial parecida (${x.detalle.candidato}, ${x.detalle.coincidencias} de ${x.detalle.de} posiciones) para ${x.detalle.identidad} · ${x.detalle.nombre}. Posible jugador: ${x.detalle.jugador_posible || "sin asignar"}. ¿Fue él?`)] : []), el("small", "", `Recomendación (${x.recomendacion.origen === "ia" ? "IA" : x.recomendacion.origen === "humano" ? "humano" : "reglas, no IA"}): ${x.recomendacion.decision} — ${x.recomendacion.motivo}`), el("small", "", resumenVotos(x)));
       if (["PENDIENTE", "INFO_SOLICITADA", "ESCALADA"].includes(x.estado)) { const bt = el("div", "acciones-form"); const B = (t, tipo, cls) => { const b = el("button", "boton" + (cls ? " " + cls : ""), t); b.addEventListener("click", () => acc(tipo, { approval_id: x.id }, t)); bt.append(b); };
         B(x.detalle ? "Aceptar (fui yo / lo permito)" : "Aprobar", "approve_request", "boton-primario"); B(x.detalle ? "Denegar y bloquear identidad" : "Rechazar", "reject_request", "boton-peligro"); B("Pedir más información", "request_more_info"); B("Escalar", "escalate"); d.append(bt); } ap.append(d); });
     const al = $("#az-alertas"); al.textContent = ""; a.alertas.slice(-6).reverse().forEach((x) => { const d = el("div", "al"); d.append(el("b", "", `${x.id} · ${x.severidad} · ${x.estado}`), el("span", "", x.titulo));
@@ -205,8 +206,71 @@
     const inc = $("#az-inc"); inc.textContent = ""; a.incidentes.forEach((x) => { const d = el("div", "al"); d.append(el("b", "", `${x.id} · ${x.estado}`), el("span", "", x.titulo + " · identidades: " + x.identidades.join(", "))); if (x.estado === "ABIERTO") { const b = el("button", "boton boton-primario", "Contener incidente"); b.addEventListener("click", () => acc("contain_incident", { incident_id: x.id }, "Incidente contenido")); d.append(b); } inc.append(d); });
     const ia = $("#az-ident-acc"); ia.textContent = ""; ["EMP-01", "EMP-02", "EMP-03", "EMP-04", "EMP-05", "EMP-06"].forEach((i) => { const b = el("button", "boton", "Revocar " + i); b.addEventListener("click", () => { if (window.confirm("Revocar la credencial de " + i + "? Si no estaba comprometida, penaliza (falso positivo).")) acc("revoke_credential", { identidad_id: i }, "Credencial revocada"); }); ia.append(b); });
     visible("#ia-azul", !!(e.ia && e.ia.modos.BLUE !== "off"));
+    dialogoSolicitudes(a);
   }
   function pintarAdminAzul(e) { /* el administrador ve el panel Rojo y el estado general en «Marcador y estado público» */ }
+
+  // ── Lista de jugadores (panel lateral, solo nombres) ────────────────────────────────────────────
+  function pintarJugadores(e) {
+    visible("#b-jug", !!S.token && S.rol !== null); const ps = e.participantes || [];
+    for (const [eq, cont, n] of [["RED", "#jug-rojo", "#jug-n-rojo"], ["BLUE", "#jug-azul", "#jug-n-azul"]]) {
+      const c = $(cont); c.textContent = ""; const lista = ps.filter((p) => p.equipo === eq); $(n).textContent = String(lista.length);
+      lista.forEach((p) => { const f = el("div", "jug " + (eq === "RED" ? "rojo" : "azul") + (p.nombre === S.nombre ? " yo" : "")); f.append(el("span", "punto" + (p.conectado ? " on" : "")), el("b", "", p.nombre)); f.title = p.conectado ? "conectado" : "desconectado"; c.append(f); });
+      if (!lista.length) c.append(el("div", "vacio-eq", "Nadie todavía."));
+    }
+  }
+  $("#b-jug").addEventListener("click", () => { const p = $("#panel-jug"); p.hidden = !p.hidden; $("#b-jug").setAttribute("aria-expanded", String(!p.hidden)); });
+  $("#b-jug-cerrar").addEventListener("click", () => { $("#panel-jug").hidden = true; $("#b-jug").setAttribute("aria-expanded", "false"); });
+
+  // ── Solicitudes del Azul: diálogo para TODOS, opiniones visibles y decisor (el primero que interviene) ─────────
+  const ABIERTA = ["PENDIENTE", "INFO_SOLICITADA", "ESCALADA"]; const OCULTAS = new Set(); let dlgId = null;
+  function resumenVotos(x) {
+    const v = Object.entries(x.votos || {}); if (!v.length && !x.decisor) return "Sin votos todavía";
+    const a = v.filter(([, q]) => q.voto === "APROBAR").length; return `Decisor: ${x.decisor || "—"} · votos: ${a} a favor, ${v.length - a} en contra`;
+  }
+  function filasDetalle(x) {
+    const d = x.detalle || {};
+    const f = [["Solicitud", `${x.id} · ${x.operacion}`], ["Qué pide", d.que_pide || x.motivo], ["Quién lo pide", d.solicitante ? `${d.solicitante} (${d.origen === "ai" ? "IA Azul" : "jugador"})` : x.solicitante],
+      ["Identidad", d.sujeto || d.identidad ? `${d.sujeto || d.identidad} · ${d.nombre || ""}` : "—"], ["Credencial", d.credencial || d.candidato || "—"], ["Jugador posible", d.jugador_posible || "—"], ["Riesgo", x.riesgo],
+      ["Hora de la partida", d.hora_partida_s != null ? `${d.hora_partida_s} s` : `${Math.round(x.ts_s)} s`], ["Hora real", d.hora_real || "—"]];
+    if (d.coincidencias != null) f.push(["Parecido", `${d.coincidencias} de ${d.de} posiciones`]);
+    if (d.ia) {
+      f.push(["Corrida de IA", `${d.ia.run_id} · ${d.ia.proveedor === "scripted" ? "SIMULADO – no es una IA" : "Ollama " + (d.ia.modelo || "")}`]);
+      f.push(["Prompt (directiva)", d.ia.directiva ? Object.entries(d.ia.directiva).filter(([, v]) => v).map(([k, v]) => k + ": " + (typeof v === "object" ? JSON.stringify(v) : v)).join(" · ") : "sin directiva (modo libre)"]);
+    }
+    f.push(["Motivo", x.motivo]); return f;
+  }
+  function pintarDialogo(x) {
+    const d = $("#dlg-detalle"); d.textContent = ""; filasDetalle(x).forEach(([k, v]) => { const f = el("div", "dlg-fila"); f.append(el("span", "", k), el("span", "", String(v))); d.append(f); });
+    $("#dlg-titulo").textContent = x.operacion === "acceso_sospechoso" ? "⚠ Solicitud misteriosa de acceso" : x.operacion === "autorizacion_ia" ? "La IA Azul pide autorización" : "Solicitud pendiente";
+  }
+  function pintarVotos(x) {
+    const c = $("#dlg-votos"); c.textContent = ""; $("#dlg-decisor").textContent = x.decisor ? `· decide ${x.decisor}` : "· aún sin decisor: el primero en responder decide";
+    Object.entries(x.votos || {}).forEach(([n, q]) => { const f = el("div", "voto " + q.voto); f.append(el("b", "", n + ": " + (q.voto === "APROBAR" ? "a favor" : "en contra")), el("span", "", q.comentario || "")); c.append(f); });
+    if (!Object.keys(x.votos || {}).length) c.append(el("div", "vacio-eq", "Nadie ha opinado todavía."));
+    const soyDecisor = !x.decisor || x.decisor === S.nombre;
+    $("#dlg-nota").textContent = soyDecisor ? "Tu decisión cierra la solicitud." : `Decide ${x.decisor}. Tu respuesta cuenta como opinión; también se cierra si la mayoría del equipo coincide.`;
+  }
+  function dialogoSolicitudes(a) {
+    const dlg = $("#dlg-sol"); if (!dlg || typeof dlg.showModal !== "function") return;
+    const abiertas = (a.aprobaciones || []).filter((x) => ABIERTA.includes(x.estado));
+    if (dlgId) {
+      const x = (a.aprobaciones || []).find((q) => q.id === dlgId);
+      if (!x || !ABIERTA.includes(x.estado)) { if (dlg.open) dlg.close(); if (x) toast(`Solicitud ${x.id}: ${x.estado.toLowerCase()}`, "ok"); dlgId = null; } else { pintarVotos(x); return; }
+    }
+    const nueva = abiertas.find((x) => !OCULTAS.has(x.id) && !(x.votos || {})[S.nombre]); if (!nueva || dlg.open) return;
+    dlgId = nueva.id; $("#dlg-coment").value = ""; pintarDialogo(nueva); pintarVotos(nueva); dlg.showModal();
+  }
+  function responder(tipo) {
+    if (!dlgId) return; const id = dlgId; const c = $("#dlg-coment").value.trim(); OCULTAS.add(id);
+    intentar(async () => {
+      const r = await api("POST", "/api/nova/accion", { action_type: tipo, params: { approval_id: id, comentario: c }, idempotency_key: "dlg-" + Date.now() + Math.random().toString(36).slice(2) }, true); const d = await r.json();
+      if (!r.ok) throw new Error(d.mensaje || "rechazada");
+      toast(d.data && d.data.voto_registrado ? "Tu opinión quedó registrada" : "Decisión aplicada", "ok"); return d;
+    }, null);
+  }
+  $("#dlg-ok").addEventListener("click", () => responder("approve_request")); $("#dlg-no").addEventListener("click", () => responder("reject_request"));
+  $("#dlg-luego").addEventListener("click", () => { if (dlgId) OCULTAS.add(dlgId); $("#dlg-sol").close(); dlgId = null; });
 
   // ── Público, victoria, eventos ──────────────────────────────────────────────────────────────────
   function pintarPub(e) {

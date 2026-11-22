@@ -24,3 +24,15 @@ main { padding: var(--p-e5); } .entrar { max-width: 520px; margin: var(--p-e8) a
 .chat-eq { max-height: 180px; overflow: auto; border: 1px solid var(--p-borde); border-radius: var(--p-r-md); padding: var(--p-e3); background: #121a2e; display: grid; gap: 4px; margin-bottom: var(--p-e3); font-size: var(--p-t-sm); }
 .form-chat { display: flex; gap: var(--p-e2); margin-bottom: var(--p-e3); } .form-chat input { flex: 1; background: #18223b; color: #e6ebf5; border: 1px solid var(--p-borde); border-radius: var(--p-r-sm); padding: 7px 10px; }
 .mis { display: flex; gap: var(--p-e3); align-items: center; padding: 6px 0; border-bottom: 1px solid var(--p-borde-suave); } .mis span:first-child { flex: 1; }
+
+.panel-jug { position: fixed; top: 56px; right: 0; width: 260px; max-height: calc(100vh - 70px); overflow: auto; background: #121a2e; border: 1px solid var(--p-borde); border-right: 0; border-radius: var(--p-r-lg) 0 0 var(--p-r-lg); padding: var(--p-e4); z-index: 20; box-shadow: 0 8px 28px rgba(0,0,0,.45); }
+.panel-jug-cab { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--p-e3); }
+.jug { display: flex; align-items: center; gap: var(--p-e2); padding: 4px 0; } .jug .punto { width: 9px; height: 9px; border-radius: 50%; background: #5a6a8c; flex: none; } .jug .punto.on { background: #2e8b57; }
+.jug.rojo b { color: #ff8f98; } .jug.azul b { color: #8fb8ff; } .jug.yo { font-weight: 700; }
+.dlg-sol { background: #121a2e; color: #e6ebf5; border: 2px solid #d9a441; border-radius: var(--p-r-lg); padding: var(--p-e5); width: min(640px, 94vw); }
+.dlg-sol::backdrop { background: rgba(5, 8, 18, .72); }
+.dlg-sol h3 { margin: 0 0 var(--p-e3); } .dlg-fila { display: grid; grid-template-columns: 170px 1fr; gap: var(--p-e3); padding: 4px 0; border-bottom: 1px solid var(--p-borde-suave); font-size: var(--p-t-sm); }
+.dlg-fila > span:first-child { color: #7c8db5; text-transform: uppercase; font-size: var(--p-t-xs); letter-spacing: .05em; }
+.voto { display: flex; gap: var(--p-e3); padding: 3px 0; font-size: var(--p-t-sm); } .voto.APROBAR b { color: #6fcf97; } .voto.RECHAZAR b { color: #ff8f98; }
+.nota { color: #7c8db5; font-size: var(--p-t-xs); margin: var(--p-e3) 0 0; }
+@media (max-width: 640px) { .panel-jug { width: 100%; top: 0; max-height: 100vh; border-radius: 0; } .dlg-fila { grid-template-columns: 1fr; } }

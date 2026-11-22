@@ -48,3 +48,6 @@ Ninguno: no se modificó la aserción de ninguna prueba anterior. Las 5 suites q
 
 ## D-31 · Prompts de IA controlados por directiva y oportunidades (Nova)
 Decidido con el usuario: la IA nunca lanza prompts por sí sola; el jugador elige partes de catálogo (combos) y cada lanzamiento gasta una de 10 oportunidades por equipo (configurable). La credencial obtenida se desbloquea en el combo; la aleatoria se pide con estructura. Un intento casi correcto genera una solicitud sospechosa al Azul (aceptar/denegar). Por equipo, no por jugador. Modo `libre` se conserva solo para experimentos.
+
+## D-32 · Autorizaciones del Azul por votación con decisor (Nova)
+Decidido con el usuario: todas las solicitudes llegan a todos los Azules; opinan con comentario; el primero que responde es el decisor; cierra la mayoría absoluta o, al acabar una ventana corta, la mayoría de los votos (empate: el decisor). La IA en auto y el admin no esperan. Se conserva el modo `primero` (decide solo el primero). Votar y comentar quedan en el registro de eventos.

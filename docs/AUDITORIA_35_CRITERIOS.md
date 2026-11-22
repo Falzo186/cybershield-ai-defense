@@ -6,7 +6,7 @@ Estados: **APROBADO** (operación real + prueba sobre estado + ruta), **PARCIAL*
 |---|---|---|---|
 | 1 | Admin crea partida | APROBADO | `server/test_nova.py`, `e2e/test_nova_ui.py` |
 | 2 | Jugadores entran | APROBADO | `server/test_nova.py`, e2e 5 navegadores |
-| 3 | Aparecen conectados | PARCIAL | Lista de conectados en sala Nova; presencia automática por latido de Repair no integrada a Nova |
+| 3 | Aparecen conectados | PARCIAL | Lista de jugadores con punto de conexión (panel lateral y sala); la presencia sigue siendo la de unirse/desconectar, sin latido automático |
 | 4 | Se ve el equipo de cada jugador | APROBADO | `src/lab/test_nova.py`, `e2e/test_nova_ui.py` |
 | 5 | Roles respetados en backend | APROBADO | `WRONG_TEAM`/403 en `server/test_nova.py`, `src/lab/test_nova.py` |
 | 6 | Sala de espera | APROBADO | estados CONFIGURACION→SALA_DE_ESPERA→LISTA en `test_nova.py` |
@@ -40,4 +40,4 @@ Estados: **APROBADO** (operación real + prueba sobre estado + ruta), **PARCIAL*
 | 34 | Procedimiento de instalación | APROBADO | `docs/GUIA_INSTALACION.md` (sección Nova); la red local sigue sin verificar (33) |
 | 35 | Ensayo de demo reproducible | APROBADO | `src/lab/demo_nova.py` (9 hitos, determinista, en la batería) + `docs/GUION_DEMO.md` |
 
-Resumen: 30 APROBADO, 3 PARCIAL (3, 15, 32), 2 NO VERIFICADO (14, 33).
+Resumen: 30 APROBADO, 3 PARCIAL (3, 15, 32), 2 NO VERIFICADO (14, 33). Multijugador 4 vs 4 y votación: probados en motor y 7 navegadores; 8 personas reales en red local NO VERIFICADO.

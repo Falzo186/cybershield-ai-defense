@@ -16,6 +16,7 @@ import test_combate_ui as B  # noqa: E402
 RAIZ = Path(__file__).resolve().parents[1]
 SALIDA = RAIZ / "docs" / "capturas_nova"
 R, CONSOLA, RED = [], [], []
+MANUAL = {"on": False}      # True cuando la prueba quiere interactuar con el diálogo de solicitudes; si no, se pospone solo para no tapar la pantalla
 
 
 def chk(n, c, d=""):
@@ -32,6 +33,8 @@ def pagina(nav, base, rol, token, nombre, vista=(1366, 768)):
     p.on("console", lambda m: CONSOLA.append(m.text) if m.type in ("error", "warning") else None)
     p.on("pageerror", lambda e: CONSOLA.append(str(e)))
     p.on("response", lambda r: RED.append((r.status, r.url)) if r.status >= 400 else None)
+    if rol == "azul":
+        p.add_locator_handler(p.locator("#dlg-sol[open]"), lambda: None if MANUAL["on"] else p.click("#dlg-luego"), no_wait_after=True)
     p.goto(base + "/nova/")
     return ctx, p
 
@@ -151,7 +154,11 @@ def main(ver=False, capturas=True):
         pr.select_option("#op-accion", "export_database"); pr.click("#form-op button[type=submit]")
         esperar_texto(pr, "#op-resultado", "Rechazada")
         chk("sin aprobación la exportación completa la rechaza el motor (PERMISSION_DENIED)", "PERMISSION_DENIED" in txt(pr, "#op-resultado"))
-        p1.locator("#az-aprob button", has_text="Aprobar").first.click()
+        MANUAL["on"] = True
+        p1.wait_for_selector("#dlg-sol[open]")
+        chk("a todos los Azules les aparece un cuadro con la solicitud: qué pide, quién, hora y recomendación", all(k.upper() in txt(p1, "#dlg-detalle").upper() for k in ("Qué pide", "Quién lo pide", "Hora real", "Riesgo")) and "ALTO" in txt(p1, "#dlg-detalle"))
+        p1.click("#dlg-ok")
+        MANUAL["on"] = False
         esperar_texto(pr, "#elev-rojo", "APROBADA")
         chk("Azul aprueba y el Rojo ve la solicitud APROBADA (la decisión cambia el estado del escenario)", "APROBADA" in txt(pr, "#elev-rojo"))
         pr.select_option("#op-accion", "export_database"); pr.click("#form-op button[type=submit]")

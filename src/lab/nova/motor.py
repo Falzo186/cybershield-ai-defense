@@ -44,11 +44,11 @@ TRANS_TAREA = {"PENDIENTE": {"EN_PROGRESO", "CANCELADA"}, "EN_PROGRESO": {"ESPER
 EQUIPOS = ("RED", "BLUE", "ADMIN", "SPECTATOR")
 ACCIONES_ROJO = {"send_email", "scan_directory", "guess_credential", "use_credential", "query_resource", "extract_table", "export_database", "request_elevation", "respond_info", "message_team"}
 ACCIONES_AZUL = {"assign_task", "set_task_status", "classify_email", "report_email", "open_email", "view_link", "click_link", "risk_action", "revoke_credential", "suspend_identity", "block_link", "contain_incident",
-                 "approve_request", "reject_request", "request_more_info", "escalate", "set_alert_status", "message_team", "allow"}
+                 "approve_request", "reject_request", "request_more_info", "escalate", "set_alert_status", "message_team", "allow", "vote_request", "request_authorization"}
 CONFIG_DEFECTO = {"duration_s": 720, "round_s": 60, "guess_attempts_per_round": 3, "guess_attempts_per_match": 12, "guess_cooldown_s": 20, "guess_lockout_after_fails": 3, "lockout_s": 90,
                   "detect_prob_fail": 0.6, "min_continuity": 0.6, "abuse_policy": "empate", "approval_ttl_s": 90, "elevation_grant_s": 120, "emails_per_round": 3, "scans_per_round": 2,
                   "click_prob_unconnected": 1.0, "click_delay_s": 25, "modalidad": "BALANCED", "ai_mode": {"RED": "off", "BLUE": "off"}, "win": E.WIN_POR_DEFECTO, "seed": 1,
-                  "model_down_policy": "pause", "ai_prompt_budget": 10, "ai_prompt_mode": "controlado", "near_miss_min": 4}
+                  "model_down_policy": "pause", "ai_prompt_budget": 10, "ai_prompt_mode": "controlado", "near_miss_min": 4, "approval_mode": "primero", "approval_window_s": 15}
 
 
 class ErrorNova(Exception):
@@ -302,6 +302,8 @@ class NovaPartida:
                     self._ev("scheduler.event_fired", data={"scenario_event_id": c["id"]})
                     self._entregar_programado(c)
             for a in self.aprobaciones.values():
+                if a["estado"] in self.ABIERTAS and a.get("cierra_s") is not None and t >= a["cierra_s"]:
+                    self._cierre_por_ventana(a)
                 if a["estado"] in ("PENDIENTE", "INFO_SOLICITADA", "ESCALADA") and t >= a["expira_s"]:
                     self._aprob_estado(a, "EXPIRADA", {"kind": "system", "team": "SYSTEM"})
                     if a["legitima"]:
@@ -371,6 +373,8 @@ class NovaPartida:
                 permitido = (tipo in ACCIONES_ROJO and equipo in ("RED", "ADMIN")) or (tipo in ACCIONES_AZUL and equipo in ("BLUE", "ADMIN"))
                 if not permitido:
                     raise ErrorNova(403, "Ese equipo no puede ejecutar esa acción", "WRONG_TEAM")
+                if actor.get("kind", "human") == "human" and equipo in ("RED", "BLUE") and actor.get("user") not in self.participantes and not str(actor.get("user", "")).startswith("Autorización humana"):
+                    raise ErrorNova(403, "Solo los jugadores que se unieron a la partida pueden actuar", "NOT_A_PLAYER")
                 data = getattr(self, "_h_" + tipo)(accion)
                 r = {"ok": True, "result": "OK", "reject_reason": None, "mensaje": "", "data": data or {}, "action_id": aid}
                 self._ev("action.executed", {"kind": actor.get("kind", "human"), "team": equipo, "label": actor.get("user")}, {"kind": "action", "id": aid}, vis=["ADMIN"], data={"action_type": tipo, "meta": {k: str(v)[:120] for k, v in ((accion.get("params") or {}).get("meta") or {}).items()} if isinstance((accion.get("params") or {}).get("meta"), dict) else None})
@@ -777,7 +781,7 @@ class NovaPartida:
         aid = "AP-" + str(len(self.aprobaciones) + 1).zfill(3)
         riesgo = "ALTO" if operacion == "db_export" else "BAJO"
         ap = {"id": aid, "estado": "PENDIENTE", "solicitante": actor.get("label") or actor.get("team"), "equipo_solicitante": actor.get("team"), "operacion": operacion, "recurso": recurso, "motivo": motivo,
-              "riesgo": riesgo, "legitima": legitima, "email_id": email_id, "identidad": solicitante_identidad, "ts_s": self.t_s(), "expira_s": self.t_s() + self.config["approval_ttl_s"],
+              "riesgo": riesgo, "legitima": legitima, "email_id": email_id, "identidad": solicitante_identidad, "votos": {}, "decisor": None, "ts_s": self.t_s(), "expira_s": self.t_s() + self.config["approval_ttl_s"],
               "recomendacion": {"origen": "reglas", "decision": "RECHAZAR" if operacion == "db_export" else "APROBAR", "motivo": "copia completa de la base: exige verificación fuerte" if operacion == "db_export" else "operación rutinaria dentro de los permisos"}}
         self.aprobaciones[aid] = ap
         self._ev("approval.requested", actor, {"kind": "approval", "id": aid}, vis=["ADMIN", "BLUE"] + (["RED"] if actor.get("team") == "RED" else []), data={"operacion": operacion, "recurso": recurso, "riesgo": riesgo})
@@ -797,10 +801,99 @@ class NovaPartida:
             raise ErrorNova(404, "Solicitud desconocida", "UNKNOWN_TARGET")
         return ap
 
-    def _h_approve_request(self, a):
+    # ── votación de solicitudes (todos los Azules ven y opinan; decide el primero que interviene o la mayoría) ──
+    ABIERTAS = ("PENDIENTE", "INFO_SOLICITADA", "ESCALADA")
+
+    def _n_azules(self):
+        return max(1, sum(1 for p in self.participantes.values() if p["equipo"] == "BLUE"))
+
+    def _puede_decidir(self, ap, a):
+        """El decisor es el PRIMER Azul humano que interviene en la solicitud; la IA y el administrador siempre pueden (modo auto / supervisión)."""
+        u, kind, team = a["actor"].get("user"), a["actor"].get("kind", "human"), a["actor"].get("team")
+        if kind == "ai" or team == "ADMIN":
+            return True
+        if ap.get("decisor") is None:
+            ap["decisor"] = u
+            self._ev("approval.decisor_set", {"kind": "human", "team": "BLUE", "label": u}, {"kind": "approval", "id": ap["id"]}, vis=["ADMIN", "BLUE"], data={"decisor": u})
+        return ap["decisor"] == u
+
+    def _registrar_voto(self, ap, a, voto, comentario=""):
+        if ap["estado"] not in self.ABIERTAS:
+            raise ErrorNova(409, f"La solicitud ya está {ap['estado']}", "INVALID_TRANSITION")
+        u = a["actor"].get("user") or "?"
+        if ap["decisor"] is None and a["actor"].get("kind", "human") == "human":
+            ap["decisor"] = u
+        ap["votos"][u] = {"voto": voto, "comentario": str(comentario or "")[:200], "ts_s": round(self.t_s(), 1)}
+        if ap.get("cierra_s") is None and self.config["approval_mode"] == "votacion":
+            ap["cierra_s"] = self.t_s() + self.config["approval_window_s"]       # el primero que responde abre una ventana para que el resto opine
+        self._ev("approval.vote", {"kind": "human", "team": "BLUE", "label": u}, {"kind": "approval", "id": ap["id"]}, vis=["ADMIN", "BLUE"], data={"voto": voto, "decisor": ap["decisor"]})
+
+    def _cierre_por_votos(self, ap):
+        """Mayoría absoluta de los Azules cierra la solicitud; si todos votaron y empatan, manda el voto del decisor. -> 'APROBAR' | 'RECHAZAR' | None."""
+        n = self._n_azules()
+        cuenta = {"APROBAR": 0, "RECHAZAR": 0}
+        for v in ap["votos"].values():
+            cuenta[v["voto"]] += 1
+        for k, c in cuenta.items():
+            if c > n / 2:
+                return k
+        if len(ap["votos"]) >= n and cuenta["APROBAR"] == cuenta["RECHAZAR"]:
+            return (ap["votos"].get(ap["decisor"]) or {}).get("voto")
+        return None
+
+    def _h_vote_request(self, a):
         ap = self._ap(a)
+        p = a.get("params", {})
+        voto = {"APROBAR": "APROBAR", "RECHAZAR": "RECHAZAR"}.get(str(p.get("voto") or "").upper())
+        if voto is None:
+            raise ErrorNova(400, "El voto debe ser APROBAR o RECHAZAR", "INVALID_SCHEMA")
+        return self._votar(ap, a, voto, p.get("comentario"))
+
+    def _votar(self, ap, a, voto, comentario):
+        self._registrar_voto(ap, a, voto, comentario)
+        cierre = self._cierre_por_votos(ap)
+        if cierre:
+            self._aplicar(ap, {"kind": "system", "team": "BLUE", "label": "mayoría de los Azules"}, cierre == "APROBAR")
+            return {"estado": ap["estado"], "cerrada_por": "votos"}
+        return {"estado": ap["estado"], "voto_registrado": True, "decisor": ap["decisor"], "cierra_s": ap.get("cierra_s")}
+
+    def _cierre_por_ventana(self, ap):
+        """Terminó la ventana de opiniones: gana la mayoría de los votos emitidos; si empatan manda el decisor (el primero que respondió)."""
+        cuenta = {"APROBAR": 0, "RECHAZAR": 0}
+        for v in ap["votos"].values():
+            cuenta[v["voto"]] += 1
+        ganador = "APROBAR" if cuenta["APROBAR"] > cuenta["RECHAZAR"] else "RECHAZAR" if cuenta["RECHAZAR"] > cuenta["APROBAR"] else (ap["votos"].get(ap["decisor"]) or {}).get("voto", "RECHAZAR")
+        self._aplicar(ap, {"kind": "system", "team": "BLUE", "label": "cierre de la votación"}, ganador == "APROBAR")
+
+    def _h_approve_request(self, a):
+        return self._decidir(a, True)
+
+    def _h_reject_request(self, a):
+        return self._decidir(a, False)
+
+    def _decidir(self, a, aprobar):
+        ap = self._ap(a)
+        if ap["estado"] not in self.ABIERTAS:
+            raise ErrorNova(409, f"La solicitud ya está {ap['estado']}", "INVALID_TRANSITION")
+        humano_azul = a["actor"].get("kind", "human") == "human" and a["actor"].get("team") == "BLUE"
+        if humano_azul and self.config["approval_mode"] == "votacion":           # votación: responder = opinar; cierra la mayoría o el fin de la ventana
+            return self._votar(ap, a, "APROBAR" if aprobar else "RECHAZAR", (a.get("params") or {}).get("comentario"))
+        if not self._puede_decidir(ap, a):          # modo «primero»: quien no es el decisor solo opina
+            return self._votar(ap, a, "APROBAR" if aprobar else "RECHAZAR", (a.get("params") or {}).get("comentario"))
         actor = {"kind": a["actor"].get("kind", "human"), "team": "BLUE", "label": a["actor"].get("user")}
-        self._aprob_estado(ap, "APROBADA", actor)
+        if actor["kind"] == "human" and a["actor"].get("user") not in ap["votos"]:
+            ap["votos"][a["actor"].get("user")] = {"voto": "APROBAR" if aprobar else "RECHAZAR", "comentario": "", "ts_s": round(self.t_s(), 1)}
+        self._aplicar(ap, actor, aprobar)
+        return {"estado": ap["estado"]}
+
+    def _aplicar(self, ap, actor, aprobar):
+        self._aprob_estado(ap, "APROBADA" if aprobar else "RECHAZADA", actor)
+        if aprobar:
+            self._consecuencia_aprobada(ap, actor)
+        else:
+            self._consecuencia_rechazada(ap)
+
+    def _consecuencia_aprobada(self, ap, actor):
         if ap["legitima"]:
             self.legitimas["resueltas"] += 1
             self.legitimas["servidas"] += 1
@@ -809,25 +902,49 @@ class NovaPartida:
             self.fallos_identidad[ap["identidad"]] = 0
             self.puntos["BLUE"] -= 5
             self._ev("access.suspicious_accepted", actor, {"kind": "identity", "id": ap["identidad"]}, vis=["ADMIN", "BLUE"])
+        elif ap["operacion"] == "autorizacion_ia":       # los humanos autorizan lo que pidió la IA Azul: el motor ejecuta ESA acción y solo esa
+            pa = ap.get("accion_propuesta")
+            if pa:
+                r = self.ejecutar({"action_type": pa["action_type"], "params": pa.get("params") or {}, "idempotency_key": "auth-" + ap["id"],
+                                   "actor": {"kind": "human", "team": "BLUE", "user": "Autorización humana " + ap["id"]}})
+                ap["ejecucion"] = {"ok": r["ok"], "reject_reason": r["reject_reason"]}
         elif ap["operacion"] == "db_export":       # la consecuencia SÍ cambia el estado del escenario: concede el permiso db_export por un tiempo
             self.grants_db_export_hasta = self.t_s() + self.config["elevation_grant_s"]
             self.puntos["BLUE"] -= 10
             self._ev("credential.permissions_changed", {"kind": "system", "team": "SYSTEM"}, {"kind": "credential", "id": "db_export"}, vis=["ADMIN", "BLUE", "RED"], data={"concedido_hasta_s": self.grants_db_export_hasta})
-        return {"estado": ap["estado"]}
 
-    def _h_reject_request(self, a):
-        ap = self._ap(a)
-        self._aprob_estado(ap, "RECHAZADA", {"kind": a["actor"].get("kind", "human"), "team": "BLUE", "label": a["actor"].get("user")})
+    def _consecuencia_rechazada(self, ap):
         if ap["operacion"] == "acceso_sospechoso":       # denegar bloquea la identidad atacada: la consecuencia cambia el estado
             self.bloqueo_hasta[ap["identidad"]] = self.t_s() + self.config["lockout_s"]
             self.puntos["BLUE"] += 5
             self._ev("credential.lockout", {"kind": "system", "team": "SYSTEM"}, {"kind": "identity", "id": ap["identidad"]}, data={"hasta_s": self.bloqueo_hasta[ap["identidad"]], "motivo": "acceso sospechoso denegado"})
+        elif ap["operacion"] == "autorizacion_ia":
+            self._ev("authorization.denied", {"kind": "human", "team": "BLUE"}, {"kind": "approval", "id": ap["id"]}, vis=["ADMIN", "BLUE"])
         elif ap["legitima"]:
             self.legitimas["resueltas"] += 1
             self.puntos["BLUE"] -= 3       # rechazar una solicitud legítima penaliza
         else:
             self.puntos["BLUE"] += 5
-        return {"estado": ap["estado"]}
+
+    # acciones que la IA Azul puede PEDIR que los humanos autoricen (lista cerrada; nunca decisiones de aprobación)
+    AUTORIZABLES = {"revoke_credential", "suspend_identity", "block_link", "contain_incident", "set_alert_status", "report_email"}
+
+    def _h_request_authorization(self, a):
+        """La IA Azul (o un humano) pide autorización a todos los Azules para una acción concreta, con el detalle completo."""
+        p = a.get("params") or {}
+        pa = p.get("accion_propuesta") or {}
+        if pa and pa.get("action_type") not in self.AUTORIZABLES:
+            raise ErrorNova(400, "Esa acción no se puede pedir como autorización", "INVALID_SCHEMA")
+        iid = (pa.get("params") or {}).get("identidad_id") or p.get("identidad_id")
+        ap = self._crear_aprobacion({"kind": a["actor"].get("kind", "human"), "team": "BLUE", "label": a["actor"].get("user")}, str(p.get("motivo") or "Autorización solicitada")[:300], "autorizacion_ia",
+                                    self.identidades[iid]["recurso"] if iid in self.identidades else "-", False, solicitante_identidad=iid if iid in self.identidades else None)
+        ap["riesgo"] = str(p.get("riesgo") or "MEDIO")
+        ap["accion_propuesta"] = {"action_type": pa["action_type"], "params": pa.get("params") or {}} if pa else None
+        ap["recomendacion"] = {"origen": "ia" if a["actor"].get("kind") == "ai" else "humano", "decision": "APROBAR", "motivo": str(p.get("motivo") or "")[:200]}
+        cred = self.secretos.enmascarar(self.secretos.descifrar(self.creds[iid]["enc"])) if iid in self.creds else None
+        ap["detalle"] = {"que_pide": (pa.get("action_type") if pa else "autorización general"), "sujeto": iid or p.get("sujeto"), "nombre": self.identidades[iid]["nombre"] if iid in self.identidades else None,
+                         "credencial": cred, "solicitante": a["actor"].get("user"), "origen": a["actor"].get("kind", "human"), "hora_partida_s": round(self.t_s(), 1), "hora_real": _utc(), "ia": p.get("ia")}
+        return {"approval_id": ap["id"]}
 
     def _h_request_more_info(self, a):
         ap = self._ap(a)

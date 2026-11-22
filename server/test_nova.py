@@ -170,8 +170,13 @@ def main():
         sosp = [x for x in ea["aprobaciones"] if x["operacion"] == "acceso_sospechoso"]
         chk("un intento casi correcto llega al Azul como solicitud misteriosa con identidad y jugador, y el Rojo no ve nada de eso", g.status == 200 and len(sosp) == 1 and sosp[0]["detalle"]["identidad"] == "EMP-01"
             and "approval" not in str(rojo.get("/api/nova/estado")["rojo"]["aprobaciones"]))
-        den = acc(a1, "reject_request", approval_id=sosp[0]["id"])
-        chk("el Azul deniega y la identidad queda bloqueada para el Rojo", den.status == 200 and acc(rojo, "guess_credential", identidad_id="EMP-01", candidate_value="11111A")["reject_reason"] == "IDENTITY_LOCKED")
+        vt = rojo.post("/api/nova/accion", {"action_type": "vote_request", "params": {"approval_id": "AP-001", "voto": "APROBAR"}})
+        chk("un Rojo no puede votar solicitudes del Azul (403) y el voto inválido se rechaza", vt.status == 403 and a1.post("/api/nova/accion", {"action_type": "vote_request", "params": {"approval_id": "AP-001", "voto": "TAL VEZ"}}).status in (400, 404))
+        ap1 = next((x for x in a1.get("/api/nova/estado")["azul"]["aprobaciones"] if x["operacion"] == "acceso_sospechoso"), None)
+        vv = a1.post("/api/nova/accion", {"action_type": "vote_request", "params": {"approval_id": ap1["id"], "voto": "RECHAZAR", "comentario": "no es de aquí"}})
+        vot = next(x for x in a1.get("/api/nova/estado")["azul"]["aprobaciones"] if x["id"] == ap1["id"])
+        chk("la API de votos registra la opinión de un Azul con su comentario y fija el decisor", vv.status == 200 and vv["data"].get("cerrada_por") == "votos" and list(vot["votos"].values())[0]["comentario"] == "no es de aquí" and vot["decisor"] in vot["votos"])
+        chk("con un solo Azul su voto es mayoría absoluta: cierra la solicitud y la identidad queda bloqueada para el Rojo", acc(rojo, "guess_credential", identidad_id="EMP-01", candidate_value="11111A")["reject_reason"] == "IDENTITY_LOCKED")
         adm.post("/api/nova/detener", {})
         salud = Cliente(E.base).get("/api/ia/estado")
         chk("la API sigue sana tras todo el flujo", salud.status == 200)

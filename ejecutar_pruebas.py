@@ -19,7 +19,7 @@ if hasattr(sys.stdout, "reconfigure"):   # consolas de Windows en cp1252 rompía
 UNITARIAS = ["test_lab", "test_motor", "test_correos", "test_reglas", "test_misiones", "test_documentos", "test_eventos",
              "test_puntaje", "test_cliente", "test_correo_app", "test_incidentes", "test_ataque_ia", "test_informe",
              "test_apps", "test_diagnostico", "test_harness", "test_rag", "test_evaluacion", "test_adversarial", "test_wazuh", "test_correlacion",
-             "test_control_partida", "test_lotes", "test_escenarios_empresa", "test_combate", "test_wazuh_sim", "test_caminos", "test_caminos_auto", "test_nova", "test_nova_ia", "test_nova_prompts", "demo_nova"]
+             "test_control_partida", "test_lotes", "test_escenarios_empresa", "test_combate", "test_wazuh_sim", "test_caminos", "test_caminos_auto", "test_nova", "test_nova_ia", "test_nova_prompts", "test_nova_multijugador", "demo_nova"]
 SERVIDOR = ["server/test_partida.py", "server/test_app.py", "server/test_batalla_partida.py", "server/test_resultados.py",
             "server/test_apps.py", "server/test_presupuesto.py", "server/test_combate.py", "server/test_nova.py"]
 INTEGRACION = ["e2e/test_reinicio.py", "integraciones/wazuh/test_reglas.py", "server/test_panel.py",
@@ -27,7 +27,7 @@ INTEGRACION = ["e2e/test_reinicio.py", "integraciones/wazuh/test_reglas.py", "se
                "CyberShield_Repair_Library/tests/unit/test_solicitudes.py", "CyberShield_Repair_Library/tests/unit/test_chat.py",
                "CyberShield_Repair_Library/tests/regression/test_regresion_presentacion.py", "CyberShield_Repair_Library/tests/regression/test_ollama_controles.py",
                "CyberShield_Repair_Library/tests/demo/demo_academica.py"]
-NAVEGADOR = ["e2e/demo_partida.py", "e2e/test_combate_ui.py", "e2e/test_combate_extra.py", "e2e/test_simulacion_ui.py", "e2e/test_nova_ui.py", "CyberShield_Repair_Library/tests/e2e_sala_equipo.py"]
+NAVEGADOR = ["e2e/demo_partida.py", "e2e/test_combate_ui.py", "e2e/test_combate_extra.py", "e2e/test_simulacion_ui.py", "e2e/test_nova_ui.py", "e2e/test_nova_multijugador_ui.py", "CyberShield_Repair_Library/tests/e2e_sala_equipo.py"]
 TOTAL = re.compile(r"(\d+)/(\d+)")
 
 

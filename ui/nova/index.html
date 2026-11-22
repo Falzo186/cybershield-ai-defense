@@ -19,6 +19,7 @@
     <span class="chip chip-neutro sin-punto" id="chip-estado">SIN PARTIDA</span>
     <span class="chip chip-neutro sin-punto" id="chip-reloj">—</span>
     <span class="chip chip-neutro sin-punto" id="chip-yo">sin sesión</span>
+    <button class="boton" id="b-jug" type="button" aria-expanded="false" aria-controls="panel-jug" hidden>Jugadores</button>
   </div>
   <nav class="barra-enlaces"><a href="/equipo/">Sala de equipo</a> · <a href="/simulacion/">Simulación</a> · <a href="/combate/">Combate</a> · <a href="/">Partida Rojo/Azul</a></nav>
 </header>
@@ -32,6 +33,22 @@
     <button class="boton boton-primario" type="submit">Entrar</button><span class="error-form" id="e-error" role="alert"></span>
   </form>
 </section>
+
+<aside id="panel-jug" class="panel-jug" aria-label="Lista de jugadores" hidden>
+  <div class="panel-jug-cab"><b>Jugadores</b><button class="boton" id="b-jug-cerrar" type="button" aria-label="Cerrar la lista de jugadores">Cerrar</button></div>
+  <div class="sub-titulo">Equipo Rojo (<span id="jug-n-rojo">0</span>/4)</div><div id="jug-rojo"></div>
+  <div class="sub-titulo">Equipo Azul (<span id="jug-n-azul">0</span>/4)</div><div id="jug-azul"></div>
+</aside>
+
+<dialog id="dlg-sol" class="dlg-sol" aria-labelledby="dlg-titulo">
+  <h3 id="dlg-titulo">Solicitud</h3>
+  <div id="dlg-detalle"></div>
+  <div class="sub-titulo">Opiniones del equipo <span id="dlg-decisor"></span></div>
+  <div id="dlg-votos"></div>
+  <label class="campo"><span>Tu comentario (opcional)</span><input id="dlg-coment" maxlength="200" autocomplete="off"></label>
+  <div class="acciones-form"><button class="boton boton-primario" id="dlg-ok" type="button">Aceptar</button><button class="boton boton-peligro" id="dlg-no" type="button">Denegar</button><button class="boton" id="dlg-luego" type="button">Decidir más tarde</button></div>
+  <p class="nota" id="dlg-nota"></p>
+</dialog>
 
 <main id="principal" tabindex="-1" hidden>
   <div class="banner-estado" id="banner-estado" role="status"></div>
@@ -51,6 +68,7 @@
         <form id="form-crear" class="form-sol" autocomplete="off">
           <label class="campo"><span>Duración (s de partida)</span><input type="number" id="c-dur" value="720" min="60" max="3600"></label>
           <label class="campo"><span>Velocidad del reloj (1–60×)</span><input type="number" id="c-esc" value="1" min="0.1" max="60" step="0.1"></label>
+          <label class="campo"><span>Autorizaciones del Azul</span><select id="c-amodo"><option value="votacion">Votación: todos opinan, decide la mayoría o el primero que respondió</option><option value="primero">El primero que responde decide solo</option></select></label>
           <label class="campo"><span>Prompts de IA</span><select id="c-pmodo"><option value="controlado">Controlado (el jugador arma cada prompt)</option><option value="libre">Libre (solo ensayos)</option></select></label>
           <label class="campo"><span>Oportunidades de prompt por equipo</span><input type="number" id="c-pres" value="10" min="1" max="50"></label>
           <label class="campo"><span>Modalidad</span><select id="c-mod"><option>BALANCED</option><option>RED_ADVANTAGE</option><option>BLUE_ADVANTAGE</option></select></label>

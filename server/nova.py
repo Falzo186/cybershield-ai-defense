@@ -125,11 +125,16 @@ def registrar(app, ms=None):
             return _err("Ya hay una partida Nova sin terminar: deténla antes de crear otra", 409, "MATCH_EXISTS")
         cfg = {}
         for k in ("duration_s", "round_s", "guess_attempts_per_round", "guess_attempts_per_match", "guess_cooldown_s", "guess_lockout_after_fails", "lockout_s", "min_continuity", "detect_prob_fail",
-                  "approval_ttl_s", "elevation_grant_s", "click_delay_s", "seed", "modalidad", "abuse_policy", "ai_prompt_mode", "ai_prompt_budget", "near_miss_min"):
+                  "approval_ttl_s", "elevation_grant_s", "click_delay_s", "seed", "modalidad", "abuse_policy", "ai_prompt_mode", "ai_prompt_budget", "near_miss_min", "approval_mode", "approval_window_s"):
             if k in cuerpo:
                 cfg[k] = cuerpo[k]
         if "win" in cuerpo and isinstance(cuerpo["win"], dict):
             cfg["win"] = {**E.WIN_POR_DEFECTO, **{k: v for k, v in cuerpo["win"].items() if k in E.WIN_POR_DEFECTO}}
+        cfg.setdefault("approval_mode", "votacion")
+        if cfg["approval_mode"] not in ("votacion", "primero"):
+            return _err("approval_mode debe ser votacion o primero")
+        if "approval_window_s" in cfg and (not isinstance(cfg["approval_window_s"], int) or isinstance(cfg["approval_window_s"], bool) or not 3 <= cfg["approval_window_s"] <= 120):
+            return _err("approval_window_s debe ser un entero entre 3 y 120")
         if cfg.get("ai_prompt_mode", "controlado") not in ("controlado", "libre"):
             return _err("ai_prompt_mode debe ser controlado o libre")
         for k_, lo, hi in (("ai_prompt_budget", 1, 50), ("near_miss_min", 2, 6)):

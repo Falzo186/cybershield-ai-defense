@@ -2,6 +2,8 @@
 
 Estado revisado en el código el 2026-11-22. Todo es para la prueba y la presentación del proyecto integrador.
 
+## ESTADO: implementado el 2026-11-22 (ver docs/NOVA.md, sección Multijugador). Lo siguiente era el diagnóstico previo.
+
 ## Qué ya está cubierto y qué no
 | Punto pedido | Estado | Evidencia / hueco |
 |---|---|---|

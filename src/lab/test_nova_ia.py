@@ -138,7 +138,9 @@ def main():
     ia.configurar("BLUE", proveedor=Fijo(json.dumps({"verdict": "SOLICITAR_AUTORIZACION", "classification": "AMBIGUA", "confidence": 0.4, "subject": {"kind": "request", "id": "AP-001"}, "reasoning": "no está claro si es legítima",
                                                     "evidence": [], "recommended_action": {"action_type": "allow", "params": {}}})))
     r = ia.proponer("BLUE")
-    chk("SOLICITAR_AUTORIZACION: la IA Azul NO actúa sola: crea una tarea para los jugadores humanos", r["propuesta"]["estado"] == "EJECUTADA" and any("Autorizar la acción propuesta por la IA Azul" in t["titulo"] for t in m.tareas.values()))
+    ap = next((x for x in m.aprobaciones.values() if x["operacion"] == "autorizacion_ia"), None)
+    chk("SOLICITAR_AUTORIZACION: la IA Azul NO actúa sola: crea una SOLICITUD pendiente para todos los Azules con el detalle de la corrida", r["propuesta"]["estado"] == "EJECUTADA" and ap and ap["estado"] == "PENDIENTE"
+        and ap["detalle"]["origen"] == "ai" and ap["detalle"]["ia"]["run_id"] == r["run_id"] and ap["detalle"]["hora_real"])
 
     # esquemas
     chk("validar_propuesta_rojo exige campos, catálogo de objetivo/estrategia, acción del Rojo y candidatas con el patrón", lanza(lambda: validar_propuesta_rojo({}), "INVALID_SCHEMA")

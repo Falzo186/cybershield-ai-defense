@@ -438,9 +438,15 @@ class ControlIA:
             self.acciones_ronda[(run["team"], r_)] = self.acciones_ronda.get((run["team"], r_), 0) + 1
         a = self._accion_de(run)
         if run["team"] == "BLUE" and run["salida_estructurada"].get("verdict") == "SOLICITAR_AUTORIZACION":
-            # La IA Azul PIDE autorización humana: se crea una tarea para los jugadores en vez de actuar sola.
-            sujeto = (run["salida_estructurada"].get("subject") or {}).get("id", "-")
-            a = {"action_type": "assign_task", "params": {"titulo": f"Autorizar la acción propuesta por la IA Azul sobre {sujeto}: {run['salida_estructurada'].get('reasoning', '')[:80]}"}}
+            # La IA Azul PIDE autorización humana: se crea una SOLICITUD con todo el detalle que ven todos los Azules (qué pide, quién, credencial, directiva usada, hora).
+            o = run["salida_estructurada"]
+            sujeto = (o.get("subject") or {}).get("id", "-")
+            ra = o.get("recommended_action") or {}
+            pa = {"action_type": ra.get("action_type"), "params": ra.get("params") or {}} if ra.get("action_type") in m.AUTORIZABLES else None
+            iid = (pa or {}).get("params", {}).get("identidad_id") or (sujeto if sujeto in m.identidades else None)
+            a = {"action_type": "request_authorization", "params": {"motivo": f"La IA Azul pide autorizar: {o.get('reasoning', '')[:160]}", "accion_propuesta": pa, "identidad_id": iid, "sujeto": sujeto,
+                                                              "riesgo": "ALTO" if o.get("classification") in ("MALICIOSA", "SOSPECHOSA") else "MEDIO",
+                                                              "ia": {"run_id": run["run_id"], "proveedor": run["provider_kind"], "modelo": run["modelo"], "directiva": run.get("directiva"), "hora_real": run["ts_real"]}}}
         res = m.ejecutar({"action_type": a["action_type"], "params": a["params"], "idempotency_key": "ia-" + run["run_id"],
                           "actor": {"kind": kind, "team": run["team"], "user": usuario or ("IA " + run["team"]), "ai_run_id": run["run_id"]}})
         run["propuesta"] = {"estado": "EJECUTADA" if res["ok"] else "RECHAZADA", "reject_reason": res["reject_reason"], "mensaje": res["mensaje"]}
