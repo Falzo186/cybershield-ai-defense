@@ -4,7 +4,12 @@ no hay otros bucles. Los GET de estado son públicos (el espectador ve su vista)
 """
 import asyncio
 import os
+import re
+import shutil
+import subprocess
+import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
@@ -17,6 +22,56 @@ from src.lab.nova.motor import ACCIONES_AZUL, ACCIONES_ROJO, ErrorNova, NovaPart
 ROL = {"general": "ADMIN", "rojo": "RED", "azul": "BLUE", "espectador": "SPECTATOR"}
 _E = {"p": None, "tarea": None, "ms": None, "ia": None}
 RAIZ = Path(__file__).resolve().parents[1]
+
+
+MAX_B = float(os.environ.get("CS_NOVA_MAX_B", "8"))   # tope de parámetros (miles de millones) por modelo: la máquina anfitriona tiene ~20 GB de RAM
+RECOMENDADO_B = 4.0
+
+
+def _tam_b(modelo):
+    """Tamaño en B según el nombre (`qwen3:4b` → 4.0; `qwen2.5:1.5b` → 1.5). None si el nombre no lo dice."""
+    m = re.search(r"(?<![\w.])(\d+(?:\.\d+)?)b(?![a-z])", str(modelo).lower())
+    return float(m.group(1)) if m else None
+
+
+def _es_local(url):
+    return (urlparse(url).hostname or "") in ("127.0.0.1", "localhost", "::1")
+
+
+def _encender_ollama(url, espera_s=25):
+    if cliente_ollama.ollama_disponible(url):
+        return {"conectado": True, "ya_estaba": True, "mensaje": "Ollama ya estaba encendido"}
+    exe = shutil.which("ollama")
+    if not exe:
+        return {"conectado": False, "mensaje": "No se encontró el programa «ollama» en esta máquina. Instálalo o enciéndelo a mano."}
+    kw = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    cmd = [exe, "serve"]
+    if os.name == "nt":
+        kw["creationflags"] = 0x08000000 | 0x00000008          # sin ventana, desprendido
+        app = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Ollama" / "ollama app.exe"
+        if app.exists():                                       # la aplicación de escritorio usa la carpeta de modelos configurada por el usuario
+            cmd = [str(app)]
+    try:
+        subprocess.Popen(cmd, **kw)
+    except OSError as e:
+        return {"conectado": False, "mensaje": "No se pudo encender Ollama: " + str(e)}
+    t0 = time.time()
+    while time.time() - t0 < espera_s:
+        if cliente_ollama.ollama_disponible(url):
+            return {"conectado": True, "ya_estaba": False, "mensaje": "Ollama encendido"}
+        time.sleep(0.5)
+    return {"conectado": False, "mensaje": "Ollama no respondió a tiempo. Intenta de nuevo o enciéndelo a mano."}
+
+
+def _apagar_ollama():
+    if os.name == "nt":
+        for n in ("ollama app.exe", "ollama.exe", "llama-server.exe", "ollama_llama_server.exe"):
+            subprocess.run(["taskkill", "/F", "/IM", n], capture_output=True)
+    else:
+        for n in ("ollama", "llama-server"):
+            subprocess.run(["pkill", "-f", n], capture_output=True)
+    time.sleep(1)
+    return {"conectado": cliente_ollama.ollama_disponible("http://127.0.0.1:11434"), "mensaje": "Ollama apagado (libera RAM y GPU)"}
 
 
 def _err(msg, status=400, motivo=None):
@@ -274,7 +329,11 @@ def registrar(app, ms=None):
         if tipo == "offline":
             return IA.OfflineProvider()
         if tipo == "ollama":
-            return IA.OllamaProvider(spec.get("endpoint"), str(spec.get("modelo") or "")[:100] or "qwen3:8b", semilla=int(spec.get("semilla", 0)))
+            modelo = str(spec.get("modelo") or "")[:100] or "qwen3:4b"
+            tam = _tam_b(modelo)
+            if tam is not None and tam > MAX_B:
+                raise ErrorNova(400, f"El modelo {modelo} ({tam:g}B) supera el máximo permitido de {MAX_B:g}B para esta máquina. Usa uno de {RECOMENDADO_B:g}B.", "MODEL_TOO_BIG")
+            return IA.OllamaProvider(spec.get("endpoint"), modelo, semilla=int(spec.get("semilla", 0)))
         raise ErrorNova(400, "tipo de proveedor no válido (scripted, ollama u offline)")
 
     @app.post("/api/nova/ia/config")
@@ -308,7 +367,36 @@ def registrar(app, ms=None):
         loop = asyncio.get_running_loop()
         disp = await loop.run_in_executor(None, cliente_ollama.ollama_disponible, url)
         modelos = await loop.run_in_executor(None, cliente_ollama.listar_modelos, url) if disp else []
-        return JSONResponse({"endpoint": url, "conectado": disp, "modelos": modelos, "error": None if disp else "Ollama no responde en ese endpoint"})
+        info = [{"nombre": m, "tam_b": _tam_b(m), "permitido": _tam_b(m) is None or _tam_b(m) <= MAX_B, "recomendado": _tam_b(m) is not None and _tam_b(m) <= RECOMENDADO_B} for m in modelos]
+        return JSONResponse({"endpoint": url, "conectado": disp, "modelos": modelos, "modelos_info": info, "max_b": MAX_B, "recomendado_b": RECOMENDADO_B, "local": _es_local(url),
+                             "error": None if disp else "Ollama está apagado o no responde en ese endpoint"})
+
+    def _admin(request):
+        return _rol(request) == "ADMIN"
+
+    @app.post("/api/nova/ollama/iniciar")
+    async def nova_ollama_iniciar(request: Request, cuerpo: dict):
+        """Solo ADMIN y solo en este equipo (endpoint local): enciende `ollama serve` sin ventana y espera a que responda."""
+        if not _admin(request):
+            return _err("Solo el administrador enciende Ollama", 403, "FORBIDDEN")
+        try:
+            url = IA.validar_endpoint(cuerpo.get("endpoint") or "http://127.0.0.1:11434")
+        except ErrorNova as e:
+            return _err(e.mensaje, e.status, e.motivo)
+        if not _es_local(url):
+            return _err("Solo se puede encender Ollama en esta misma máquina (127.0.0.1)", 400, "NOT_LOCAL")
+        loop = asyncio.get_running_loop()
+        r = await loop.run_in_executor(None, _encender_ollama, url)
+        return JSONResponse(r, status_code=200 if r["conectado"] else 503)
+
+    @app.post("/api/nova/ollama/detener")
+    async def nova_ollama_detener(request: Request, cuerpo: dict):
+        """Solo ADMIN: apaga Ollama y sus modelos en esta máquina (libera RAM y GPU)."""
+        if not _admin(request):
+            return _err("Solo el administrador apaga Ollama", 403, "FORBIDDEN")
+        loop = asyncio.get_running_loop()
+        r = await loop.run_in_executor(None, _apagar_ollama)
+        return JSONResponse(r)
 
     @app.post("/api/nova/ia/proponer")
     async def nova_ia_proponer(request: Request, cuerpo: dict):

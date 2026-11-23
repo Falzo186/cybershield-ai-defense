@@ -205,6 +205,7 @@ def main(ver=False, capturas=True):
         chk("las misiones de cada equipo se derivan del estado real (el Rojo parte con misiones disponibles, el Azul también)", "Identificar identidades" in txt(pr, "#misiones") and "Reportar un correo" in txt(p1, "#misiones") and "COMPLETADA" not in txt(pr, "#misiones"))
         esperar_texto(pr, "#op-restantes-rojo", "10 DE 10")
         chk("la IA espera: antes de que el jugador arme y lance el prompt no hay propuesta y quedan las 10 oportunidades", txt(pr, "#prop-rojo") == "" and "10 DE 10" in txt(pr, "#op-restantes-rojo"))
+        pr.evaluate("document.querySelector('#d-avanzado').open = true")
         opts = pr.eval_on_selector_all("#d-cred option", "els => els.map(e => e.value)")
         chk("el combo de credencial ofrece «sin credencial» y «aleatoria», y NO ofrece ninguna credencial obtenida mientras el Rojo no tenga una", "aleatoria" in opts and "ninguna" in opts and not any(o.startswith("conocida:") for o in opts))
         pr.select_option("#d-cred", "aleatoria"); pr.wait_for_selector("#d-estruct:not([hidden])")

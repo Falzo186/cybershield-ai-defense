@@ -18,6 +18,15 @@
     if (!r.ok) { const x = new Error((d && (d.mensaje || d.error || d.detail)) || "Error " + r.status); x.status = r.status; x.datos = d; throw x; }
     return d;
   }
+  // Traduce códigos y errores técnicos a frases que entienda cualquier jugador.
+  const MOTIVOS = { BUDGET_EXCEEDED: "Ya usaste todos los intentos permitidos de este tipo en esta ronda. Espera a la siguiente ronda o prueba otra acción.", COOLDOWN: "Esa acción aún se está enfriando; espera unos segundos.",
+    PROMPT_BUDGET_EXCEEDED: "Tu equipo ya gastó todas sus oportunidades de prompt.", NOT_A_PLAYER: "Primero pulsa «Unirme a la partida».", WRONG_TEAM: "Esa acción no es de tu equipo.", MODEL_TOO_BIG: "Ese modelo es demasiado grande para esta máquina; elige uno de 4B." };
+  function humano(msg, motivo) {
+    const m = String(msg || ""); if (motivo && MOTIVOS[motivo]) return MOTIVOS[motivo];
+    if (/10061|denegó|refused|urlopen|no responde|Connection/i.test(m)) return "Ollama no está encendido en el computador anfitrión. El administrador debe pulsar «Encender Ollama» en el panel de IA (o usar el modo SIMULADO).";
+    if (/timed out|timeout|tiempo/i.test(m) && /IA|Ollama|modelo/i.test(m)) return "El modelo tardó demasiado en responder. Prueba un modelo más pequeño (4B).";
+    return m;
+  }
   function toast(msg, tipo = "") { const t = el("div", "toast " + tipo, msg); $("#toasts").append(t); setTimeout(() => t.remove(), 4500); }
   const intentar = async (fn, ok) => { try { const r = await fn(); if (ok) toast(ok, "ok"); await refrescar(); return r; } catch (e) { toast(e.message, "error"); await refrescar(); return null; } };
 
@@ -61,7 +70,7 @@
     if (e.rojo) pintarRojo(e);
     pintarConstructor(e);
     pintarJugadores(e);
-    pintarEstadoIA(e);
+    pintarEstadoIA(e); pintarRapido(e); pintarOllamaAdmin(); pintarGuia(e);
     const az = S.rol === "BLUE" && e.azul; for (const id of ["#p-azul-id", "#p-azul-bandeja", "#p-azul-aprob", "#p-azul-alertas"]) visible(id, !!az);
     if (az) pintarAzul(e); else if (S.rol === "ADMIN" && e.azul_todos) pintarAdminAzul(e);
     pintarPub(e);
@@ -147,22 +156,79 @@
     const obj = $("#op-obj").value, est = $("#op-estr").value; if (obj || est) p.meta = { objetivo: obj, estrategia: est };
     if (a === "request_elevation") p.motivo = $("#op-cuerpo").value; if (a === "guess_credential") p.candidate_value = $("#op-cand").value.trim().toUpperCase(); if (a === "extract_table") p.tabla = $("#op-tabla").value;
     const r = await api("POST", "/api/nova/accion", { action_type: a, params: p, idempotency_key: "op-" + Date.now() + Math.random().toString(36).slice(2) }, true); const d = await r.json();
-    $("#op-resultado").textContent = r.ok ? "Operación aceptada por el motor." + (d.data && d.data.acierto != null ? (d.data.acierto ? " ¡Credencial válida!" : " Credencial incorrecta.") : "") : "Rechazada por el motor: " + d.mensaje + " (" + d.reject_reason + ")";
-    if (!r.ok) toast(d.mensaje, "error"); await refrescar();
+    const hum = r.ok ? "" : humano(d.mensaje, d.reject_reason);
+    $("#op-resultado").textContent = r.ok ? "Operación aceptada por el motor." + (d.data && d.data.acierto != null ? (d.data.acierto ? " ¡Credencial válida!" : " Credencial incorrecta.") : "") : "Rechazada por el motor: " + hum + (d.reject_reason ? " (" + d.reject_reason + ")" : "");
+    $("#op-resultado").className = "nota-tarjeta " + (r.ok ? "ok" : "mal");
+    if (!r.ok) toast(hum, "error"); await refrescar();
   });
   async function propuesta(eq, cont, directiva) {
     try { const r = await api("POST", "/api/nova/ia/proponer", { equipo: eq, directiva }); const c = $(cont); c.textContent = "";
       const d = el("div", "prop"); const o = r.salida_estructurada || {};
       d.append(el("b", "", `${r.provider_kind === "scripted" ? "SIMULADO – no es una IA" : "Ollama " + (r.modelo || "")} · corrida ${r.run_id} · ${r.estado}`));
-      if (r.propuesta && r.propuesta.estado === "INVALIDA") d.append(el("span", "", "La IA respondió algo que no cumple el esquema: no se ejecuta nada.")); else if (r.estado === "FALLIDA") d.append(el("span", "", "La IA falló: " + (r.error || "sin detalle")));
+      if (r.propuesta && r.propuesta.estado === "INVALIDA") d.append(el("span", "", "La IA respondió algo que no cumple el esquema: no se ejecuta nada.")); else if (r.estado === "FALLIDA") d.append(el("span", "", "La IA no pudo responder. " + humano(r.error || "sin detalle") + (r.error && humano(r.error) !== r.error ? "" : "")));
       else { d.append(el("span", "", (o.operation_name || o.verdict || "propuesta") + " — " + (o.justification || o.reasoning || "")));
         const pa = o.proposed_action || o.recommended_action; if (pa) d.append(el("small", "", "Acción: " + pa.action_type));
         if (r.propuesta && r.propuesta.estado === "PROPUESTA") { const a = el("div", "acciones-form"); const ok = el("button", "boton boton-primario", "Confirmar y ejecutar"), no = el("button", "boton", "Descartar");
           ok.addEventListener("click", () => intentar(() => api("POST", "/api/nova/ia/confirmar", { run_id: r.run_id }), "Propuesta ejecutada por el motor")); no.addEventListener("click", () => intentar(() => api("POST", "/api/nova/ia/confirmar", { run_id: r.run_id, descartar: true }), "Propuesta descartada")); a.append(ok, no); d.append(a); }
         else if (r.propuesta) d.append(el("small", "", "Estado de la propuesta: " + r.propuesta.estado + (r.propuesta.reject_reason ? " (" + r.propuesta.reject_reason + ")" : ""))); }
       c.append(d); await refrescar();
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) { toast(humano(e.message, e.datos && e.datos.motivo), "error"); }
   }
+  // ── Modo rápido: un objetivo en lenguaje simple → el sistema arma la directiva por ti (el motor sigue validando todo) ──
+  const TABLA_DE = { "EMP-05": "reportes_financieros", "EMP-03": "empleados", "EMP-01": "ventas", "EMP-02": "compras", "EMP-04": "productos" };
+  function metasRapidas(e) {
+    const conocidas = ((e.rojo && e.rojo.credenciales) || []).filter((x) => x.credencial); const hay = conocidas.length > 0;
+    const fin = conocidas.find((x) => x.id === "EMP-05") || conocidas[0]; const n = (t, ok) => ({ v: t, t: ok ? t : t + " (necesitas una credencial primero)", off: !ok });
+    return { fin, lista: [{ v: "reconocer", t: "Reconocer el directorio (ver quién existe)" }, { v: "correo", t: "Engañar a alguien por correo para conseguir su credencial" }, { v: "usar", t: hay ? "Consultar un recurso con una credencial que ya tengo" : "Consultar un recurso (necesitas una credencial primero)", off: !hay },
+      { v: "extraer", t: hay ? "Extraer una tabla con una credencial que ya tengo" : "Extraer una tabla (necesitas una credencial primero)", off: !hay }, { v: "copia", t: "Pedir al Azul una copia completa de la base" }] };
+  }
+  function pintarRapido(e) {
+    if (!e.rojo || S.rol !== "RED") return; const m = metasRapidas(e); const s = $("#q-obj"); const sig = JSON.stringify(m.lista); if (s.dataset.sig !== sig) { s.dataset.sig = sig; const p = s.value; s.textContent = ""; m.lista.forEach((o) => { const x = el("option", "", o.t); x.value = o.v; x.disabled = !!o.off; s.append(x); }); if ([...s.options].some((o) => o.value === p && !o.disabled)) s.value = p; }
+    const qi = $("#q-ident"); if (qi.options.length === 0) e.rojo.credenciales.forEach((x) => { const o = el("option", "", x.id + (x.nombre ? " · " + x.nombre : "")); o.value = x.id; qi.append(o); });
+    $("#q-id-w").hidden = $("#q-obj").value !== "correo";
+  }
+  $("#q-obj").addEventListener("change", () => { $("#q-id-w").hidden = $("#q-obj").value !== "correo"; });
+  $("#b-rapido-rojo").addEventListener("click", () => {
+    const e = S.est; if (!e || !e.rojo) return; const m = metasRapidas(e); const meta = $("#q-obj").value; const fin = m.fin; const ninguna = { modo: "ninguna" }; let d;
+    if (meta === "reconocer") d = { accion: "scan_directory", objetivo: "info_administrativa", estrategia: "", identidad_id: "", tabla: "", plantilla: "", credencial: ninguna };
+    else if (meta === "correo") d = { accion: "send_email", objetivo: "info_administrativa", estrategia: "ingenieria_social", identidad_id: $("#q-ident").value, tabla: "", plantilla: "aviso_soporte", credencial: ninguna };
+    else if (meta === "usar" && fin) d = { accion: "query_resource", objetivo: "consultar_reportes_financieros", estrategia: "uso_credencial_expuesta", identidad_id: fin.id, tabla: TABLA_DE[fin.id] || "", plantilla: "", credencial: { modo: "conocida" } };
+    else if (meta === "extraer" && fin) d = { accion: "extract_table", objetivo: "extraer_tabla", estrategia: "uso_credencial_expuesta", identidad_id: fin.id, tabla: TABLA_DE[fin.id] || "reportes_financieros", plantilla: "", credencial: { modo: "conocida" } };
+    else if (meta === "copia") d = { accion: "request_elevation", objetivo: "copia_bd", estrategia: "solicitud_legitima", identidad_id: "", tabla: "", plantilla: "", credencial: ninguna };
+    else { toast("Elige primero qué quieres intentar", "error"); return; }
+    propuesta("RED", "#prop-rojo", d);
+  });
+  $("#b-rapido-azul").addEventListener("click", () => { const c = S.est && S.est.ia && S.est.ia.catalogo_directiva; if (!c) return; propuesta("BLUE", "#prop-azul", { foco: (c.focos_azul[0].v || c.focos_azul[0]), sujeto_id: "", accion_preferida: "", pedir_autorizacion: $("#q-pedir").checked }); });
+  // ── Panel de Ollama del administrador: estado real, encender/apagar y modelos instalados con su tamaño ──
+  function pintarOllamaAdmin() {
+    if (S.rol !== "ADMIN" || $("#ia-ollama").hidden) return; const ep = $("#ia-endpoint").value.trim(); const s = sondearOllama(ep); const r = s.r; const t = $("#ollama-estado");
+    if (!r) { t.textContent = "Ollama: comprobando…"; t.className = "nota-tarjeta"; return; }
+    if (!r.conectado) { t.textContent = "Ollama está APAGADO. Pulsa «Encender Ollama» antes de usar la IA real."; t.className = "nota-tarjeta mal"; return; }
+    const dl = $("#ia-modelos"); const sig = JSON.stringify(r.modelos_info || []); if (dl.dataset.sig !== sig) { dl.dataset.sig = sig; dl.textContent = ""; (r.modelos_info || []).filter((m) => m.permitido).forEach((m) => { const o = el("option"); o.value = m.nombre; o.label = m.nombre + (m.recomendado ? " ✔ recomendado" : ""); dl.append(o); }); }
+    const mi = (r.modelos_info || []).find((m) => m.nombre === $("#ia-modelo").value.trim()); let txt = "Ollama ENCENDIDO · " + (r.modelos || []).length + " modelos instalados · máximo permitido " + r.max_b + "B";
+    if (!mi) txt += " · ⚠ ese modelo no está instalado"; else if (!mi.permitido) txt += " · ⛔ demasiado grande para esta máquina"; else if (!mi.recomendado) txt += " · aviso: " + (mi.tam_b || "?") + "B funciona pero usa más RAM; para dos IAs a la vez conviene 4B";
+    t.textContent = txt; t.className = "nota-tarjeta " + (mi && mi.permitido ? "ok" : "mal");
+  }
+  const sondeoYa = (ep) => { delete SONDEO[ep]; return sondearOllama(ep); };
+  $("#b-ollama-on").addEventListener("click", async () => { const ep = $("#ia-endpoint").value.trim(); $("#ollama-estado").textContent = "Encendiendo Ollama… (puede tardar unos segundos)"; $("#b-ollama-on").disabled = true;
+    try { const r = await api("POST", "/api/nova/ollama/iniciar", { endpoint: ep }); toast(r.mensaje, "ok"); } catch (er) { toast(humano(er.message), "error"); } $("#b-ollama-on").disabled = false; sondeoYa(ep); await refrescar(); });
+  $("#b-ollama-off").addEventListener("click", async () => { const ep = $("#ia-endpoint").value.trim(); try { const r = await api("POST", "/api/nova/ollama/detener", {}); toast(r.mensaje, "ok"); } catch (er) { toast(humano(er.message), "error"); } sondeoYa(ep); await refrescar(); });
+  // ── Guía «qué hacer ahora» y botón de siguiente paso del administrador ──
+  function pintarGuia(e) {
+    const st = e.estado; const yo = (e.participantes || []).find((p) => p.nombre === S.nombre); let t;
+    if (S.rol === "ADMIN") t = { null: "Pulsa «Crear partida». Nada empieza hasta que tú la inicies.", CONFIGURACION: "Abre la sala de espera para que los jugadores entren.", SALA_DE_ESPERA: "Espera a que todos entren y estén listos; luego marca la partida como LISTA.", LISTA: "Pulsa Iniciar cuando todos estén preparados.", EN_CURSO: "Observa la partida. Puedes pausar o detener.", PAUSADA: "La partida está en pausa. Reanúdala cuando quieras." }[st == null ? "null" : st] || "Partida terminada: revisa el resultado arriba.";
+    else if (S.rol === "SPECTATOR") t = "Estás mirando. Verás el marcador y los eventos públicos.";
+    else if (st == null || st === "CONFIGURACION") t = "Espera a que el administrador abra la sala.";
+    else if (!yo && ["SALA_DE_ESPERA", "LISTA", "EN_CURSO", "PAUSADA"].includes(st)) t = "Pulsa «Unirme a la partida».";
+    else if (["SALA_DE_ESPERA"].includes(st)) t = "Pulsa «Estoy listo» y espera al administrador.";
+    else if (st === "LISTA") t = "Todo listo: esperando a que el administrador inicie.";
+    else if (st === "EN_CURSO") t = S.rol === "RED" ? "Reconoce el directorio, consigue una credencial y extrae la tabla protegida. Puedes pedir ayuda a la IA." : "Revisa tu bandeja y las alertas. Si te llega una solicitud, decide con tu equipo.";
+    else if (st === "PAUSADA") t = "Partida en pausa: espera."; else t = "La partida terminó.";
+    $("#guia-texto").textContent = t; visible("#guia", true);
+    if (S.rol === "ADMIN") { const b = $("#b-siguiente"); const m = { null: ["Crear partida", "#btn-crear"], CONFIGURACION: ["1 · Abrir sala de espera", "#b-sala"], SALA_DE_ESPERA: ["2 · Marcar LISTA", "#b-lista"], LISTA: ["3 · Iniciar partida", "#b-iniciar"], EN_CURSO: ["Pausar partida", "#b-pausar"], PAUSADA: ["Reanudar partida", "#b-reanudar"] }[st == null ? "null" : st];
+      b.textContent = m ? m[0] : "Partida terminada"; b.disabled = !m; b.dataset.destino = m ? m[1] : ""; }
+  }
+  $("#b-siguiente").addEventListener("click", () => { const d = $("#b-siguiente").dataset.destino; if (!d) return; if (d === "#btn-crear") $("#form-crear").requestSubmit(); else $(d).click(); });
   // ── Constructor de prompts: el jugador elige PARTES de catálogo; la IA solo se lanza al pulsar y cada lanzamiento gasta una oportunidad ──
   function llena(sel, vals, vacio) { const s = $(sel); const sig = JSON.stringify([vals, vacio]); if (s.dataset.sig === sig) return; s.dataset.sig = sig; const previo = s.value; s.textContent = ""; if (vacio != null) { const o = el("option", "", vacio); o.value = ""; s.append(o); }
     vals.forEach((v) => { const o = el("option", "", v.t || String(v).replace(/_/g, " ")); o.value = v.v || v; s.append(o); }); if ([...s.options].some((o) => o.value === previo)) s.value = previo; }
@@ -287,7 +353,7 @@
     if (!dlgId) return; const id = dlgId; const c = $("#dlg-coment").value.trim(); OCULTAS.add(id);
     intentar(async () => {
       const r = await api("POST", "/api/nova/accion", { action_type: tipo, params: { approval_id: id, comentario: c }, idempotency_key: "dlg-" + Date.now() + Math.random().toString(36).slice(2) }, true); const d = await r.json();
-      if (!r.ok) throw new Error(d.mensaje || "rechazada");
+      if (!r.ok) throw new Error(humano(d.mensaje, d.reject_reason || d.motivo) || "rechazada");
       toast(d.data && d.data.voto_registrado ? "Tu opinión quedó registrada" : "Decisión aplicada", "ok"); return d;
     }, null);
   }

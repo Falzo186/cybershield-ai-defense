@@ -36,3 +36,21 @@ main { padding: var(--p-e5); } .entrar { max-width: 520px; margin: var(--p-e8) a
 .voto { display: flex; gap: var(--p-e3); padding: 3px 0; font-size: var(--p-t-sm); } .voto.APROBAR b { color: #6fcf97; } .voto.RECHAZAR b { color: #ff8f98; }
 .nota { color: #7c8db5; font-size: var(--p-t-xs); margin: var(--p-e3) 0 0; }
 @media (max-width: 640px) { .panel-jug { width: 100%; top: 0; max-height: 100vh; border-radius: 0; } .dlg-fila { grid-template-columns: 1fr; } }
+
+/* ── Rediseño compacto (v2): más legible, menos desplazamiento ─────────────────────────────────────────── */
+body { font-size: 15px; line-height: 1.45; }
+main { padding: var(--p-e4); max-width: 1500px; margin: 0 auto; }
+.rejilla-nova { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--p-e3); }
+.guia { border-left: 4px solid #3b82f6; background: #14203a; border-radius: var(--p-r-md); padding: 10px var(--p-e4); margin-bottom: var(--p-e4); font-size: 15px; }
+.guia b { color: #8fb8ff; }
+.form-sol.cols { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); align-items: end; }
+.form-sol.cols > .ancho-campo, .form-sol.cols > button { grid-column: 1 / -1; }
+.boton-grande { width: 100%; padding: 12px; font-size: 16px; margin-bottom: var(--p-e3); }
+.rapido { display: grid; gap: var(--p-e3); border: 1px solid #2c3a5f; border-radius: var(--p-r-md); padding: var(--p-e3); background: #101830; margin-bottom: var(--p-e3); }
+details.avanzado { margin-bottom: var(--p-e3); } details.avanzado > summary { cursor: pointer; color: #8fb8ff; font-size: var(--p-t-sm); padding: 4px 0; }
+#lista-ev { max-height: 260px; overflow: auto; }
+.chat-eq { max-height: 140px; }
+#pub { font-size: 16px; display: grid; gap: 6px; }
+.ia-linea { font-size: var(--p-t-sm); color: #b9c6e4; padding: 3px 0; }
+.nota-tarjeta.ok { color: #6fcf97; } .nota-tarjeta.mal { color: #ff8f98; }
+@media (max-width: 700px) { main { padding: var(--p-e3); } .rejilla-nova { grid-template-columns: 1fr; } body { font-size: 16px; } }

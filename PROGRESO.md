@@ -446,3 +446,9 @@ siguen siendo 21. El cálculo vive ahora en `experimentos/avance.py`, verificabl
 - Pruebas nuevas: `src/lab/test_nova_multijugador.py` (40), `e2e/test_nova_multijugador_ui.py` (17), ampliaciones en `server/test_nova.py` (54), `test_nova_prompts.py` (30), `e2e/test_nova_ui.py` (40).
 - Fallos conocidos: `e2e/test_combate_ui.py` (umbral de tiempo de la cronología, anterior a esta fase) y `server/test_partida.py` «cada partida tiene su propio id» (intermitente: pasa solo).
 - Pendiente: prueba real con un compañero en red local (`docs/PRUEBA_RED_LOCAL.md`), modelos en dos PCs, IA vs IA con Ollama (`docs/evaluacion/NOVA_OLLAMA_IA_VS_IA.md`).
+
+## Ajustes tras la primera prueba en red (22-nov)
+- Hallazgo del usuario: «La IA falló: WinError 10061» = Ollama estaba apagado en el anfitrión (se había apagado a propósito para liberar la GPU). La IA corre SIEMPRE en el anfitrión; los compañeros solo usan el navegador.
+- Nuevo: `POST /api/nova/ollama/iniciar|detener` (solo ADMIN y solo 127.0.0.1), estado con modelos y tamaños, tope de modelo `CS_NOVA_MAX_B` (8B por defecto; recomendado 4B → `MODEL_TOO_BIG`), errores traducidos a lenguaje simple en la UI.
+- Nuevo en la UI: «Qué hacer ahora», botón único de siguiente paso para el administrador, modo rápido de IA (un objetivo y un botón) con el constructor avanzado plegado, formularios en columnas.
+- Sigue NO VERIFICADO: criterio 14 (modelos en dos PCs) y 33 (LAN con el compañero conectado desde su propio equipo).

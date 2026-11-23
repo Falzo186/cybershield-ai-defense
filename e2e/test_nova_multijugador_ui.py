@@ -84,6 +84,7 @@ def main(ver=False):
         # la IA Azul (simulada) pide autorización humana desde el constructor de prompts
         adm.post("/api/nova/ia/config", {"BLUE": {"modo": "assist", "proveedor": {"tipo": "scripted"}}})
         pz[0].wait_for_selector("#ia-azul:not([hidden])", timeout=20000)
+        pz[0].evaluate("document.querySelector('#e-avanzado').open = true")
         pz[0].select_option("#e-foco", "identidad"); pz[0].select_option("#e-suj", "EMP-04"); pz[0].select_option("#e-acc", "revoke_credential"); pz[0].check("#e-pedir")
         pz[0].click("#b-prop-azul")
         esperar_texto(pz[0], "#prop-azul", "Confirmar y ejecutar")

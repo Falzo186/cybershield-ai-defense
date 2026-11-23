@@ -52,6 +52,7 @@
 
 <main id="principal" tabindex="-1" hidden>
   <div class="banner-estado" id="banner-estado" role="status"></div>
+  <div class="guia" id="guia" role="note"><b>Qué hacer ahora:</b> <span id="guia-texto"></span></div>
 
   <!-- Victoria -->
   <section class="tarjeta victoria" id="victoria" hidden>
@@ -65,7 +66,8 @@
     <section class="tarjeta" id="p-admin" hidden>
       <div class="tarjeta-cab"><h3>Control de la partida (administrador)</h3></div>
       <div class="tarjeta-cuerpo">
-        <form id="form-crear" class="form-sol" autocomplete="off">
+        <button class="boton boton-primario boton-grande" id="b-siguiente" type="button" disabled>Crea la partida abajo</button>
+        <form id="form-crear" class="form-sol cols" autocomplete="off">
           <label class="campo"><span>Duración (s de partida)</span><input type="number" id="c-dur" value="720" min="60" max="3600"></label>
           <label class="campo"><span>Velocidad del reloj (1–60×)</span><input type="number" id="c-esc" value="1" min="0.1" max="60" step="0.1"></label>
           <label class="campo"><span>Autorizaciones del Azul</span><select id="c-amodo"><option value="votacion">Votación: todos opinan, decide la mayoría o el primero que respondió</option><option value="primero">El primero que responde decide solo</option></select></label>
@@ -81,11 +83,16 @@
           <button class="boton boton-peligro" id="b-detener">Detener</button><button class="boton" id="b-cancelar">Cancelar partida</button>
         </div>
         <div class="sub-titulo">Inteligencia artificial por equipo</div>
-        <div class="form-sol" id="ia-config">
+        <div class="form-sol cols" id="ia-config">
           <label class="campo"><span>IA Roja</span><select id="ia-rojo-modo"><option>off</option><option>assist</option><option>auto</option></select></label>
           <label class="campo"><span>IA Azul</span><select id="ia-azul-modo"><option>off</option><option>assist</option><option>auto</option></select></label>
           <label class="campo"><span>Proveedor</span><select id="ia-prov"><option value="scripted">SIMULADO (no es una IA)</option><option value="ollama">Ollama</option><option value="offline">Desconectado</option></select></label>
-          <label class="campo" id="ia-ollama" hidden><span>Endpoint Ollama (red local) · modelo</span><input id="ia-endpoint" value="http://127.0.0.1:11434"><input id="ia-modelo" value="qwen3:8b"></label>
+          <div id="ia-ollama" class="ancho-campo" hidden>
+            <label class="campo"><span>Modelo (recomendado: 4B por equipo)</span><input id="ia-modelo" value="qwen3:4b" list="ia-modelos" autocomplete="off"><datalist id="ia-modelos"></datalist></label>
+            <label class="campo"><span>Endpoint de Ollama (esta máquina)</span><input id="ia-endpoint" value="http://127.0.0.1:11434"></label>
+            <div class="acciones-form"><button class="boton" id="b-ollama-on" type="button">Encender Ollama</button><button class="boton" id="b-ollama-off" type="button">Apagar Ollama</button></div>
+            <p class="nota-tarjeta" id="ollama-estado" role="status">Ollama: comprobando…</p>
+          </div>
           <button class="boton" id="b-ia">Aplicar IA</button>
         </div>
         <p class="nota-tarjeta" id="ia-estado"></p>
@@ -120,8 +127,14 @@
           <button class="boton boton-primario" type="submit">Ejecutar operación</button>
         </form>
         <p class="nota-tarjeta" id="op-resultado" role="status"></p>
-        <div id="ia-rojo" hidden><p class="nota-tarjeta" id="ia-linea-rojo"></p><div class="sub-titulo">Armar prompt para la IA (Rojo) <span class="insignia" id="op-restantes-rojo"></span></div>
-          <form class="form-sol" id="form-dir-rojo">
+        <div id="ia-rojo" hidden><p class="nota-tarjeta" id="ia-linea-rojo"></p><div class="sub-titulo">Pedir ayuda a la IA (Rojo) <span class="insignia" id="op-restantes-rojo"></span></div>
+          <div class="rapido" id="rapido-rojo">
+            <label class="campo"><span>¿Qué quieres que intente la IA?</span><select id="q-obj"></select></label>
+            <label class="campo" id="q-id-w" hidden><span>¿A quién?</span><select id="q-ident"></select></label>
+            <button class="boton boton-primario" type="button" id="b-rapido-rojo">Pedir a la IA</button>
+          </div>
+          <details class="avanzado" id="d-avanzado"><summary>Constructor avanzado de prompt</summary>
+          <form class="form-sol cols" id="form-dir-rojo">
             <label class="campo"><span>Acción</span><select id="d-accion"></select></label>
             <label class="campo"><span>Objetivo</span><select id="d-obj"></select></label>
             <label class="campo"><span>Estrategia</span><select id="d-estr"></select></label>
@@ -131,7 +144,7 @@
             <label class="campo"><span>Credencial</span><select id="d-cred"></select></label>
             <label class="campo" id="d-estruct" hidden><span>Estructura de la credencial aleatoria: dígitos iniciales (0–5) · letra final</span><input id="d-dig" maxlength="5" inputmode="numeric" placeholder="ej. 12"><input id="d-letra" maxlength="1" placeholder="ej. Q"></label>
             <button class="boton boton-primario" type="submit" id="b-prop-rojo">Lanzar prompt a la IA</button>
-          </form><div id="prop-rojo"></div></div>
+          </form></details><div id="prop-rojo"></div></div>
         <div id="elev-rojo"></div>
       </div>
     </section>
@@ -152,14 +165,17 @@
     <section class="tarjeta" id="p-azul-alertas" hidden>
       <div class="tarjeta-cab"><h3>Alertas, incidentes y acciones defensivas</h3></div>
       <div class="tarjeta-cuerpo"><div id="az-alertas"></div><div id="az-inc"></div><div class="sub-titulo">Acciones sobre identidades</div><div id="az-ident-acc" class="acciones-form"></div>
-        <div id="ia-azul" hidden><p class="nota-tarjeta" id="ia-linea-azul"></p><div class="sub-titulo">Armar prompt para la IA (Azul) <span class="insignia" id="op-restantes-azul"></span></div>
-          <form class="form-sol" id="form-dir-azul">
+        <div id="ia-azul" hidden><p class="nota-tarjeta" id="ia-linea-azul"></p><div class="sub-titulo">Pedir ayuda a la IA (Azul) <span class="insignia" id="op-restantes-azul"></span></div>
+          <div class="rapido"><label class="campo"><span><input type="checkbox" id="q-pedir"> Que pida autorización al equipo antes de actuar</span></label>
+            <button class="boton boton-primario" type="button" id="b-rapido-azul">Que la IA revise lo pendiente</button></div>
+          <details class="avanzado" id="e-avanzado"><summary>Constructor avanzado de prompt</summary>
+          <form class="form-sol cols" id="form-dir-azul">
             <label class="campo"><span>Foco</span><select id="e-foco"></select></label>
             <label class="campo"><span>Sujeto (alerta, solicitud, identidad o correo)</span><select id="e-suj"></select></label>
             <label class="campo"><span>Acción preferida</span><select id="e-acc"></select></label>
             <label class="campo"><span><input type="checkbox" id="e-pedir"> Que la IA pida autorización humana (se avisa a todo el equipo)</span></label>
             <button class="boton boton-primario" type="submit" id="b-prop-azul">Lanzar prompt a la IA</button>
-          </form><div id="prop-azul"></div></div></div>
+          </form></details><div id="prop-azul"></div></div></div>
     </section>
 
     <section class="tarjeta" id="p-catalogo" hidden>
