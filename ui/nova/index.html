@@ -9,15 +9,17 @@
 <link rel="stylesheet" href="../panel/panel.css">
 <link rel="stylesheet" href="../combate/combate.css">
 <link rel="stylesheet" href="nova.css">
+<link rel="stylesheet" href="ds.css">
 </head>
 <body>
 <a class="saltar" href="#principal">Saltar al contenido</a>
 <header class="barra">
-  <div class="barra-marca"><b>CyberShield</b> · Distribuidora Nova</div>
+  <div class="barra-marca"><span class="logo" aria-hidden="true">◆</span><b>CyberShield</b><span class="marca-sub">Distribuidora Nova</span></div>
   <div class="barra-estados" aria-live="polite">
     <span class="chip chip-neutro" id="chip-conexion">Conectando…</span>
     <span class="chip chip-neutro sin-punto" id="chip-estado">SIN PARTIDA</span>
     <span class="chip chip-neutro sin-punto" id="chip-reloj">—</span>
+    <span class="chip chip-aviso sin-punto" id="chip-practica" hidden>PRÁCTICA</span>
     <span class="chip chip-neutro sin-punto" id="chip-yo">sin sesión</span>
     <button class="boton" id="b-jug" type="button" aria-expanded="false" aria-controls="panel-jug" hidden>Jugadores</button>
   </div>
@@ -54,18 +56,19 @@
   <div class="banner-estado" id="banner-estado" role="status"></div>
   <div class="guia" id="guia" role="note"><b>Qué hacer ahora:</b> <span id="guia-texto"></span></div>
 
-  <!-- Victoria -->
+  <!-- Resultado y resumen final -->
   <section class="tarjeta victoria" id="victoria" hidden>
     <div class="tarjeta-cab"><h3 id="v-titulo">Resultado</h3><span class="chip sin-punto" id="v-chip">—</span></div>
     <div class="tarjeta-cuerpo"><p id="v-motivo"></p><div id="v-datos" class="datos"></div>
-      <div class="acciones-form" id="v-descargas"></div></div>
+      <div class="acciones-form" id="v-descargas"></div>
+      <div id="v-resumen" class="resumen"></div></div>
   </section>
 
-  <div class="rejilla-nova">
-    <!-- Administrador -->
-    <section class="tarjeta" id="p-admin" hidden>
-      <div class="tarjeta-cab"><h3>Control de la partida (administrador)</h3></div>
-      <div class="tarjeta-cuerpo">
+  <!-- Administrador -->
+  <section class="tarjeta" id="p-admin" hidden>
+    <div class="tarjeta-cab"><h3>Control de la partida (administrador)</h3></div>
+    <div class="tarjeta-cuerpo admin-grid">
+      <div class="admin-col">
         <button class="boton boton-primario boton-grande" id="b-siguiente" type="button" disabled>Crea la partida abajo</button>
         <form id="form-crear" class="form-sol cols" autocomplete="off">
           <label class="campo"><span>Duración (s de partida)</span><input type="number" id="c-dur" value="720" min="60" max="3600"></label>
@@ -75,6 +78,8 @@
           <label class="campo"><span>Oportunidades de prompt por equipo</span><input type="number" id="c-pres" value="10" min="1" max="50"></label>
           <label class="campo"><span>Modalidad</span><select id="c-mod"><option>BALANCED</option><option>RED_ADVANTAGE</option><option>BLUE_ADVANTAGE</option></select></label>
           <label class="campo"><span>Victoria del Rojo</span><select id="c-win"><option value="W1,W2">W1 o W2 (por defecto)</option><option value="W1">Solo W1: tabla reportes_financieros</option><option value="W2">Solo W2: copia completa</option></select></label>
+          <label class="campo"><span>Dificultad de los empleados NPC</span><select id="c-npc"><option value="facil">Fácil: caen con frecuencia</option><option value="normal" selected>Normal</option><option value="dificil">Difícil: desconfían</option></select></label>
+          <label class="campo marca"><span><input type="checkbox" id="c-prac"> Partida de práctica: 5 minutos, ritmo rápido, no cuenta como oficial</span></label>
           <button class="boton boton-primario" type="submit" id="btn-crear">Crear partida</button>
         </form>
         <div class="acciones-form" id="botones-admin">
@@ -82,10 +87,12 @@
           <button class="boton boton-primario" id="b-iniciar">Iniciar</button><button class="boton" id="b-pausar">Pausar</button><button class="boton" id="b-reanudar">Reanudar</button>
           <button class="boton boton-peligro" id="b-detener">Detener</button><button class="boton" id="b-cancelar">Cancelar partida</button>
         </div>
+      </div>
+      <div class="admin-col">
         <div class="sub-titulo">Inteligencia artificial por equipo</div>
         <div class="form-sol cols" id="ia-config">
-          <label class="campo"><span>IA Roja</span><select id="ia-rojo-modo"><option>off</option><option>assist</option><option>auto</option></select></label>
-          <label class="campo"><span>IA Azul</span><select id="ia-azul-modo"><option>off</option><option>assist</option><option>auto</option></select></label>
+          <label class="campo"><span>IA Roja</span><select id="ia-rojo-modo"><option value="off">Apagada</option><option value="assist">Asistida: propone y tú confirmas</option><option value="auto">Automática: ejecuta sola (no recomendado)</option></select></label>
+          <label class="campo"><span>IA Azul</span><select id="ia-azul-modo"><option value="off">Apagada</option><option value="assist">Asistida: propone y tú confirmas</option><option value="auto">Automática: ejecuta sola (no recomendado)</option></select></label>
           <label class="campo"><span>Proveedor</span><select id="ia-prov"><option value="scripted">SIMULADO (no es una IA)</option><option value="ollama">Ollama</option><option value="offline">Desconectado</option></select></label>
           <div id="ia-ollama" class="ancho-campo" hidden>
             <label class="campo"><span>Modelo (recomendado: 4B por equipo)</span><input id="ia-modelo" value="qwen3:4b" list="ia-modelos" autocomplete="off"><datalist id="ia-modelos"></datalist></label>
@@ -98,111 +105,181 @@
         <p class="nota-tarjeta" id="ia-estado"></p>
         <div id="ia-detalle" aria-live="polite"></div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Sala -->
-    <section class="tarjeta" id="p-sala">
-      <div class="tarjeta-cab"><h3>Sala de espera y participantes</h3><span class="chip chip-neutro sin-punto" id="n-part">0</span></div>
-      <div class="tarjeta-cuerpo"><div id="lista-part"></div>
-        <div class="acciones-form"><button class="boton boton-primario" id="b-unirse" hidden>Unirme a la partida</button><button class="boton" id="b-listo" hidden>Estoy listo</button></div></div>
-    </section>
+  <div class="tablero" id="tablero">
+    <!-- Columna izquierda: situación de la partida -->
+    <div class="col" id="col-izq">
+      <section class="tarjeta" id="p-sala">
+        <div class="tarjeta-cab"><h3>Participantes</h3><span class="chip chip-neutro sin-punto" id="n-part">0</span></div>
+        <div class="tarjeta-cuerpo"><div id="lista-part"></div>
+          <div class="acciones-form"><button class="boton boton-primario" id="b-unirse" hidden>Unirme a la partida</button><button class="boton" id="b-listo" hidden>Estoy listo</button></div></div>
+      </section>
+      <section class="tarjeta" id="p-pub">
+        <div class="tarjeta-cab"><h3>Marcador y estado</h3></div>
+        <div class="tarjeta-cuerpo" id="pub"></div>
+      </section>
+      <section class="tarjeta" id="p-presu" hidden>
+        <div class="tarjeta-cab"><h3>Tus límites</h3><span class="chip chip-neutro sin-punto" id="presu-ronda">—</span></div>
+        <div class="tarjeta-cuerpo" id="presu"></div>
+      </section>
+      <section class="tarjeta" id="p-misiones" hidden>
+        <div class="tarjeta-cab"><h3>Misiones del equipo</h3></div>
+        <div class="tarjeta-cuerpo" id="misiones"></div>
+      </section>
+      <section class="tarjeta" id="p-msg" hidden>
+        <div class="tarjeta-cab"><h3>Chat del equipo</h3></div>
+        <div class="tarjeta-cuerpo"><div id="msgs" class="chat-eq"></div>
+          <form id="form-msg" class="form-chat" autocomplete="off"><input id="m-texto" maxlength="300" placeholder="Escribe a tu equipo" aria-label="Mensaje al equipo"><button class="boton boton-primario" type="submit">Enviar</button></form>
+          <div id="tareas"></div><form id="form-tarea" class="form-chat" hidden autocomplete="off"><input id="t-titulo" maxlength="120" placeholder="Nueva tarea de investigación" aria-label="Título de la tarea"><button class="boton" type="submit">Crear tarea</button></form></div>
+      </section>
+    </div>
 
-    <!-- Rojo -->
-    <section class="tarjeta" id="p-rojo-cred" hidden>
-      <div class="tarjeta-cab"><h3>Credenciales y accesos descubiertos</h3><span class="chip chip-neutro sin-punto" id="n-desc">0 de 6</span></div>
-      <div class="tarjeta-cuerpo"><div class="creds" id="creds"></div></div>
-    </section>
-    <section class="tarjeta" id="p-rojo-op" hidden>
-      <div class="tarjeta-cab"><h3>Preparar operación</h3></div>
-      <div class="tarjeta-cuerpo">
-        <form id="form-op" class="form-sol" autocomplete="off">
-          <label class="campo"><span>Acción</span><select id="op-accion"><option value="scan_directory">Reconocer el directorio</option><option value="send_email">Enviar correo a una identidad</option><option value="guess_credential">Probar una credencial candidata</option><option value="query_resource">Consultar un recurso con una credencial descubierta</option><option value="extract_table">Extraer una tabla</option><option value="request_elevation">Pedir una elevación al equipo Azul (copia completa)</option><option value="export_database">Exportar la base completa (requiere elevación aprobada)</option></select></label>
-          <label class="campo" id="op-id-w"><span>Identidad</span><select id="op-ident"></select></label>
-          <label class="campo" id="op-pl-w" hidden><span>Plantilla del correo</span><select id="op-plant"></select></label>
-          <label class="campo" id="op-cuerpo-w" hidden><span>Texto del correo / motivo (sin enlaces web)</span><input id="op-cuerpo" maxlength="300"></label>
-          <label class="campo" id="op-cand-w" hidden><span>Credencial candidata (5 dígitos y una letra)</span><input id="op-cand" maxlength="6" placeholder="p. ej. 12345A"></label>
-          <label class="campo" id="op-tab-w" hidden><span>Tabla</span><select id="op-tabla"></select></label>
-          <label class="campo"><span>Objetivo (para el registro)</span><select id="op-obj"><option value="">—</option><option>consultar_ventas</option><option>consultar_compras</option><option>consultar_inventario</option><option>consultar_clientes</option><option>consultar_reportes_financieros</option><option>info_administrativa</option><option>extraer_tabla</option><option>copia_bd</option></select></label>
-          <label class="campo"><span>Estrategia (para el registro)</span><select id="op-estr"><option value="">—</option><option>solicitud_legitima</option><option>ingenieria_social</option><option>suplantacion</option><option>uso_credencial_expuesta</option><option>adivinacion</option><option>prompt_injection</option><option>permisos_insuficientes</option></select></label>
-          <button class="boton boton-primario" type="submit">Ejecutar operación</button>
-        </form>
-        <p class="nota-tarjeta" id="op-resultado" role="status"></p>
-        <div id="ia-rojo" hidden><p class="nota-tarjeta" id="ia-linea-rojo"></p><div class="sub-titulo">Pedir ayuda a la IA (Rojo) <span class="insignia" id="op-restantes-rojo"></span></div>
-          <div class="rapido" id="rapido-rojo">
-            <label class="campo"><span>¿Qué quieres que intente la IA?</span><select id="q-obj"></select></label>
-            <label class="campo" id="q-id-w" hidden><span>¿A quién?</span><select id="q-ident"></select></label>
-            <button class="boton boton-primario" type="button" id="b-rapido-rojo">Pedir a la IA</button>
+    <!-- Columna central: operaciones (Rojo) / monitoreo (Azul) -->
+    <div class="col col-centro" id="col-centro">
+      <!-- ROJO -->
+      <section class="tarjeta mision" id="p-mision" hidden>
+        <div class="tarjeta-cab"><h3>Misión</h3><span class="chip chip-neutro sin-punto" id="mision-paso">Paso 1 de 5</span></div>
+        <div class="tarjeta-cuerpo">
+          <ol class="fases" id="fases" aria-label="Fases de la misión"></ol>
+          <div class="paso-actual"><div><b id="paso-titulo">Reconocer el directorio</b><p id="paso-texto" class="nota-tarjeta"></p></div>
+            <div class="acciones-form"><button class="boton boton-primario boton-grande" id="b-siguiente-rojo" type="button">Hacer siguiente paso</button><button class="boton" id="b-que-hago" type="button">¿Qué hago ahora?</button></div></div>
+          <div class="ruta" id="ruta" role="group" aria-label="Elige tu objetivo">
+            <button type="button" class="ruta-op" data-ruta="W1"><b>Ruta financiera</b><span>Extraer la tabla financiera con la identidad de Finanzas.</span></button>
+            <button type="button" class="ruta-op" data-ruta="W2"><b>Ruta de copia completa</b><span>Pedir una elevación al Azul y exportar toda la base.</span></button>
           </div>
-          <details class="avanzado" id="d-avanzado"><summary>Constructor avanzado de prompt</summary>
-          <form class="form-sol cols" id="form-dir-rojo">
-            <label class="campo"><span>Acción</span><select id="d-accion"></select></label>
-            <label class="campo"><span>Objetivo</span><select id="d-obj"></select></label>
-            <label class="campo"><span>Estrategia</span><select id="d-estr"></select></label>
-            <label class="campo"><span>Identidad</span><select id="d-ident"></select></label>
-            <label class="campo"><span>Tabla / base de datos</span><select id="d-tabla"></select></label>
-            <label class="campo"><span>Plantilla de correo</span><select id="d-plant"></select></label>
-            <label class="campo"><span>Credencial</span><select id="d-cred"></select></label>
-            <label class="campo" id="d-estruct" hidden><span>Estructura de la credencial aleatoria: dígitos iniciales (0–5) · letra final</span><input id="d-dig" maxlength="5" inputmode="numeric" placeholder="ej. 12"><input id="d-letra" maxlength="1" placeholder="ej. Q"></label>
-            <button class="boton boton-primario" type="submit" id="b-prop-rojo">Lanzar prompt a la IA</button>
-          </form></details><div id="prop-rojo"></div></div>
-        <div id="elev-rojo"></div>
-      </div>
-    </section>
+          <div id="que-hago" class="aviso-ayuda" hidden role="status"></div>
+        </div>
+      </section>
+      <details class="tarjeta plegable" id="p-rojo-cred" hidden>
+        <summary><h3>Credenciales e identidades</h3><span class="chip chip-neutro sin-punto" id="n-desc">0 de 6</span><span class="resumen-cred" id="cred-resumen"></span></summary>
+        <div class="tarjeta-cuerpo"><div class="creds" id="creds"></div></div>
+      </details>
+      <section class="tarjeta" id="p-rojo-op" hidden>
+        <div class="tarjeta-cab"><h3>Preparar y ejecutar una operación</h3></div>
+        <div class="tarjeta-cuerpo">
+          <form id="form-op" class="op-grid" autocomplete="off">
+            <div class="op-prep">
+              <div class="sub-titulo">1 · Preparar</div>
+              <label class="campo"><span>Acción</span><select id="op-accion"><option value="scan_directory">Reconocer directorio</option><option value="send_email">Enviar correo de soporte</option><option value="guess_credential">Probar credencial candidata</option><option value="query_resource">Consultar un recurso con una credencial</option><option value="extract_table">Extraer información</option><option value="request_elevation">Solicitar elevación de permisos</option><option value="export_database">Exportar la base completa</option></select></label>
+              <p class="ayuda-accion" id="op-ayuda"></p>
+              <label class="campo" id="op-id-w"><span>Identidad</span><select id="op-ident"></select></label>
+              <label class="campo" id="op-pl-w" hidden><span>Plantilla del correo</span><select id="op-plant"></select></label>
+              <label class="campo" id="op-cuerpo-w" hidden><span>Texto del correo / motivo (sin enlaces web)</span><input id="op-cuerpo" maxlength="300"></label>
+              <label class="campo" id="op-cand-w" hidden><span>Credencial candidata (5 dígitos y una letra)</span><input id="op-cand" maxlength="6" placeholder="p. ej. 12345A"></label>
+              <label class="campo" id="op-tab-w" hidden><span>Tabla</span><select id="op-tabla"></select></label>
+              <details class="avanzado"><summary>Registro para el análisis (opcional)</summary>
+                <label class="campo"><span>Objetivo</span><select id="op-obj"><option value="">—</option><option>consultar_ventas</option><option>consultar_compras</option><option>consultar_inventario</option><option>consultar_clientes</option><option>consultar_reportes_financieros</option><option>info_administrativa</option><option>extraer_tabla</option><option>copia_bd</option></select></label>
+                <label class="campo"><span>Estrategia</span><select id="op-estr"><option value="">—</option><option>solicitud_legitima</option><option>ingenieria_social</option><option>suplantacion</option><option>uso_credencial_expuesta</option><option>adivinacion</option><option>prompt_injection</option><option>permisos_insuficientes</option></select></label>
+              </details>
+            </div>
+            <div class="op-ejec">
+              <div class="sub-titulo">2 · Ejecutar</div>
+              <div class="op-resumen" id="op-resumen">Elige una acción.</div>
+              <button class="boton boton-primario boton-grande" type="submit" id="b-ejecutar">Ejecutar operación</button>
+              <p class="nota-tarjeta" id="op-resultado" role="status"></p>
+            </div>
+          </form>
+          <div id="elev-rojo"></div>
+        </div>
+      </section>
 
-    <!-- Azul -->
-    <section class="tarjeta" id="p-azul-id" hidden>
-      <div class="tarjeta-cab"><h3>Mi identidad</h3><span class="chip chip-neutro sin-punto" id="az-estado">—</span></div>
-      <div class="tarjeta-cuerpo" id="az-ident"></div>
-    </section>
-    <section class="tarjeta" id="p-azul-bandeja" hidden>
-      <div class="tarjeta-cab"><h3>Bandeja de correo</h3><span class="chip chip-info sin-punto" id="n-nl" hidden></span></div>
-      <div class="tarjeta-cuerpo sin-relleno" id="az-correos"></div>
-    </section>
-    <section class="tarjeta" id="p-azul-aprob" hidden>
-      <div class="tarjeta-cab"><h3>Solicitudes y aprobaciones</h3><span class="chip chip-aviso sin-punto" id="n-aprob" hidden></span></div>
-      <div class="tarjeta-cuerpo" id="az-aprob"></div>
-    </section>
-    <section class="tarjeta" id="p-azul-alertas" hidden>
-      <div class="tarjeta-cab"><h3>Alertas, incidentes y acciones defensivas</h3></div>
-      <div class="tarjeta-cuerpo"><div id="az-alertas"></div><div id="az-inc"></div><div class="sub-titulo">Acciones sobre identidades</div><div id="az-ident-acc" class="acciones-form"></div>
-        <div id="ia-azul" hidden><p class="nota-tarjeta" id="ia-linea-azul"></p><div class="sub-titulo">Pedir ayuda a la IA (Azul) <span class="insignia" id="op-restantes-azul"></span></div>
-          <div class="rapido"><label class="campo"><span><input type="checkbox" id="q-pedir"> Que pida autorización al equipo antes de actuar</span></label>
-            <button class="boton boton-primario" type="button" id="b-rapido-azul">Que la IA revise lo pendiente</button></div>
-          <details class="avanzado" id="e-avanzado"><summary>Constructor avanzado de prompt</summary>
-          <form class="form-sol cols" id="form-dir-azul">
-            <label class="campo"><span>Foco</span><select id="e-foco"></select></label>
-            <label class="campo"><span>Sujeto (alerta, solicitud, identidad o correo)</span><select id="e-suj"></select></label>
-            <label class="campo"><span>Acción preferida</span><select id="e-acc"></select></label>
-            <label class="campo"><span><input type="checkbox" id="e-pedir"> Que la IA pida autorización humana (se avisa a todo el equipo)</span></label>
-            <button class="boton boton-primario" type="submit" id="b-prop-azul">Lanzar prompt a la IA</button>
-          </form></details><div id="prop-azul"></div></div></div>
-    </section>
+      <!-- AZUL: centro de monitoreo -->
+      <section class="tarjeta" id="p-azul-kpi" hidden>
+        <div class="tarjeta-cab"><h3>Seguridad de la empresa</h3><span class="chip chip-neutro sin-punto" id="az-metodo">reglas del motor</span></div>
+        <div class="tarjeta-cuerpo"><div class="kpis" id="az-kpis"></div></div>
+      </section>
+      <section class="tarjeta destacada" id="p-azul-aprob" hidden>
+        <div class="tarjeta-cab"><h3>Solicitudes que requieren atención</h3><span class="chip chip-aviso sin-punto" id="n-aprob" hidden></span></div>
+        <div class="tarjeta-cuerpo" id="az-aprob"></div>
+      </section>
+      <section class="tarjeta" id="p-azul-monitor" hidden>
+        <div class="tarjeta-cab"><h3>Monitor de eventos</h3><span class="chip chip-neutro sin-punto" id="n-mon">0</span></div>
+        <div class="tarjeta-cuerpo sin-relleno"><div id="az-monitor" class="monitor"></div></div>
+      </section>
+      <section class="tarjeta" id="p-azul-alertas" hidden>
+        <div class="tarjeta-cab"><h3>Alertas, incidentes y acciones defensivas</h3></div>
+        <div class="tarjeta-cuerpo"><div id="az-alertas"></div><div id="az-inc"></div><div class="sub-titulo">Acciones sobre identidades</div><div id="az-ident-acc" class="acciones-form"></div></div>
+      </section>
 
-    <section class="tarjeta" id="p-catalogo" hidden>
-      <div class="tarjeta-cab"><h3>Catálogo de identidades y credenciales (administrador)</h3><button class="boton" id="b-mostrar">Mostrar valores</button></div>
-      <div class="tarjeta-cuerpo sin-relleno" id="catalogo"></div>
-    </section>
-    <section class="tarjeta" id="p-misiones" hidden>
-      <div class="tarjeta-cab"><h3>Misiones de mi equipo</h3></div>
-      <div class="tarjeta-cuerpo" id="misiones"></div>
-    </section>
-    <section class="tarjeta" id="p-msg" hidden>
-      <div class="tarjeta-cab"><h3>Mensajes del equipo y tareas</h3></div>
-      <div class="tarjeta-cuerpo"><div id="msgs" class="chat-eq"></div>
-        <form id="form-msg" class="form-chat" autocomplete="off"><input id="m-texto" maxlength="300" placeholder="Escribe a tu equipo" aria-label="Mensaje al equipo"><button class="boton boton-primario" type="submit">Enviar</button></form>
-        <div id="tareas"></div><form id="form-tarea" class="form-chat" hidden autocomplete="off"><input id="t-titulo" maxlength="120" placeholder="Nueva tarea de investigación" aria-label="Título de la tarea"><button class="boton" type="submit">Crear tarea</button></form></div>
-    </section>
+      <section class="tarjeta" id="p-catalogo" hidden>
+        <div class="tarjeta-cab"><h3>Catálogo de identidades y credenciales (administrador)</h3><button class="boton" id="b-mostrar">Mostrar valores</button></div>
+        <div class="tarjeta-cuerpo sin-relleno" id="catalogo"></div>
+      </section>
+    </div>
 
-    <!-- Espectador / todos -->
-    <section class="tarjeta" id="p-pub">
-      <div class="tarjeta-cab"><h3>Marcador y estado público</h3></div>
-      <div class="tarjeta-cuerpo" id="pub"></div>
-    </section>
-    <section class="tarjeta ancho">
-      <div class="tarjeta-cab"><h3>Registro de eventos</h3><span class="chip chip-neutro sin-punto" id="n-ev">0</span></div>
-      <div class="tarjeta-cuerpo sin-relleno" id="lista-ev"></div>
-    </section>
+    <!-- Columna derecha: inteligencia artificial y bandeja -->
+    <div class="col" id="col-der">
+      <section class="tarjeta ia" id="p-ia-rojo" hidden>
+        <div class="tarjeta-cab"><h3>IA Roja</h3><span class="chip chip-neutro sin-punto" id="ia-chip-rojo">—</span></div>
+        <div class="tarjeta-cuerpo">
+          <div id="ia-rojo" hidden>
+            <p class="nota-tarjeta" id="ia-linea-rojo"></p>
+            <div class="ia-meta" id="ia-meta-rojo"></div>
+            <div id="prop-rojo" aria-live="polite"></div>
+            <div class="sub-titulo">Pedir ayuda a la IA <span class="insignia" id="op-restantes-rojo"></span></div>
+            <div class="rapido" id="rapido-rojo">
+              <label class="campo"><span>¿Qué quieres que intente la IA?</span><select id="q-obj"></select></label>
+              <label class="campo" id="q-id-w" hidden><span>¿A quién?</span><select id="q-ident"></select></label>
+              <button class="boton boton-primario" type="button" id="b-rapido-rojo">Pedir a la IA</button>
+            </div>
+            <details class="avanzado" id="d-avanzado"><summary>Modo experto: constructor de prompt</summary>
+            <form class="form-sol cols" id="form-dir-rojo">
+              <label class="campo"><span>Acción</span><select id="d-accion"></select></label>
+              <label class="campo"><span>Objetivo</span><select id="d-obj"></select></label>
+              <label class="campo"><span>Estrategia</span><select id="d-estr"></select></label>
+              <label class="campo"><span>Identidad</span><select id="d-ident"></select></label>
+              <label class="campo"><span>Tabla / base de datos</span><select id="d-tabla"></select></label>
+              <label class="campo"><span>Plantilla de correo</span><select id="d-plant"></select></label>
+              <label class="campo"><span>Credencial</span><select id="d-cred"></select></label>
+              <label class="campo" id="d-estruct" hidden><span>Estructura de la credencial aleatoria: dígitos iniciales (0–5) · letra final</span><input id="d-dig" maxlength="5" inputmode="numeric" placeholder="ej. 12"><input id="d-letra" maxlength="1" placeholder="ej. Q"></label>
+              <button class="boton boton-primario" type="submit" id="b-prop-rojo">Lanzar prompt a la IA</button>
+            </form></details>
+          </div>
+          <p class="vacio-eq" id="ia-rojo-off">La IA Roja está apagada. El administrador puede encenderla.</p>
+        </div>
+      </section>
+
+      <section class="tarjeta" id="p-azul-id" hidden>
+        <div class="tarjeta-cab"><h3>Mi identidad</h3><span class="chip chip-neutro sin-punto" id="az-estado">—</span></div>
+        <div class="tarjeta-cuerpo" id="az-ident"></div>
+      </section>
+      <section class="tarjeta" id="p-azul-bandeja" hidden>
+        <div class="tarjeta-cab"><h3>Mi bandeja de correo</h3><span class="chip chip-info sin-punto" id="n-nl" hidden></span></div>
+        <div class="tarjeta-cuerpo sin-relleno" id="az-correos"></div>
+      </section>
+      <section class="tarjeta ia" id="p-ia-azul" hidden>
+        <div class="tarjeta-cab"><h3>IA defensora</h3><span class="chip chip-neutro sin-punto" id="ia-chip-azul">—</span></div>
+        <div class="tarjeta-cuerpo">
+          <p class="nota-tarjeta">Observa los eventos y explica el nivel de sospecha. La puntuación la calcula el motor con reglas: funciona aunque no haya modelo.</p>
+          <div id="ia-azul" hidden>
+            <p class="nota-tarjeta" id="ia-linea-azul"></p>
+            <div id="prop-azul" aria-live="polite"></div>
+            <details class="avanzado" id="e-avanzado"><summary>Modo experto: consultar a la IA defensora</summary>
+              <div class="sub-titulo"><span class="insignia" id="op-restantes-azul"></span></div>
+              <form class="form-sol cols" id="form-dir-azul">
+                <label class="campo"><span>Foco</span><select id="e-foco"></select></label>
+                <label class="campo"><span>Sujeto (alerta, solicitud, identidad o correo)</span><select id="e-suj"></select></label>
+                <label class="campo"><span>Acción preferida</span><select id="e-acc"></select></label>
+                <label class="campo"><span><input type="checkbox" id="e-pedir"> Que la IA pida autorización humana (se avisa a todo el equipo)</span></label>
+                <button class="boton boton-primario" type="submit" id="b-prop-azul">Consultar a la IA</button>
+              </form></details>
+          </div>
+        </div>
+      </section>
+
+      <section class="tarjeta" id="p-espectador" hidden>
+        <div class="tarjeta-cab"><h3>Línea de tiempo pública</h3></div>
+        <div class="tarjeta-cuerpo sin-relleno linea" id="espectador-tiempo"></div>
+      </section>
+    </div>
   </div>
+
+  <details class="tarjeta plegable ancho" id="p-log" open>
+    <summary><h3>Registro de eventos</h3><span class="chip chip-neutro sin-punto" id="n-ev">0</span></summary>
+    <div class="tarjeta-cuerpo sin-relleno" id="lista-ev"></div>
+  </details>
 </main>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 <script src="nova.js"></script>

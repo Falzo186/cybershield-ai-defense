@@ -87,8 +87,8 @@ def main(ver=False):
         pz[0].evaluate("document.querySelector('#e-avanzado').open = true")
         pz[0].select_option("#e-foco", "identidad"); pz[0].select_option("#e-suj", "EMP-04"); pz[0].select_option("#e-acc", "revoke_credential"); pz[0].check("#e-pedir")
         pz[0].click("#b-prop-azul")
-        esperar_texto(pz[0], "#prop-azul", "Confirmar y ejecutar")
-        pz[0].click("#prop-azul button:has-text('Confirmar y ejecutar')")
+        esperar_texto(pz[0], "#prop-azul", "Ejecutar")
+        pz[0].click("#prop-azul button:has-text('Ejecutar')")
         for p in pz:
             p.wait_for_selector("#dlg-sol[open]", timeout=20000)
         chk("la IA Azul pide autorización: a los 4 Azules les sale el cuadro con qué pide, la corrida SIMULADA y el prompt (directiva) usado",

@@ -212,6 +212,8 @@ def main():
         chk("al terminar, el resumen trae resultado, práctica, línea de tiempo con fuentes y errores defensivos (aprobó una solicitud de alto riesgo)", rs.status == 200 and rs["resultado"]["resultado"] == "VICTORIA_ROJA" and rs["practica"] is True
             and {x["fuente"] for x in rs["linea_tiempo"]} & {"jugador", "motor"} and any("alto riesgo" in x for x in rs["errores_defensivos"]))
         chk("la vista de espectador del resumen no incluye valores de credenciales", "12345A" not in str(esp.get("/api/nova/resumen")) and esp.get("/api/nova/resumen").status == 200)
+        ex1 = a1.post("/api/nova/azul/explicar", {"seq": rs_seq}) if (rs_seq := (a1.get("/api/nova/estado")["azul"]["monitor"]["eventos"] or [{"seq": -1}])[0]["seq"]) else None
+        chk("la explicación del monitor funciona sin modelo (fuente «reglas») y el Rojo no puede pedirla (403)", ex1.status == 200 and ex1["fuente"] == "reglas" and "sospecha" in ex1["explicacion"] and rojo.post("/api/nova/azul/explicar", {"seq": rs_seq}).status == 403)
         chk("una dificultad de NPC inválida se rechaza (400)", adm.post("/api/nova/partida", {"npc_dificultad": "imposible"}).status in (400, 409))
         chk("la API sigue sana tras todo el flujo", salud.status == 200)
     print(f"Total {sum(R)}/{len(R)}")

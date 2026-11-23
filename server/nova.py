@@ -3,6 +3,7 @@
 no hay otros bucles. Los GET de estado son públicos (el espectador ve su vista); todo POST exige sesión y la validación de equipo se hace en servidor.
 """
 import asyncio
+import json
 import os
 import re
 import shutil
@@ -403,6 +404,37 @@ def registrar(app, ms=None):
         loop = asyncio.get_running_loop()
         r = await loop.run_in_executor(None, _apagar_ollama)
         return JSONResponse(r)
+
+    @app.post("/api/nova/azul/explicar")
+    async def nova_azul_explicar(request: Request, cuerpo: dict):
+        """Explicación contextual de un evento/solicitud. La PUNTUACIÓN siempre sale de las reglas del motor; el modelo (si hay uno conectado) solo redacta la explicación y puede fallar sin consecuencias."""
+        try:
+            p = _p()
+        except ErrorNova as e:
+            return _err(e.mensaje, e.status, e.motivo)
+        if _rol(request) not in ("BLUE", "ADMIN"):
+            return _err("Solo el equipo Azul y el administrador piden explicaciones", 403, "WRONG_TEAM")
+        mon = p.monitor_azul()
+        fila = next((x for x in mon["eventos"] if x["seq"] == cuerpo.get("seq") or (cuerpo.get("ref") and x["ref"] == cuerpo.get("ref"))), None)
+        if fila is None:
+            return _err("No se encontró ese evento en el monitor", 404, "UNKNOWN_TARGET")
+        base = f"{fila['etiqueta']}: sospecha {fila['puntuacion']} de 100 ({fila['nivel'].lower()}). Motivos: {fila['motivo']}. Acción sugerida: {fila['accion']}."
+        ctl, pr = _E["ia"], None
+        if _E["ia"] is not None:
+            pr = _E["ia"].proveedores.get("BLUE")
+        if pr is None or pr.kind != "ollama" or p.config["ai_mode"].get("BLUE") == "off":
+            return JSONResponse({"explicacion": base, "fuente": "reglas", "aviso": "La explicación sale de las reglas del motor: no hay un modelo conectado para el Azul."})
+        sistema = "Eres un analista de ciberseguridad de un laboratorio ficticio. Explica en español, en 2 frases claras, por qué el evento recibió esa puntuación. No cambies la puntuación ni decidas por el equipo. Responde SOLO JSON: {\"explicacion\": \"...\"}."
+        r = await asyncio.get_running_loop().run_in_executor(None, pr.generar, sistema, json.dumps({"evento": fila}, ensure_ascii=False), 40)
+        txt = None
+        if r.get("ok"):
+            try:
+                txt = str(json.loads(r["contenido"]).get("explicacion") or "")[:500] or None
+            except (ValueError, AttributeError):
+                txt = None
+        if not txt:
+            return JSONResponse({"explicacion": base, "fuente": "reglas", "aviso": "El modelo no respondió dentro del tiempo permitido o respondió algo no válido; se muestra la explicación de las reglas."})
+        return JSONResponse({"explicacion": txt, "fuente": "modelo", "modelo": pr.modelo, "puntuacion_reglas": fila["puntuacion"], "base": base})
 
     @app.get("/api/nova/resumen")
     async def nova_resumen(request: Request):

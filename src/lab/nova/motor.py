@@ -1203,7 +1203,7 @@ class NovaPartida:
             if p is None:
                 continue
             actor = e["actor"].get("label") or e["actor"].get("team")
-            filas.append({"seq": e["seq"], "t_s": round(e["ts_match_ms"] / 1000, 1), "tipo": tipo, "etiqueta": self.ETQ_EVENTO.get(tipo, tipo), "identidad": ident, "actor": actor,
+            filas.append({"ref": e["target"].get("id"), "seq": e["seq"], "t_s": round(e["ts_match_ms"] / 1000, 1), "tipo": tipo, "etiqueta": self.ETQ_EVENTO.get(tipo, tipo), "identidad": ident, "actor": actor,
                           "puntuacion": p, "nivel": self.nivel_sospecha(p), "motivo": "; ".join(motivos), "estado": estado, "accion": self.ACCION_SUGERIDA.get(tipo, "Revisar")})
         filas.sort(key=lambda x: (-x["puntuacion"], -x["seq"]))
         abiertas = [f for f in filas if f["estado"] not in ("reportado", "cerrada", "resuelta", "aprobada", "rechazada", "expirada", "contenida", "registrado") or (f["estado"] == "registrado" and f["t_s"] >= t - 90 and f["puntuacion"] >= 50)]
@@ -1217,7 +1217,7 @@ class NovaPartida:
                                "credenciales_comprometidas": len(comp),
                                "solicitudes_pendientes": sum(1 for a in self.aprobaciones.values() if a["estado"] in ("PENDIENTE", "INFO_SOLICITADA", "ESCALADA"))},
                 "identidades": [{"id": i, "nombre": v["nombre"], "depto": v["depto"], "credencial": self.creds[i]["estado"], "jugador": self._jugador_de(i)} for i, v in self.identidades.items()],
-                "metodo": "reglas deterministas del motor (no usa ningún modelo)"}
+                "correos": {x["id"]: dict(zip(("puntuacion", "motivos"), self._sospecha_correo(x))) for x in self.emails.values()}, "metodo": "reglas deterministas del motor (no usa ningún modelo)"}
 
     # ── resumen final y línea de tiempo (fuente separada: jugador / NPC / IA / motor) ────────────────────────────────────
     ETQ_RESUMEN = {"match.started": "La partida empezó", "resource.queried": "Consulta a un recurso", "email.sent_by_red": "El Rojo envió un correo", "email.received": "Llegó un correo", "email.opened": "Se abrió un correo",
@@ -1235,14 +1235,16 @@ class NovaPartida:
             return "ia"
         if a.get("label") == "empleado guionizado":
             return "npc"
+        if a.get("team") == "ADMIN":
+            return "admin"
         if a.get("kind") == "human":
             return "jugador"
         return "motor"
 
     def resumen(self, para="ADMIN"):
         ev = self.eventos(para)
-        linea = [{"t_s": round(e["ts_match_ms"] / 1000, 1), "fuente": self._fuente(e), "equipo": e["actor"].get("team"), "quien": e["actor"].get("label") or e["actor"].get("team"), "tipo": e["type"],
-                  "texto": self.ETQ_RESUMEN.get(e["type"], e["type"])} for e in ev if e["type"] in self.ETQ_RESUMEN and e["type"] != "email.received" or (e["type"] == "email.received" and e["actor"].get("team") == "RED")]
+        linea = [{"t_s": round(e["ts_match_ms"] / 1000, 1), "fuente": self._fuente(e), "equipo": e["actor"].get("team"), "quien": e["actor"].get("label") or {"RED": "Equipo Rojo", "BLUE": "Equipo Azul", "ADMIN": "Administrador"}.get(e["actor"].get("team"), e["actor"].get("team")), "tipo": e["type"],
+                  "texto": self.ETQ_RESUMEN.get(e["type"], e["type"]) + ((": " + str((e["data"] or {}).get("tabla")).replace("_", " ")) if (e["data"] or {}).get("tabla") else "")} for e in ev if e["type"] in self.ETQ_RESUMEN and e["type"] != "email.received" or (e["type"] == "email.received" and e["actor"].get("team") == "RED")]
         tipos = [e["type"] for e in ev]
         ok = {"RED": sum(1 for x in self.acciones if x.get("ok") and (x.get("actor") or {}).get("team") == "RED"), "BLUE": sum(1 for x in self.acciones if x.get("ok") and (x.get("actor") or {}).get("team") == "BLUE")}
         mal = {"RED": sum(1 for x in self.acciones if not x.get("ok") and (x.get("actor") or {}).get("team") == "RED"), "BLUE": sum(1 for x in self.acciones if not x.get("ok") and (x.get("actor") or {}).get("team") == "BLUE")}
@@ -1293,7 +1295,7 @@ class NovaPartida:
         iid = p.get("identidad")
         return {"identidad": {**self.identidades[iid], "estado_credencial": self.creds[iid]["estado"]} if iid else None,
                 "correos": [e for e in self.emails.values() if e["para"] == iid], "alertas": list(self.alertas.values()), "incidentes": list(self.incidentes.values()),
-                "aprobaciones": list(self.aprobaciones.values()), "tareas": list(self.tareas.values()), "mensajes": [x for x in self.mensajes if x["equipo"] == "BLUE"][-30:], "misiones": self.misiones("BLUE"), "monitor": self.monitor_azul()}
+                "aprobaciones": [{**x, "sospecha": dict(zip(("puntuacion", "motivos"), self.sospecha_aprobacion(x))), "restante_s": max(0, round(x["expira_s"] - self.t_s(), 1))} for x in self.aprobaciones.values()], "tareas": list(self.tareas.values()), "mensajes": [x for x in self.mensajes if x["equipo"] == "BLUE"][-30:], "misiones": self.misiones("BLUE"), "monitor": self.monitor_azul()}
 
     def misiones(self, equipo):
         """Misiones del equipo, con estado DERIVADO del estado real del motor (nada se marca a mano): PENDIENTE → DISPONIBLE → EN_PROGRESO → COMPLETADA."""
