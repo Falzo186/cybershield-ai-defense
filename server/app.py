@@ -2325,5 +2325,22 @@ ms.montar_ui(app)
 
 if __name__ == "__main__":
     ms.anunciar(ms.puerto())
-    print(f"Código de árbitro (vista General): {CODIGO_ARBITRO}", flush=True)
-    uvicorn.run(app, host="0.0.0.0", port=ms.puerto())
+    _p = ms.puerto()
+    _ips = []
+    try:
+        for _i in [ms.ip_local()] + [x[4][0] for x in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)]:
+            if _i and not _i.startswith("127.") and not _i.startswith("169.254.") and _i not in _ips:
+                _ips.append(_i)
+    except OSError:
+        pass
+    print("", flush=True)
+    print("=" * 66, flush=True)
+    print(f"  CODIGO DE ARBITRO (Administrador): {CODIGO_ARBITRO}", flush=True)
+    print(f"  ANFITRION (esta PC):  http://localhost:{_p}/nova/", flush=True)
+    for _i in _ips:
+        _nota = "  (VirtualBox: NO usar)" if _i.startswith("192.168.56.") else ""
+        print(f"  COMPANERO (otra PC):  http://{_i}:{_p}/nova/{_nota}", flush=True)
+    if not _ips:
+        print("  Sin red detectada: conecta ambas PC al mismo WiFi/cable.", flush=True)
+    print("=" * 66, flush=True)
+    uvicorn.run(app, host="0.0.0.0", port=_p)
