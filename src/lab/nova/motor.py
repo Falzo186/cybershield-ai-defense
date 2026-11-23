@@ -47,7 +47,7 @@ ACCIONES_AZUL = {"assign_task", "set_task_status", "classify_email", "report_ema
                  "approve_request", "reject_request", "request_more_info", "escalate", "set_alert_status", "message_team", "allow", "vote_request", "request_authorization"}
 CONFIG_DEFECTO = {"duration_s": 720, "round_s": 60, "guess_attempts_per_round": 3, "guess_attempts_per_match": 12, "guess_cooldown_s": 20, "guess_lockout_after_fails": 3, "lockout_s": 90,
                   "detect_prob_fail": 0.6, "min_continuity": 0.6, "abuse_policy": "empate", "approval_ttl_s": 90, "elevation_grant_s": 120, "emails_per_round": 3, "scans_per_round": 2,
-                  "click_prob_unconnected": 1.0, "click_delay_s": 25, "modalidad": "BALANCED", "ai_mode": {"RED": "off", "BLUE": "off"}, "win": E.WIN_POR_DEFECTO, "seed": 1,
+                  "click_prob_unconnected": None, "npc_dificultad": "normal", "practica": False, "click_delay_s": 25, "modalidad": "BALANCED", "ai_mode": {"RED": "off", "BLUE": "off"}, "win": E.WIN_POR_DEFECTO, "seed": 1,
                   "model_down_policy": "pause", "ai_prompt_budget": 10, "ai_prompt_mode": "controlado", "near_miss_min": 4, "approval_mode": "primero", "approval_window_s": 15}
 
 
@@ -145,6 +145,7 @@ class NovaPartida:
         self.guess_ronda, self.guess_total, self.emails_ronda, self.scans_ronda = {}, 0, {}, {}
         self.programados = [{**c, "estado": "PENDIENTE"} for c in E.CORREOS_PROGRAMADOS]
         self.clics_pendientes = []
+        self.npc_alertas = 0
         self.grants_db_export_hasta = 0
         self.puntos = {"RED": 0, "BLUE": 0}
         self.resultado = None
@@ -346,18 +347,18 @@ class NovaPartida:
     def _jugador_de(self, iid):
         return next((n for n, p in self.participantes.items() if p["equipo"] == "BLUE" and p["identidad"] == iid and p["conectado"]), None)
 
-    def _crear_email(self, origen, de, iid, asunto, cuerpo, malicioso=False, scenario_id=None, link=False):
+    def _crear_email(self, origen, de, iid, asunto, cuerpo, malicioso=False, scenario_id=None, link=False, plantilla=None):
         eid = "EM-" + uuid.uuid4().hex[:6]
         lid = "LK-" + uuid.uuid4().hex[:6] if link else None
         em = {"id": eid, "origen": origen, "de": de, "para": iid, "asunto": asunto, "cuerpo": cuerpo, "link_id": lid, "estado": "ENTREGADO", "leido": False, "reportado": False,
-              "clasificado": None, "respondido": False, "ts_s": self.t_s(), "scenario_id": scenario_id}
+              "clasificado": None, "respondido": False, "ts_s": self.t_s(), "scenario_id": scenario_id, "plantilla": plantilla}
         self.emails[eid] = em
         if lid:
             self.links[lid] = {"id": lid, "email_id": eid, "malicioso": malicioso, "neutralizado": False, "visto": False, "clic": False, "riesgo": False, "para": iid, "url": f"lab://enlace/{lid}"}
         self._ev("email.received", {"kind": "system" if origen == "ESCENARIO" else "human", "team": "RED" if origen == "RED" else "SYSTEM"}, {"kind": "email", "id": eid},
                  vis=["ADMIN", "BLUE"] if origen == "ESCENARIO" else ["ADMIN", "RED", "BLUE"], data={"para": iid, "asunto": asunto, "origen": origen, "jugador": self._jugador_de(iid)})
-        if malicioso and link and self._jugador_de(iid) is None:     # empleado NO conectado: comportamiento guionizado, sin intervención de nadie
-            if self.rng.random() < self.config["click_prob_unconnected"]:
+        if malicioso and link:     # empleado NO conectado: comportamiento guionizado, sin intervención de nadie
+            if True:
                 self.clics_pendientes.append({"link_id": lid, "at_s": self.t_s() + self.config["click_delay_s"]})
         return em
 
@@ -465,7 +466,7 @@ class NovaPartida:
             raise ErrorNova(429, "Límite de correos de esta ronda", "BUDGET_EXCEEDED")
         self.emails_ronda[r] = self.emails_ronda.get(r, 0) + 1
         mal = E.PLANTILLAS_ROJO[plantilla]["malicioso"]
-        em = self._crear_email("RED", f"{(a['actor'].get('user') or 'rojo')} <rojo@laboratorio.invalid>", iid, asunto, cuerpo or "Mensaje de laboratorio.", malicioso=mal, link=mal)
+        em = self._crear_email("RED", f"{(a['actor'].get('user') or 'rojo')} <rojo@laboratorio.invalid>", iid, asunto, cuerpo or "Mensaje de laboratorio.", malicioso=mal, link=mal, plantilla=plantilla)
         self.puntos["RED"] += 1
         self._ev("email.sent_by_red", {"kind": a["actor"].get("kind", "human"), "team": "RED", "label": a["actor"].get("user")}, {"kind": "email", "id": em["id"]}, vis=["ADMIN", "RED"], data={"para": iid})
         return {"email_id": em["id"]}
@@ -562,14 +563,17 @@ class NovaPartida:
         self.puntos["RED"] += 40 if tabla in E.PROTEGIDAS else 8
         if tabla in E.PROTEGIDAS:
             self._alerta(f"Extracción de la tabla protegida {tabla}", iid, "CRITICA", "extraction.completed")
-        if tabla == "empleados":       # el directorio contiene las credenciales de laboratorio: quedan EXPUESTAS (cascada realista del escenario)
+        if tabla == "empleados":       # el directorio da datos de personas, NO secretos: se identifica a todos y solo las cuentas con credencial débil quedan expuestas
             for i in self.identidades:
-                if i not in self.rojo_conoce:
-                    self._comprometer(i, "tabla empleados extraída", {"kind": "human", "team": "RED"}, silencioso=True)
+                if self.rojo_estado[i] == "DESCONOCIDA":
+                    self.rojo_estado[i] = "IDENTIFICADA"
+                    self.rojo_origen[i] = "tabla empleados extraída"
+                if self.identidades[i].get("weak") and i not in self.rojo_conoce:
+                    self._comprometer(i, "credencial débil en la tabla empleados", {"kind": "human", "team": "RED"}, silencioso=True)
         return {"tabla": tabla, "filas": len(self.base[tabla])}
 
     def _guardar_extraccion(self, tabla):
-        self.extraido[tabla] = [dict(f) for f in self.base[tabla]]
+        self.extraido[tabla] = [({**f, "credencial_ficticia": "[protegida]"} if tabla == "empleados" else dict(f)) for f in self.base[tabla]]
         self.db.execute("INSERT OR REPLACE INTO nova_extracted VALUES(?,?,?)", (self.id, tabla, len(self.base[tabla])))
         self.db.commit()
         self._ev("extraction.completed", {"kind": "human", "team": "RED"}, {"kind": "resource", "id": tabla}, vis=["ADMIN", "RED", "BLUE", "SPECTATOR"], data={"tabla": tabla, "filas": len(self.base[tabla]), "protegida": tabla in E.PROTEGIDAS})
@@ -696,11 +700,56 @@ class NovaPartida:
             self._alerta("Credencial expuesta tras una acción de riesgo", lk["para"], "ALTA", "risk_action.completed")
         return {"credencial_expuesta": expone}
 
+    def _prob_clic(self, lk):
+        """Probabilidad de que un empleado SIN jugador pulse el enlace: dificultad + plantilla + contexto + preparación − señales − defensas del Azul. Devuelve (p, factores)."""
+        cfg = self.config
+        em = self.emails[lk["email_id"]]
+        iid = lk["para"]
+        if cfg.get("click_prob_unconnected") is not None:
+            return float(cfg["click_prob_unconnected"]), [{"factor": "fijado por configuración", "valor": float(cfg["click_prob_unconnected"])}]
+        base = E.NPC_DIFICULTAD.get(cfg.get("npc_dificultad", "normal"), 0.55)
+        f = [{"factor": f"dificultad {cfg.get('npc_dificultad', 'normal')}", "valor": base}]
+        pl = em.get("plantilla")
+        dep = self.identidades[iid]["depto"]
+        aj = {"aviso_soporte": 0.05, "reporte_urgente": 0.10}.get(pl, 0.0)
+        if pl == "reporte_urgente" and dep in ("Finanzas", "Administración"):
+            aj += 0.15
+            f.append({"factor": "el reporte financiero encaja con su departamento", "valor": 0.15})
+        if aj:
+            f.append({"factor": "tipo de correo", "valor": round(aj - (0.15 if pl == "reporte_urgente" and dep in ("Finanzas", "Administración") else 0), 2)})
+        prep = E.NPC_PREPARACION.get(iid, 0.0)
+        if prep:
+            f.append({"factor": "preparación del empleado", "valor": prep})
+        texto = (em["asunto"] + " " + em["cuerpo"]).lower()
+        señales = min(0.15, 0.05 * sum(1 for w in E.PALABRAS_PRESION if w in texto))
+        if señales:
+            f.append({"factor": "señales sospechosas en el texto", "valor": -round(señales, 2)})
+        defensas = min(0.32, 0.08 * self.npc_alertas)
+        if defensas:
+            f.append({"factor": "el equipo Azul ya reportó o neutralizó correos", "valor": -round(defensas, 2)})
+        p = max(0.05, min(0.95, base + aj + prep - señales - defensas))
+        return p, f
+
     def _clic_guionizado(self, cp):
         lk = self.links.get(cp["link_id"])
-        if lk:
-            self._ev("link.clicked", {"kind": "system", "team": "SYSTEM", "label": "empleado guionizado"}, {"kind": "link", "id": lk["id"]}, vis=["ADMIN", "BLUE"])
-            self._riesgo(lk, {"kind": "system", "team": "SYSTEM", "label": "empleado guionizado"})
+        if not lk:
+            return
+        iid = lk["para"]
+        if self._jugador_de(iid) is not None:        # hay un humano para esa identidad: decide él
+            return
+        em = self.emails[lk["email_id"]]
+        actor = {"kind": "system", "team": "SYSTEM", "label": "empleado guionizado"}
+        if em["reportado"] or lk["neutralizado"]:
+            self._ev("email.ignored", actor, {"kind": "link", "id": lk["id"]}, vis=["ADMIN", "RED", "BLUE"], data={"identidad": iid, "motivo": "reportado o neutralizado antes de leerlo"})
+            return
+        p, factores = self._prob_clic(lk)
+        cae = self.rng.random() < p
+        self._ev("npc.decision", actor, {"kind": "link", "id": lk["id"]}, vis=["ADMIN", "BLUE"], data={"identidad": iid, "probabilidad": round(p, 2), "cae": cae, "factores": factores})
+        if not cae:
+            self._ev("email.ignored", actor, {"kind": "link", "id": lk["id"]}, vis=["ADMIN", "RED", "BLUE"], data={"identidad": iid, "motivo": "el empleado desconfió"})
+            return
+        self._ev("link.clicked", actor, {"kind": "link", "id": lk["id"]}, vis=["ADMIN", "BLUE"])
+        self._riesgo(lk, actor)
 
     # ── acciones del Azul ─────────────────────────────────────────────────────────────────────────────
     def _h_classify_email(self, a):
@@ -715,6 +764,7 @@ class NovaPartida:
         self._ev("email.reported", {"kind": a["actor"].get("kind", "human"), "team": "BLUE", "label": a["actor"].get("user")}, {"kind": "email", "id": em["id"]}, vis=["ADMIN", "BLUE"])
         if em["origen"] == "RED":
             self.puntos["BLUE"] += 5
+            self.npc_alertas += 1
         return {}
 
     def _h_block_link(self, a):
@@ -723,6 +773,7 @@ class NovaPartida:
         self._ev("link.neutralized", {"kind": a["actor"].get("kind", "human"), "team": "BLUE", "label": a["actor"].get("user")}, {"kind": "link", "id": lk["id"]}, vis=["ADMIN", "BLUE"])
         if lk["malicioso"]:
             self.puntos["BLUE"] += 5
+            self.npc_alertas += 1
         return {}
 
     def _h_revoke_credential(self, a):
@@ -1017,7 +1068,7 @@ class NovaPartida:
             self.estado = "FINALIZADA"
             self._ev("match.finished", data={"motivo": motivo})
         r = {"resultado": resultado, "motivo": motivo, "match_id": self.id, "puntos": dict(self.puntos), "continuidad": round(self.continuidad(), 3), "tablas_extraidas": sorted(self.extraido),
-             "duracion_s": round(self.t_s(), 1)}
+             "duracion_s": round(self.t_s(), 1), "practica": bool(self.config.get("practica"))}
         self.resultado = r
         self.db.execute("INSERT OR IGNORE INTO nova_results VALUES(?,?,?,?)", (self.id, resultado, json.dumps(r, ensure_ascii=False), _utc()))
         self.db.commit()
@@ -1051,6 +1102,174 @@ class NovaPartida:
             return "application/sql", "\n".join(out) + "\n"
         raise ErrorNova(400, "Formato no válido (csv, json o sql)", "INVALID_SCHEMA")
 
+    def presupuesto_rojo(self):
+        """Límites visibles para el Rojo: lo gastado y lo que queda en la ronda actual y en la partida, con el tiempo que falta para la siguiente ronda."""
+        c, r, t = self.config, self.ronda(), self.t_s()
+        sig = (r + 1) * c["round_s"] - t
+        return {"ronda": r, "segundos_para_siguiente_ronda": round(max(0, sig), 1), "ronda_duracion_s": c["round_s"],
+                "correos": {"usados": self.emails_ronda.get(r, 0), "max": c["emails_per_round"]},
+                "reconocimientos": {"usados": self.scans_ronda.get(r, 0), "max": c["scans_per_round"]},
+                "intentos_ronda": {"usados": self.guess_ronda.get(r, 0), "max": c["guess_attempts_per_round"]},
+                "intentos_partida": {"usados": self.guess_total, "max": c["guess_attempts_per_match"]},
+                "espera_intento_s": round(max(0, self.guess_cooldown_hasta - t), 1),
+                "elevacion_activa_s": round(max(0, self.grants_db_export_hasta - t), 1),
+                "tiempo_restante_s": round(max(0, c["duration_s"] - t), 1)}
+
+    # ── monitoreo del Azul: puntuación DETERMINISTA de sospecha (0-100). Reglas del motor; ningún modelo decide ─────────────
+    ETQ_EVENTO = {"credential.guess_fail": "Intento de acceso fallido", "credential.guess_success": "Acceso con credencial adivinada", "credential.lockout": "Identidad bloqueada por intentos",
+                  "credential.exposed": "Credencial expuesta", "credential.validated_by_engine": "Credencial comprometida", "credential.used": "Uso de una credencial comprometida",
+                  "extraction.started": "Inicio de extracción de datos", "extraction.completed": "Extracción de datos completada", "extraction.blocked": "Extracción bloqueada por permisos",
+                  "email.received": "Correo recibido", "link.clicked": "Enlace pulsado", "risk_action.completed": "Acción de riesgo completada", "alert.created": "Alerta del sistema",
+                  "incident.created": "Incidente abierto", "approval.requested": "Solicitud pendiente", "resource.queried": "Consulta a un recurso"}
+    BASE_EVENTO = {"credential.guess_fail": 35, "credential.guess_success": 85, "credential.lockout": 60, "credential.exposed": 80, "credential.validated_by_engine": 75, "credential.used": 60,
+                   "extraction.started": 70, "extraction.blocked": 55, "link.clicked": 30, "risk_action.completed": 65, "incident.created": 70, "resource.queried": 20}
+    ACCION_SUGERIDA = {"credential.exposed": "Revocar la credencial", "credential.validated_by_engine": "Revocar la credencial", "credential.used": "Revocar o suspender la identidad", "email.received": "Abrir y reportar si es sospechoso",
+                       "link.clicked": "Neutralizar el enlace", "risk_action.completed": "Revocar la credencial", "alert.created": "Analizar la alerta", "incident.created": "Contener el incidente",
+                       "approval.requested": "Decidir la solicitud", "extraction.completed": "Contener el incidente", "credential.guess_fail": "Vigilar la identidad", "credential.lockout": "Vigilar la identidad"}
+
+    @staticmethod
+    def nivel_sospecha(p):
+        return "CRITICO" if p >= 75 else "SOSPECHOSO" if p >= 50 else "ADVERTENCIA" if p >= 25 else "NORMAL"
+
+    def _sospecha_correo(self, em):
+        """Señales visibles para el Azul: remitente externo, palabras de presión y enlace. No usa el campo «malicioso» (secreto del motor)."""
+        motivos, p = [], 10
+        if not em["de"].split("@")[-1].strip("> ").endswith(E.DOMINIO):
+            p += 35
+            motivos.append("remitente fuera del dominio de la empresa")
+        txt = (em["asunto"] + " " + em["cuerpo"]).lower()
+        pres = [w for w in E.PALABRAS_PRESION if w in txt]
+        if pres:
+            p += 15
+            motivos.append("lenguaje de presión («" + pres[0] + "»)")
+        if em.get("link_id"):
+            p += 10
+            motivos.append("contiene un enlace")
+        return min(p, 100), motivos or ["sin señales de riesgo"]
+
+    def sospecha_aprobacion(self, ap):
+        base = {"db_export": 70, "acceso_sospechoso": 45, "autorizacion_ia": 30, "consulta_autorizada": 10}.get(ap["operacion"], 30)
+        motivos = {"db_export": ["pide una copia completa de la base"], "acceso_sospechoso": ["credencial muy parecida a la real"], "autorizacion_ia": ["la IA defensora pide actuar"],
+                   "consulta_autorizada": ["consulta rutinaria"]}.get(ap["operacion"], ["solicitud sin clasificar"]).copy()
+        p = base
+        d = ap.get("detalle") or {}
+        if d.get("coincidencias"):
+            p += 10 * max(0, d["coincidencias"] - self.config["near_miss_min"])
+        if ap.get("equipo_solicitante") == "RED":
+            p += 15
+            motivos.append("la envía el equipo Rojo")
+        iid = ap.get("identidad")
+        if iid and (self.fallos_identidad.get(iid) or any(a["identidad"] == iid and a["estado"] != "CERRADA" for a in self.alertas.values())):
+            p += 10
+            motivos.append("la identidad ya tiene actividad sospechosa")
+        if any(c["estado"] in ("EXPUESTA", "COMPROMETIDA") for c in self.creds.values()):
+            p += 10
+            motivos.append("hay credenciales comprometidas ahora mismo")
+        if ap.get("legitima"):
+            p -= 10
+        return max(0, min(100, p)), motivos
+
+    def monitor_azul(self):
+        t = self.t_s()
+        filas = []
+        for e in self.eventos("BLUE"):
+            tipo = e["type"]
+            p, motivos, estado, ident = None, [], "registrado", (e["data"] or {}).get("identidad")
+            if tipo == "email.received":
+                em = next((x for x in self.emails.values() if x["id"] == e["target"]["id"]), None)
+                if not em:
+                    continue
+                p, motivos = self._sospecha_correo(em)
+                estado = "reportado" if em["reportado"] else "leído" if em["leido"] else "sin leer"
+                ident = em["para"]
+            elif tipo == "alert.created":
+                al = self.alertas.get(e["target"]["id"])
+                p = {"BAJA": 20, "MEDIA": 40, "ALTA": 65, "CRITICA": 90}.get((e["data"] or {}).get("severidad"), 40)
+                motivos = [(e["data"] or {}).get("titulo", "alerta")]
+                estado = al["estado"].lower() if al else "registrado"
+            elif tipo == "approval.requested":
+                ap = self.aprobaciones.get(e["target"]["id"])
+                if not ap:
+                    continue
+                p, motivos = self.sospecha_aprobacion(ap)
+                estado = ap["estado"].lower()
+                ident = ap.get("identidad")
+            elif tipo == "extraction.completed":
+                prot = (e["data"] or {}).get("protegida")
+                p, motivos = (95 if prot else 55), ["se extrajo " + str((e["data"] or {}).get("tabla"))]
+            elif tipo in self.BASE_EVENTO:
+                p = self.BASE_EVENTO[tipo]
+                motivos = [self.ETQ_EVENTO.get(tipo, tipo)]
+            if p is None:
+                continue
+            actor = e["actor"].get("label") or e["actor"].get("team")
+            filas.append({"seq": e["seq"], "t_s": round(e["ts_match_ms"] / 1000, 1), "tipo": tipo, "etiqueta": self.ETQ_EVENTO.get(tipo, tipo), "identidad": ident, "actor": actor,
+                          "puntuacion": p, "nivel": self.nivel_sospecha(p), "motivo": "; ".join(motivos), "estado": estado, "accion": self.ACCION_SUGERIDA.get(tipo, "Revisar")})
+        filas.sort(key=lambda x: (-x["puntuacion"], -x["seq"]))
+        abiertas = [f for f in filas if f["estado"] not in ("reportado", "cerrada", "resuelta", "aprobada", "rechazada", "expirada", "contenida", "registrado") or (f["estado"] == "registrado" and f["t_s"] >= t - 90 and f["puntuacion"] >= 50)]
+        top = sorted((f["puntuacion"] for f in abiertas), reverse=True)[:5]
+        riesgo = round(0.5 * top[0] + 0.5 * sum(top) / len(top)) if top else 0
+        comp = [i for i, c in self.creds.items() if c["estado"] in ("EXPUESTA", "COMPROMETIDA")]
+        return {"riesgo_general": riesgo, "nivel": self.nivel_sospecha(riesgo), "eventos": filas[:40],
+                "contadores": {"alertas_criticas": sum(1 for a in self.alertas.values() if a["severidad"] in ("ALTA", "CRITICA") and a["estado"] not in ("RESUELTA", "CERRADA")),
+                               "incidentes_activos": sum(1 for i in self.incidentes.values() if i["estado"] not in ("CONTENIDO", "CERRADO")),
+                               "correos_sospechosos": sum(1 for x in self.emails.values() if self._sospecha_correo(x)[0] >= 50 and not x["reportado"]),
+                               "credenciales_comprometidas": len(comp),
+                               "solicitudes_pendientes": sum(1 for a in self.aprobaciones.values() if a["estado"] in ("PENDIENTE", "INFO_SOLICITADA", "ESCALADA"))},
+                "identidades": [{"id": i, "nombre": v["nombre"], "depto": v["depto"], "credencial": self.creds[i]["estado"], "jugador": self._jugador_de(i)} for i, v in self.identidades.items()],
+                "metodo": "reglas deterministas del motor (no usa ningún modelo)"}
+
+    # ── resumen final y línea de tiempo (fuente separada: jugador / NPC / IA / motor) ────────────────────────────────────
+    ETQ_RESUMEN = {"match.started": "La partida empezó", "resource.queried": "Consulta a un recurso", "email.sent_by_red": "El Rojo envió un correo", "email.received": "Llegó un correo", "email.opened": "Se abrió un correo",
+                   "email.reported": "Se reportó un correo", "email.ignored": "El empleado ignoró el correo", "link.clicked": "Se pulsó un enlace", "link.neutralized": "Se neutralizó un enlace",
+                   "risk_action.completed": "Se completó una acción de riesgo", "credential.guess_attempt": "Intento de credencial", "credential.guess_success": "Credencial adivinada", "credential.guess_fail": "Credencial incorrecta",
+                   "credential.lockout": "Identidad bloqueada", "credential.exposed": "Credencial expuesta", "credential.validated_by_engine": "El motor validó una credencial comprometida",
+                   "credential.revoked": "Credencial revocada", "extraction.completed": "Extracción completada", "extraction.blocked": "Extracción bloqueada", "approval.requested": "Se pidió una autorización",
+                   "approval.approved": "Autorización aprobada", "approval.rejected": "Autorización rechazada", "alert.created": "Alerta creada", "incident.created": "Incidente abierto", "incident.contained": "Incidente contenido",
+                   "win.condition_met": "Se cumplió una condición de victoria", "match.finished": "La partida terminó", "npc.decision": "Decisión de un empleado", "ai.run_started": "Una IA empezó a analizar",
+                   "ai.run_failed": "Una IA falló", "ai.run_completed": "Una IA respondió"}
+
+    def _fuente(self, e):
+        a = e["actor"]
+        if a.get("kind") == "ai":
+            return "ia"
+        if a.get("label") == "empleado guionizado":
+            return "npc"
+        if a.get("kind") == "human":
+            return "jugador"
+        return "motor"
+
+    def resumen(self, para="ADMIN"):
+        ev = self.eventos(para)
+        linea = [{"t_s": round(e["ts_match_ms"] / 1000, 1), "fuente": self._fuente(e), "equipo": e["actor"].get("team"), "quien": e["actor"].get("label") or e["actor"].get("team"), "tipo": e["type"],
+                  "texto": self.ETQ_RESUMEN.get(e["type"], e["type"])} for e in ev if e["type"] in self.ETQ_RESUMEN and e["type"] != "email.received" or (e["type"] == "email.received" and e["actor"].get("team") == "RED")]
+        tipos = [e["type"] for e in ev]
+        ok = {"RED": sum(1 for x in self.acciones if x.get("ok") and (x.get("actor") or {}).get("team") == "RED"), "BLUE": sum(1 for x in self.acciones if x.get("ok") and (x.get("actor") or {}).get("team") == "BLUE")}
+        mal = {"RED": sum(1 for x in self.acciones if not x.get("ok") and (x.get("actor") or {}).get("team") == "RED"), "BLUE": sum(1 for x in self.acciones if not x.get("ok") and (x.get("actor") or {}).get("team") == "BLUE")}
+        comp = [i for i, c in self.creds.items() if c["estado"] in ("EXPUESTA", "COMPROMETIDA")] if para in ("ADMIN", "BLUE", "SPECTATOR", "RED") else []
+        prot = [t for t in E.PROTEGIDAS if t not in self.extraido]
+        errores = []
+        if "risk_action.completed" in tipos:
+            errores.append("Se completó una acción de riesgo desde un enlace malicioso")
+        if any(a["estado"] == "APROBADA" and a["operacion"] in ("db_export", "acceso_sospechoso") for a in self.aprobaciones.values()):
+            errores.append("Se aprobó una solicitud de alto riesgo")
+        buenas = []
+        if any(e["type"] == "email.reported" and self._email_es_rojo(e) for e in ev):
+            buenas.append("Se reportó un correo del Rojo")
+        if "link.neutralized" in tipos:
+            buenas.append("Se neutralizó un enlace malicioso")
+        if any(a["estado"] == "RECHAZADA" and a["operacion"] in ("db_export", "acceso_sospechoso") for a in self.aprobaciones.values()):
+            buenas.append("Se rechazó una solicitud de alto riesgo")
+        if any(i["estado"] in ("CONTENIDO", "CERRADO") for i in self.incidentes.values()):
+            buenas.append("Se contuvo un incidente")
+        return {"resultado": self.resultado, "practica": bool(self.config.get("practica")), "duracion_s": round(self.t_s(), 1), "puntos": dict(self.puntos), "continuidad": round(self.continuidad(), 3),
+                "objetivos": {"RED": self.misiones("RED"), "BLUE": self.misiones("BLUE")}, "operaciones": {"exitosas": ok, "fallidas": mal}, "credenciales_comprometidas": comp,
+                "recursos_protegidos": prot, "tablas_extraidas": sorted(self.extraido), "errores_defensivos": errores, "decisiones_correctas": buenas, "linea_tiempo": linea[-300:]}
+
+    def _email_es_rojo(self, e):
+        em = self.emails.get(e["target"]["id"])
+        return bool(em and em["origen"] == "RED")
+
     # ── vistas por rol (la visibilidad se filtra en el servidor) ────────────────────────────────────
     def vista_rojo(self):
         """Panel «Credenciales y accesos descubiertos»: el Rojo ve estados y SOLO los valores que descubrió (enmascarados)."""
@@ -1074,7 +1293,7 @@ class NovaPartida:
         iid = p.get("identidad")
         return {"identidad": {**self.identidades[iid], "estado_credencial": self.creds[iid]["estado"]} if iid else None,
                 "correos": [e for e in self.emails.values() if e["para"] == iid], "alertas": list(self.alertas.values()), "incidentes": list(self.incidentes.values()),
-                "aprobaciones": list(self.aprobaciones.values()), "tareas": list(self.tareas.values()), "mensajes": [x for x in self.mensajes if x["equipo"] == "BLUE"][-30:], "misiones": self.misiones("BLUE")}
+                "aprobaciones": list(self.aprobaciones.values()), "tareas": list(self.tareas.values()), "mensajes": [x for x in self.mensajes if x["equipo"] == "BLUE"][-30:], "misiones": self.misiones("BLUE"), "monitor": self.monitor_azul()}
 
     def misiones(self, equipo):
         """Misiones del equipo, con estado DERIVADO del estado real del motor (nada se marca a mano): PENDIENTE → DISPONIBLE → EN_PROGRESO → COMPLETADA."""

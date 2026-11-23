@@ -107,11 +107,11 @@ def _estado_publico(p, rol, nombre):
             "participantes": [{"nombre": n, "equipo": q["equipo"], "identidad": q["identidad"] if rol in ("ADMIN", "BLUE") or q["equipo"] != "BLUE" else None, "listo": q["listo"], "conectado": q["conectado"]}
                               for n, q in p.participantes.items()],
             "resultado": p.resultado, "puntos": p.puntos if (rol in ("ADMIN", "SPECTATOR") or p.resultado) else None, "continuidad": round(p.continuidad(), 3) if rol in ("ADMIN", "BLUE", "SPECTATOR") else None,
-            "rol": rol, "win": p.config["win"] if rol == "ADMIN" else None, "config": {k: v for k, v in p.config.items() if k not in ("win",)} if rol == "ADMIN" else None}
+            "rol": rol, "practica": bool(p.config.get("practica")), "win": p.config["win"] if rol == "ADMIN" else None, "config": {k: v for k, v in p.config.items() if k not in ("win",)} if rol == "ADMIN" else None}
     if rol == "RED" or rol == "ADMIN":
         base["rojo"] = {"credenciales": p.vista_rojo(), "plantillas": list(E.PLANTILLAS_ROJO), "tablas": E.TABLAS, "patron": E.PATRON_CREDENCIAL,
                         "aprobaciones": [{k: v for k, v in a.items() if k not in ("recomendacion", "votos", "decisor", "cierra_s", "detalle", "accion_propuesta")} for a in p.aprobaciones.values() if a["equipo_solicitante"] == "RED"],
-                        "extraido": {t: len(f) for t, f in p.extraido.items()}, "misiones": p.misiones("RED"), "mensajes": [x for x in p.mensajes if x["equipo"] == "RED"][-30:]}
+                        "extraido": {t: len(f) for t, f in p.extraido.items()}, "presupuesto": p.presupuesto_rojo(), "misiones": p.misiones("RED"), "mensajes": [x for x in p.mensajes if x["equipo"] == "RED"][-30:]}
     if rol == "BLUE" and nombre:
         base["azul"] = p.vista_azul(nombre)
     if rol == "ADMIN":
@@ -182,11 +182,17 @@ def registrar(app, ms=None):
             return _err("Ya hay una partida Nova sin terminar: deténla antes de crear otra", 409, "MATCH_EXISTS")
         cfg = {}
         for k in ("duration_s", "round_s", "guess_attempts_per_round", "guess_attempts_per_match", "guess_cooldown_s", "guess_lockout_after_fails", "lockout_s", "min_continuity", "detect_prob_fail",
-                  "approval_ttl_s", "elevation_grant_s", "click_delay_s", "seed", "modalidad", "abuse_policy", "ai_prompt_mode", "ai_prompt_budget", "near_miss_min", "approval_mode", "approval_window_s"):
+                  "approval_ttl_s", "elevation_grant_s", "click_delay_s", "seed", "modalidad", "abuse_policy", "ai_prompt_mode", "ai_prompt_budget", "near_miss_min", "approval_mode", "approval_window_s", "npc_dificultad", "click_prob_unconnected"):
             if k in cuerpo:
                 cfg[k] = cuerpo[k]
         if "win" in cuerpo and isinstance(cuerpo["win"], dict):
             cfg["win"] = {**E.WIN_POR_DEFECTO, **{k: v for k, v in cuerpo["win"].items() if k in E.WIN_POR_DEFECTO}}
+        if cfg.get("click_prob_unconnected") is not None and (isinstance(cfg["click_prob_unconnected"], bool) or not isinstance(cfg["click_prob_unconnected"], (int, float)) or not 0 <= cfg["click_prob_unconnected"] <= 1):
+            return _err("click_prob_unconnected debe ser un número entre 0 y 1 (o null para usar la dificultad)")
+        if cfg.get("npc_dificultad", "normal") not in E.NPC_DIFICULTAD:
+            return _err("npc_dificultad debe ser facil, normal o dificil")
+        if cuerpo.get("practica") is True:       # partida de práctica: 5 minutos, ritmo rápido, claramente marcada; los valores explícitos del admin ganan
+            cfg = {**E.PRACTICA, **cfg, "practica": True}
         cfg.setdefault("approval_mode", "votacion")
         if cfg["approval_mode"] not in ("votacion", "primero"):
             return _err("approval_mode debe ser votacion o primero")
@@ -397,6 +403,17 @@ def registrar(app, ms=None):
         loop = asyncio.get_running_loop()
         r = await loop.run_in_executor(None, _apagar_ollama)
         return JSONResponse(r)
+
+    @app.get("/api/nova/resumen")
+    async def nova_resumen(request: Request):
+        """Resumen final y línea de tiempo (jugador / NPC / IA / motor) con la visibilidad del rol que pregunta."""
+        try:
+            p = _p()
+        except ErrorNova as e:
+            return _err(e.mensaje, e.status, e.motivo)
+        if p.resultado is None and _rol(request) not in ("ADMIN", "SPECTATOR"):
+            return _err("El resumen completo está disponible cuando la partida termina", 409, "MATCH_NOT_FINISHED")
+        return JSONResponse(p.resumen(_rol(request)))
 
     @app.post("/api/nova/ia/proponer")
     async def nova_ia_proponer(request: Request, cuerpo: dict):

@@ -34,7 +34,7 @@ def main():
         acc = lambda c, t, **p: c.post("/api/nova/accion", {"action_type": t, "params": p})  # noqa: E731
         chk("sin partida Nova el estado lo dice y nadie puede crearla salvo el administrador", Cliente(E.base).get("/api/nova/estado").get("estado") is None
             and rojo.post("/api/nova/partida", {}).status == 403 and a1.post("/api/nova/partida", {}).status == 403)
-        r = adm.post("/api/nova/partida", {"duration_s": 300, "time_scale": 30})
+        r = adm.post("/api/nova/partida", {"duration_s": 300, "time_scale": 30, "click_prob_unconnected": 1.0})
         chk("el administrador crea la partida: queda en CONFIGURACION (no corre nada)", r.status == 200 and r["estado"] == "CONFIGURACION")
         time.sleep(2.5)
         chk("sin iniciar, tras unos segundos el tiempo de partida sigue en 0 (no hay autoinicio)", adm.get("/api/nova/estado")["t_s"] == 0 and adm.get("/api/nova/estado")["estado"] == "CONFIGURACION")
@@ -81,7 +81,7 @@ def main():
         chk("la descarga (csv/json/sql) solo trae lo extraído; el Azul no puede descargar", d.status == 200 and a1.get("/api/nova/descarga?formato=json").status == 403)
         chk("la pantalla de victoria: resultado visible para todos y el espectador ve lo público sin credenciales", esp.get("/api/nova/estado")["resultado"]["resultado"] == "VICTORIA_ROJA" and "catalogo" not in esp.get("/api/nova/estado"))
         # nueva partida: detener y cancelar
-        chk("tras FINALIZADA se puede crear otra partida; iniciar de nuevo exige todo el protocolo", adm.post("/api/nova/partida", {"time_scale": 30}).status == 200)
+        chk("tras FINALIZADA se puede crear otra partida; iniciar de nuevo exige todo el protocolo", adm.post("/api/nova/partida", {"time_scale": 30, "click_prob_unconnected": 1.0}).status == 200)
         adm.post("/api/nova/sala")
         rojo.post("/api/nova/unirse", {})
         a1.post("/api/nova/unirse", {})
@@ -95,7 +95,7 @@ def main():
         chk("el Rojo no puede aprobar su propia solicitud (403)", acc(rojo, "approve_request", approval_id=apid).status == 403)
         chk("el Azul aprueba: cambia el estado del escenario y el Rojo copia la base completa → VICTORIA_ROJA", acc(a1, "approve_request", approval_id=apid).status == 200 and acc(rojo, "export_database").status == 200
             and adm.get("/api/nova/estado")["resultado"]["resultado"] == "VICTORIA_ROJA" and adm.get("/api/nova/estado")["resultado"]["tablas_extraidas"] and len(adm.get("/api/nova/estado")["resultado"]["tablas_extraidas"]) == 8)
-        adm.post("/api/nova/partida", {"time_scale": 30})
+        adm.post("/api/nova/partida", {"time_scale": 30, "click_prob_unconnected": 1.0})
         adm.post("/api/nova/sala")
         rojo.post("/api/nova/unirse", {})
         a1.post("/api/nova/unirse", {})
@@ -104,7 +104,7 @@ def main():
         dt = adm.post("/api/nova/detener", {})
         chk("detener pasa a FINALIZADA sin dejar tareas vivas: el reloj queda quieto", dt["estado"] == "FINALIZADA" and (lambda t: (time.sleep(1.2), adm.get("/api/nova/estado")["t_s"] == t)[1])(adm.get("/api/nova/estado")["t_s"]))
         # ── IA de Nova: configuración, assist, anti-SSRF, Ollama falso con JSON inválido ───────────────────────
-        adm.post("/api/nova/partida", {"time_scale": 30, "duration_s": 600, "ai_prompt_mode": "libre"})
+        adm.post("/api/nova/partida", {"time_scale": 30, "click_prob_unconnected": 1.0, "duration_s": 600, "ai_prompt_mode": "libre"})
         adm.post("/api/nova/sala")
         rojo.post("/api/nova/unirse", {})
         a1.post("/api/nova/unirse", {})
@@ -144,7 +144,7 @@ def main():
             and all(x["source"] == "simulated" for x in w["alertas"]) and rojo.get("/api/nova/wazuh").status == 403)
         adm.post("/api/nova/detener", {})
         # ── prompts CONTROLADOS: directiva de catálogo, oportunidades por equipo y acceso sospechoso ──────────
-        cr = adm.post("/api/nova/partida", {"time_scale": 30, "duration_s": 600, "ai_prompt_budget": 2, "guess_cooldown_s": 0, "guess_attempts_per_round": 9, "detect_prob_fail": 0.0})
+        cr = adm.post("/api/nova/partida", {"time_scale": 30, "click_prob_unconnected": 1.0, "duration_s": 600, "ai_prompt_budget": 2, "guess_cooldown_s": 0, "guess_attempts_per_round": 9, "detect_prob_fail": 0.0})
         chk("el modo por defecto es controlado y el administrador fija las oportunidades por equipo", cr.status == 200 and cr["config"]["ai_prompt_mode"] == "controlado" and cr["config"]["ai_prompt_budget"] == 2
             and adm.post("/api/nova/partida", {"ai_prompt_budget": 0}).status in (400, 409) and adm.post("/api/nova/partida", {"ai_prompt_mode": "otro"}).status in (400, 409))
         adm.post("/api/nova/sala")
@@ -187,6 +187,32 @@ def main():
         chk("el latido de presencia lo acepta un jugador, y el espectador o el admin lo ignoran sin error", lt.status == 200 and "ignorado" not in lt and esp.post("/api/nova/latido", {}).status in (200, 403))
         adm.post("/api/nova/detener", {})
         salud = Cliente(E.base).get("/api/ia/estado")
+        # ── práctica, presupuesto visible, monitor Azul y resumen ──
+        adm.post("/api/nova/detener", {"cancelar": True})
+        pr = adm.post("/api/nova/partida", {"practica": True, "time_scale": 30, "click_prob_unconnected": 1.0})
+        adm.post("/api/nova/sala")
+        rojo.post("/api/nova/unirse", {})
+        a1.post("/api/nova/unirse", {})
+        adm.post("/api/nova/lista")
+        adm.post("/api/nova/iniciar", {"confirm": True, "idempotency_key": "demo-prac"})
+        ep = adm.get("/api/nova/estado")
+        chk("el modo práctica dura 5 minutos, va marcado como práctica y usa ritmo rápido", pr.status == 200 and ep["practica"] is True and ep["duracion_s"] == 300 and ep["config"]["click_delay_s"] == 8)
+        pb = rojo.get("/api/nova/estado")["rojo"]["presupuesto"]
+        chk("el Rojo ve su presupuesto: correos, reconocimientos, intentos, ronda y tiempo restante", {"correos", "reconocimientos", "intentos_ronda", "intentos_partida", "tiempo_restante_s", "segundos_para_siguiente_ronda"} <= set(pb))
+        acc(rojo, "send_email", identidad_id="EMP-02", plantilla="aviso_soporte", cuerpo="Confirma tu identidad.")
+        chk("el presupuesto refleja lo gastado (1 correo usado)", rojo.get("/api/nova/estado")["rojo"]["presupuesto"]["correos"]["usados"] == 1)
+        mon = a1.get("/api/nova/estado")["azul"]["monitor"]
+        chk("el Azul recibe un monitor con riesgo general 0-100, contadores y eventos puntuados; el Rojo no lo recibe", 0 <= mon["riesgo_general"] <= 100 and "contadores" in mon and "monitor" not in str(rojo.get("/api/nova/estado").get("azul")))
+        chk("antes de terminar el resumen completo no lo pide un jugador (409) pero sí el administrador", rojo.get("/api/nova/resumen").status == 409 and adm.get("/api/nova/resumen").status == 200)
+        acc(rojo, "request_elevation", motivo="Necesito la base completa")
+        apx = next(x for x in a1.get("/api/nova/estado")["azul"]["aprobaciones"] if x["operacion"] == "db_export")
+        acc(a1, "approve_request", approval_id=apx["id"])
+        acc(rojo, "export_database")
+        rs = rojo.get("/api/nova/resumen")
+        chk("al terminar, el resumen trae resultado, práctica, línea de tiempo con fuentes y errores defensivos (aprobó una solicitud de alto riesgo)", rs.status == 200 and rs["resultado"]["resultado"] == "VICTORIA_ROJA" and rs["practica"] is True
+            and {x["fuente"] for x in rs["linea_tiempo"]} & {"jugador", "motor"} and any("alto riesgo" in x for x in rs["errores_defensivos"]))
+        chk("la vista de espectador del resumen no incluye valores de credenciales", "12345A" not in str(esp.get("/api/nova/resumen")) and esp.get("/api/nova/resumen").status == 200)
+        chk("una dificultad de NPC inválida se rechaza (400)", adm.post("/api/nova/partida", {"npc_dificultad": "imposible"}).status in (400, 409))
         chk("la API sigue sana tras todo el flujo", salud.status == 200)
     print(f"Total {sum(R)}/{len(R)}")
     return all(R)

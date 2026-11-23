@@ -108,3 +108,10 @@ MODALIDADES = {
     "BLUE_ADVANTAGE": {"guess_attempts_per_round": 2, "guess_cooldown_s": 30, "guess_lockout_after_fails": 2, "detect_prob_fail": 0.9, "click_delay_s": 45, "scans_per_round": 1, "approval_ttl_s": 150,
                        "alertas_con_detalle": True},
 }
+
+
+# Comportamiento de los empleados NPC (sin jugador): probabilidad BASE de pulsar un enlace malicioso por dificultad y ajuste por preparación del empleado.
+NPC_DIFICULTAD = {"facil": 0.80, "normal": 0.55, "dificil": 0.25}
+NPC_PREPARACION = {"EMP-01": 0.0, "EMP-02": 0.0, "EMP-03": -0.10, "EMP-04": 0.15, "EMP-05": -0.05, "EMP-06": -0.15}   # + = más confiado, − = más cuidadoso
+PALABRAS_PRESION = ("urgente", "inmediat", "verifica", "contraseña", "confirma", "suspend")
+PRACTICA = {"duration_s": 300, "round_s": 30, "click_delay_s": 8, "npc_dificultad": "facil", "approval_ttl_s": 120, "emails_per_round": 5, "scans_per_round": 3, "guess_cooldown_s": 8}

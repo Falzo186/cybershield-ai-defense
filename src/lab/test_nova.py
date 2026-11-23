@@ -24,6 +24,7 @@ def lanza(fn, motivo=None):
 
 
 def nueva(azules=4, **cfg):
+    cfg.setdefault("click_prob_unconnected", 1.0)       # determinista salvo en las pruebas del comportamiento NPC (se pasa None)
     m = NovaPartida(config=cfg, secretos=SEC)
     m.abrir_sala()
     m.unirse("Rojo1", "RED")
@@ -216,15 +217,66 @@ def main():
     me = nueva(azules=2)
     exponer(me, "EMP-03")
     ex = rojo(me, "extract_table", identidad_id="EMP-03", tabla="empleados")
-    chk("extraer la tabla protegida empleados expone las demás credenciales (cascada del escenario) y alerta crítica", ex["ok"] and all(me.creds[i]["estado"] == "COMPROMETIDA" for i in me.creds)
+    chk("extraer empleados identifica a todos y expone SOLO la cuenta con credencial débil (EMP-04): no hay cascada de secretos", ex["ok"] and all(v != "DESCONOCIDA" for v in me.rojo_estado.values())
+        and me.creds["EMP-04"]["estado"] == "COMPROMETIDA" and me.creds["EMP-05"]["estado"] == "PROTEGIDA" and me.creds["EMP-01"]["estado"] == "PROTEGIDA"
         and any(a["severidad"] == "CRITICA" for a in me.alertas.values()))
+    chk("la tabla empleados extraída no contiene secretos de autenticación", all(f["credencial_ficticia"] == "[protegida]" for f in me.extraido["empleados"]))
     for iid, tabla in (("EMP-01", "ventas"), ("EMP-01", "detalle_venta"), ("EMP-01", "clientes"), ("EMP-02", "compras"), ("EMP-04", "productos"), ("EMP-04", "inventario"), ("EMP-05", "reportes_financieros")):
+        exponer(me, iid)
         rojo(me, "extract_table", identidad_id=iid, tabla=tabla)
     chk("camino alternativo W2: extraer las 8 tablas una a una con sus credenciales da VICTORIA_ROJA", me.resultado and me.resultado["resultado"] == "VICTORIA_ROJA" and len(me.extraido) >= 1)
     mw = nueva(win={"modo": "any_of", "reglas": ["W2"], "w1_tabla": "reportes_financieros", "w1_identidades": [], "w3_umbral_registros": 50})
     exponer(mw, "EMP-05")
     rojo(mw, "extract_table", identidad_id="EMP-05", tabla="reportes_financieros")
     chk("las condiciones de victoria son configurables: sin W1 extraer solo reportes_financieros no gana", mw.resultado is None)
+
+    # ── NPC por dificultad, sospecha del Azul y resumen ─────────────────────────────────────────────
+    def cae_porcentaje(dif, plantilla, iid, intentos=40, **cfg):
+        n = 0
+        for k in range(intentos):
+            mm = nueva(azules=1, click_prob_unconnected=None, npc_dificultad=dif, seed=k, emails_per_round=99, **cfg)
+            rojo(mm, "send_email", identidad_id=iid, plantilla=plantilla)
+            mm.avanzar(mm.config["click_delay_s"] + 2)
+            n += any(e["type"] == "link.clicked" for e in mm.eventos_lista)
+        return n / intentos
+    f, nrm, d = cae_porcentaje("facil", "aviso_soporte", "EMP-02"), cae_porcentaje("normal", "aviso_soporte", "EMP-02"), cae_porcentaje("dificil", "aviso_soporte", "EMP-02")
+    chk("los NPC dependen de la dificultad: fácil > normal > difícil y ninguno cae siempre ni nunca (%.2f / %.2f / %.2f)" % (f, nrm, d), f > nrm > d and 0 < d and f < 1)
+    chk("el correo de reporte financiero engaña más a Finanzas que a Dirección", cae_porcentaje("normal", "reporte_urgente", "EMP-05") > cae_porcentaje("normal", "reporte_urgente", "EMP-06"))
+    mn = nueva(azules=1, click_prob_unconnected=None)
+    rojo(mn, "send_email", identidad_id="EMP-02", plantilla="aviso_soporte")
+    mn.avanzar(mn.config["click_delay_s"] + 2)
+    dec = [e for e in mn.eventos_lista if e["type"] == "npc.decision"]
+    chk("cada decisión de un NPC queda registrada con su probabilidad y sus factores, visible para Azul y admin pero NO para el Rojo", dec and dec[0]["data"]["factores"] and "RED" not in dec[0]["visibility"]
+        and not any(e["type"] == "npc.decision" for e in mn.eventos("RED")))
+    mr = nueva(azules=1, click_prob_unconnected=1.0)
+    rojo(mr, "send_email", identidad_id="EMP-02", plantilla="aviso_soporte")
+    em_id = next(iter(mr.emails))
+    mr.emails[em_id]["reportado"] = True
+    mr.avanzar(mr.config["click_delay_s"] + 2)
+    chk("un correo reportado por el Azul antes de que el NPC lo lea ya no engaña (email.ignored)", any(e["type"] == "email.ignored" for e in mr.eventos_lista) and mr.creds["EMP-02"]["estado"] == "PROTEGIDA")
+    ma = nueva(click_prob_unconnected=None)
+    pa = ma._prob_clic(ma.links[next(iter(ma.links))]) if ma.links else None
+    rojo(ma, "send_email", identidad_id="EMP-01", plantilla="aviso_soporte")
+    lk = next(v for v in ma.links.values() if v["para"] == "EMP-01")
+    p0 = ma._prob_clic(lk)[0]
+    ma.npc_alertas = 3
+    chk("cada correo reportado o enlace neutralizado por el Azul baja la probabilidad de que los NPC piquen", ma._prob_clic(lk)[0] < p0)
+    ms = nueva(azules=1)
+    rojo(ms, "send_email", identidad_id="EMP-01", plantilla="aviso_soporte")
+    mon = ms.vista_azul("Azul1")["monitor"]
+    ce = [x for x in mon["eventos"] if x["tipo"] == "email.received"]
+    chk("el monitor Azul puntúa un correo externo con enlace y presión (0-100) con motivos, sin usar el campo secreto «malicioso»", ce and 50 <= ce[0]["puntuacion"] <= 100 and "remitente" in ce[0]["motivo"] and mon["metodo"].startswith("reglas"))
+    ms.avanzar(2)
+    ex = nueva(azules=1)
+    rojo(ex, "request_elevation", motivo="Necesito la base")
+    mon2 = ex.vista_azul("Azul1")["monitor"] if "Azul1" in ex.participantes else {"eventos": []}
+    ap = next(iter(ex.aprobaciones.values()))
+    sc, mot = ex.sospecha_aprobacion(ap)
+    chk("la solicitud de elevación del Rojo puntúa alto (≥ 70) y explica por qué", sc >= 70 and any("copia completa" in x for x in mot))
+    chk("el monitor funciona sin Ollama ni IA (es determinista): mismo estado → misma puntuación", ms.monitor_azul() == ms.monitor_azul())
+    rs = ms.resumen("ADMIN")
+    chk("el resumen final trae objetivos, operaciones, credenciales, recursos protegidos y una línea de tiempo con fuentes separadas", {"objetivos", "operaciones", "linea_tiempo", "recursos_protegidos", "credenciales_comprometidas"} <= set(rs)
+        and any(x["fuente"] in ("jugador", "motor", "npc") for x in rs["linea_tiempo"]))
 
     # ── aprobaciones / elevación ─────────────────────────────────────────────────────────────────────
     m = nueva()
